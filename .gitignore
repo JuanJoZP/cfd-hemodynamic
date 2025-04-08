@@ -3,3 +3,6 @@
 *.bp
 *.pvsm
 *.avi
+
+# carpetas con nombre tipo fecha (e.g., "2025-04-12")
+*/????-??-??/*
