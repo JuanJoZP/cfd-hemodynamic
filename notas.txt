@@ -1,1 +1,0 @@
-arreglar la confusion de u_star y u_sol
