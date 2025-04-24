@@ -3,6 +3,7 @@
 *.bp
 *.pvsm
 *.avi
+__pycache__
 
 # carpetas con nombre tipo fecha (e.g., "2025-04-12")
 [0-9][0-9][0-9][0-9]?**/
