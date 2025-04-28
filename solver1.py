@@ -9,6 +9,9 @@ from dolfinx.fem import form, DirichletBC, Constant, Function, functionspace
 from dolfinx.fem.petsc import assemble_matrix, assemble_vector, apply_lifting, create_vector, set_bc
 from ufl import FacetNormal, dx, ds, dot, inner, sym, nabla_grad, Identity, lhs, rhs, div, TrialFunction, TestFunction
 
+def initial_velocity_zero(x):
+    values = np.zeros((domain.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
+    return values
 
 class SolverIPCS():
     def __init__(self,
@@ -17,7 +20,7 @@ class SolverIPCS():
                  rho: float,
                  mu: float,
                  f: list,
-                 initial_velocity: Callable[[np.ndarray], np.ndarray]
+                 initial_velocity: Callable[[np.ndarray], np.ndarray] = None
                 ):
         self.domain = domain
         self.dt = Constant(domain, PETSc.ScalarType(dt))
@@ -42,7 +45,9 @@ class SolverIPCS():
         self.p_prev = Function(self.pressure_space)
         
         # condiciones iniciales
-        self.u_prev.interpolate(initial_velocity)
+        if initial_velocity:
+            self.u_prev.interpolate(initial_velocity)
+            self.u_sol.interpolate(initial_velocity)
 
         # forma variacional
         u_midpoint = 0.5*(self.u_prev + u)
@@ -67,7 +72,11 @@ class SolverIPCS():
         self.a3 = form(lhs(F3))
         self.L3 = form(rhs(F3))
 
+    def initial_velocity_zero(self, x):
+        values = lambda x:np.zeros((self, domain.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
+        return values
 
+    
     def assembleTimeIndependent(self, bcu: list[DirichletBC], bcp: list[DirichletBC]):
         self.A1 = assemble_matrix(self.a1, bcs=bcu)
         self.A1.assemble()
