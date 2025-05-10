@@ -1,3 +1,5 @@
+# IPCS con método del punto medio y linealización del término convectivo mediante la solución en el paso anterior
+
 from typing import Callable
 
 from petsc4py import PETSc
@@ -9,9 +11,6 @@ from dolfinx.fem import form, DirichletBC, Constant, Function, functionspace
 from dolfinx.fem.petsc import assemble_matrix, assemble_vector, apply_lifting, create_vector, set_bc
 from ufl import FacetNormal, dx, ds, dot, inner, sym, nabla_grad, Identity, lhs, rhs, div, TrialFunction, TestFunction
 
-def initial_velocity_zero(x):
-    values = np.zeros((domain.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
-    return values
 
 class SolverIPCS():
     def __init__(self,
@@ -71,10 +70,6 @@ class SolverIPCS():
         F3 += self.dt*dot(nabla_grad(self.p_sol - self.p_prev), v)*dx
         self.a3 = form(lhs(F3))
         self.L3 = form(rhs(F3))
-
-    def initial_velocity_zero(self, x):
-        values = lambda x:np.zeros((self, domain.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
-        return values
 
     
     def assembleTimeIndependent(self, bcu: list[DirichletBC], bcp: list[DirichletBC]):
