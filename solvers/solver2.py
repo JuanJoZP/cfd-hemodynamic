@@ -8,8 +8,8 @@ import numpy as np
 from basix.ufl import element
 from dolfinx.mesh import Mesh
 from dolfinx.fem import form, DirichletBC, Constant, Function, functionspace
-from dolfinx.fem.petsc import assemble_matrix, assemble_vector, apply_lifting, create_vector, set_bc
-from ufl import FacetNormal, dx, ds, dot, inner, sym, nabla_grad, Identity, lhs, rhs, div, TrialFunction, TestFunction
+from dolfinx.fem.petsc import assemble_matrix, assemble_vector, apply_lifting, create_vector, create_matrix, set_bc
+from ufl import FacetNormal, dx, ds, dot, inner, sym, nabla_grad, Identity, lhs, rhs, div, TrialFunction, TestFunction, grad, inner
 
 
 class SolverIPCS():
@@ -50,7 +50,8 @@ class SolverIPCS():
         
         # condiciones iniciales
         if initial_velocity:
-            self.u_prev.interpolate(initial_velocity)
+            self.u_n.interpolate(initial_velocity)
+            self.u_n1.interpolate(initial_velocity)
             self.u_sol.interpolate(initial_velocity)
 
         # forma variacional
@@ -65,12 +66,12 @@ class SolverIPCS():
         self.L2 = form(-self.rho / self.dt * dot(div(self.u_star), q) * dx)
 
         self.a3 = form(self.rho * dot(u, v) * dx)
-        self.L3 = form(self.rho * dot(self.u_star, v) * dx - self.k * dot(nabla_grad(self.phi), v) * dx)
+        self.L3 = form(self.rho * dot(self.u_star, v) * dx - self.dt * dot(nabla_grad(self.phi), v) * dx)
 
     
     def assembleTimeIndependent(self, bcu: list[DirichletBC], bcp: list[DirichletBC]):
-        self.A1 = create_matrix(a1)
-        self.b1 = create_vector(L1)
+        self.A1 = create_matrix(self.a1)
+        self.b1 = create_vector(self.L1)
 
         self.A2 = assemble_matrix(self.a2, bcs=bcp)
         self.A2.assemble()
@@ -104,6 +105,7 @@ class SolverIPCS():
         # paso 1
         self.A1.zeroEntries()
         assemble_matrix(self.A1, self.a1, bcs=bcu)
+        self.A1.assemble()
         with self.b1.localForm() as loc_1:
             loc_1.set(0)
         assemble_vector(self.b1, self.L1)

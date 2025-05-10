@@ -7,7 +7,6 @@
 
 
 from dolfinx import mesh, fem, io
-import ufl
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
@@ -16,6 +15,7 @@ import numpy as np
 # In[ ]:
 
 
+solver_name = "solver2"
 T = 0.1
 num_steps = 100
 n_cells = 32
@@ -30,7 +30,7 @@ rho = 1
 # In[4]:
 
 
-# solución analitica sacada de: https://www.ljll.fr/~frey/papers/Navier-Stokes/Ethier%20C.R.,%20Steinman%20D.A.,%20Exact%20fully%203d%20Navier-Stokes%20solutions%20for%20benchmarking.pdf
+# solución analitica de: https://www.ljll.fr/~frey/papers/Navier-Stokes/Ethier%20C.R.,%20Steinman%20D.A.,%20Exact%20fully%203d%20Navier-Stokes%20solutions%20for%20benchmarking.pdf
 a = np.pi/4
 d = np.pi/2
 
@@ -54,8 +54,9 @@ P_sol_analytic = fem.Function(pressure_function_space)
 
 import sys
 import os
+from importlib import import_module
 sys.path.append(os.path.dirname(os.getcwd()))
-from solver1 import SolverIPCS
+SolverIPCS = getattr(import_module(f"solvers.{solver_name}"), "SolverIPCS")
 
 solver = SolverIPCS(domain, dt, rho, mu, f, lambda x: u_analytic(*x, 0))
 
@@ -129,10 +130,10 @@ t = 0
 i = 0
 progress = tqdm(desc="Resolviendo navier-stokes", total=num_steps) if domain.comm.rank == 0 else None
 error_log = open(f"{folder}/error.txt", "w") if domain.comm.rank == 0 else None
-folder = datetime.now(tz=timezone(-timedelta(hours=5))).isoformat(timespec='seconds') if domain.comm.rank == 0 else None
-folder = domain.comm.bcast(folder, root=0)
-u_file = io.VTXWriter(domain.comm, f"{folder}/velocity.bp", solver.u_sol)
-p_file = io.VTXWriter(domain.comm, f"{folder}/pressure.bp", solver.p_sol)
+date = datetime.now(tz=timezone(-timedelta(hours=5))).isoformat(timespec='seconds') if domain.comm.rank == 0 else None
+date = domain.comm.bcast(folder, root=0)
+u_file = io.VTXWriter(domain.comm, f"{solver_name}/{date}/velocity.bp", solver.u_sol)
+p_file = io.VTXWriter(domain.comm, f"{solver_name}/{date}/pressure.bp", solver.p_sol)
 u_file.write(t)
 p_file.write(t)
 
