@@ -2,30 +2,29 @@ from src.simulation import Simulation
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
-from dolfinx.mesh import create_unit_square, locate_entities_boundary
-from dolfinx.fem import (
-    dirichletbc,
-    locate_dofs_topological,
-    Constant,
-)
+from dolfinx.mesh import create_unit_square, locate_entities_boundary, Mesh
+from dolfinx.fem import dirichletbc, locate_dofs_topological, Constant, DirichletBC
 
 
-n_cells = 32
 solver_name = "solver1"
 simulation_name = "unit_square"
+n_cells = 32
 rho = 1
 mu = 1
 dt = 1 / 200
 T = 5
 
+
 class UnitSquareSimulation(Simulation):
     def __init__(
         self, solver_name, rho=1, mu=1, dt=1 / 100, T=5, f: tuple[float, float] = (0, 0)
     ):
-        self._mesh = None
-        self._bcu = None
-        self._bcp = None
+        self._mesh: Mesh = None
+        self._bcu: list[DirichletBC] = None
+        self._bcp: list[DirichletBC] = None
         super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
+
+        self.setup()
 
     @property
     def mesh(self):
@@ -96,4 +95,5 @@ class UnitSquareSimulation(Simulation):
 
 
 simulation = UnitSquareSimulation(solver_name, rho, mu, dt, T)
-simulation.solve()
+results_path = simulation.solve()
+print(f"Resultados guardados en: {results_path}")
