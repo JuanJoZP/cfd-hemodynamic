@@ -2,8 +2,9 @@ from importlib import import_module
 from abc import ABC, abstractmethod
 from typing import Callable
 
-from src.solverBase import SolverBase
+import os
 import numpy as np
+from src.solverBase import SolverBase
 from datetime import datetime, timezone, timedelta
 from mpi4py import MPI
 from ufl import inner, dx
@@ -36,7 +37,14 @@ class Simulation(ABC):
         pass
 
     def __init__(
-        self, solver_name: str, simulation_name: str, rho: float, mu: float, dt: float, T: float, f: list
+        self,
+        solver_name: str,
+        simulation_name: str,
+        rho: float,
+        mu: float,
+        dt: float,
+        T: float,
+        f: list,
     ):
         self.solver_name = solver_name
         self.solverClass: type[SolverBase] = getattr(
@@ -52,9 +60,11 @@ class Simulation(ABC):
         self.dt = dt
         self.simulation_name = simulation_name
 
+    def setup(self):
         self.solver.assembleTimeIndependent(self.bcu, self.bcp)
 
-    def solve(self) -> None:
+    def solve(self, afterStepCallback: Callable[[float], None] = None) -> str:
+        """Returns the path to the results directory."""
         tqdm = self.get_tqdm()
         mesh = self.mesh
         num_steps = self.num_steps
@@ -80,11 +90,11 @@ class Simulation(ABC):
         u_file.write(t)
         p_file.write(t)
 
-        error_log = (
-            open(f"{parent_route}/err.txt", "w") if mesh.comm.rank == 0 else None
-        )
-
+        error_log = None
         if self.has_exact_solution:
+            error_log = (
+                open(f"{parent_route}/err.txt", "w") if mesh.comm.rank == 0 else None
+            )
             u_e = Function(solver.V)
             u_e.interpolate(lambda x: self.exact_velocity(t)(x))
             error = self.compute_error(solver.u_sol, u_e, mesh)
@@ -108,12 +118,17 @@ class Simulation(ABC):
             u_file.write(t)
             p_file.write(t)
 
+            if afterStepCallback:
+                afterStepCallback(t)
+
         u_file.close()
         p_file.close()
         if error_log:
             error_log.close()
         if progress:
             progress.close()
+
+        return os.path.abspath(parent_route)
 
     @staticmethod
     def get_tqdm():
