@@ -91,9 +91,7 @@ class LidDriven2DSimulation(Simulation):
         )
 
     def save_benchmark_plot(self, results_path):
-        data = pd.read_csv(
-            f"src/benchmark_data/lid_driven2D/plot_u_y_Ghia{self.Re}.csv"
-        )
+        data = pd.read_csv(f"src/benchmark_data/lid_driven2D/plot_u_y_Ghia{self.Re}.csv")
         points = np.column_stack(
             (
                 np.array((0.5,) * data["y"].size, dtype=np.float64),

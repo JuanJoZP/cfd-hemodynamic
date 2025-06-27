@@ -45,12 +45,15 @@ class Simulation(ABC):
         dt: float,
         T: float,
         f: list,
+        h: list = None,
     ):
         self.solver_name = solver_name
         self.solverClass: type[SolverBase] = getattr(
             import_module(f"src.solvers.{solver_name}"), "Solver"
         )
-        self.solver = self.solverClass(self.mesh, dt, rho, mu, f, self.initial_velocity)
+        self.solver = self.solverClass(
+            self.mesh, dt, rho, mu, f, h=h, initial_velocity=self.initial_velocity
+        )
 
         self.num_steps = int(T / dt)
         self.has_exact_solution = (
@@ -152,9 +155,7 @@ class Simulation(ABC):
         """Compute the L2 relative error between u and u_aprox."""
 
         error_form = form(inner(u_aprox - u, u_aprox - u) * dx)
-        error_abs = np.sqrt(
-            mesh.comm.allreduce(assemble_scalar(error_form), op=MPI.SUM)
-        )
+        error_abs = np.sqrt(mesh.comm.allreduce(assemble_scalar(error_form), op=MPI.SUM))
         norm_form = form(inner(u, u) * dx)
         norm = np.sqrt(mesh.comm.allreduce(assemble_scalar(norm_form), op=MPI.SUM))
         return error_abs / norm

@@ -40,6 +40,7 @@ class Solver(SolverBase):
         rho: float,
         mu: float,
         f: list,
+        h: list = None,
         initial_velocity: Callable[[np.ndarray], np.ndarray] = None,
     ):
         self.mesh = mesh
@@ -77,9 +78,7 @@ class Solver(SolverBase):
         F1 = self.rho * dot((u - self.u_prev) / self.dt, v) * dx
         F1 += self.rho * dot(dot(self.u_prev, nabla_grad(self.u_prev)), v) * dx
         F1 += inner(self.sigma(u_midpoint, self.p_prev, self.mu), self.epsilon(v)) * dx
-        F1 += (
-            dot(self.p_prev * n, v) * ds - dot(mu * nabla_grad(u_midpoint) * n, v) * ds
-        )
+        F1 += dot(self.p_prev * n, v) * ds - dot(mu * nabla_grad(u_midpoint) * n, v) * ds
         F1 -= dot(self.f, v) * dx
         self.a1 = form(lhs(F1))
         self.L1 = form(rhs(F1))
