@@ -45,6 +45,7 @@ class Solver(SolverBase):
         rho: float,
         mu: float,
         f: list,
+        h: list = None,
         initial_velocity: Callable[[np.ndarray], np.ndarray] = None,
     ):
         self.mesh = mesh
