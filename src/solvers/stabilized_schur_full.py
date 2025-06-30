@@ -90,20 +90,21 @@ class Solver(SolverBase):
         u_sol = self.u_sol
         p_sol = self.p_sol
         u_prev = self.u_prev
+        u_mid = 0.5 * (u_sol + u_prev)
 
         F = self.rho * inner(v, (u_sol - u_prev) / self.dt) * dx
-        F += self.rho * dot(v, dot(self.u_sol, nabla_grad(u_sol))) * dx
+        F += self.rho * dot(v, dot(u_mid, nabla_grad(u_mid))) * dx
         F -= inner(v, self.rho * self.f) * dx
-        F += inner(self.epsilon(v), self.sigma(u_sol, p_sol, self.mu)) * dx
+        F += inner(self.epsilon(v), self.sigma(u_mid, p_sol, self.mu)) * dx
         F -= inner(v, self.h) * ds
-        F += inner(q, div(u_sol)) * dx
+        F += inner(q, div(u_mid)) * dx
 
         # stabilization terms
         h = CellDiameter(mesh)
-        vnorm = sqrt(inner(u_sol, u_sol))
+        vnorm = sqrt(inner(u_mid, u_mid))
 
-        R = self.rho * ((u_sol - u_prev) / self.dt + dot(u_sol, nabla_grad(u_sol)))
-        R -= div(self.sigma(u_sol, p_sol, self.mu))
+        R = self.rho * ((u_sol - u_prev) / self.dt + dot(u_mid, nabla_grad(u_mid)))
+        R -= div(self.sigma(u_mid, p_sol, self.mu))
         R -= self.rho * self.f
 
         # SUPG
@@ -113,7 +114,7 @@ class Solver(SolverBase):
         tau_supg = (
             1 / (tau_supg1**2) + 1 / (tau_supg2**2) + 1 / (tau_supg3**2)
         ) ** (-1 / 2)
-        F_supg = inner(tau_supg * R, dot(u_sol, nabla_grad(v))) * dx
+        F_supg = inner(tau_supg * R, dot(u_mid, nabla_grad(v))) * dx
 
         # PSPG
         tau_pspg = tau_supg
@@ -123,7 +124,7 @@ class Solver(SolverBase):
         Re = (vnorm * h) / (2.0 * (self.mu / self.rho))
         z = conditional(le(Re, 3), Re / 3, 1.0)
         tau_lsic = (vnorm * h * z) / 2.0
-        F_lsic = tau_lsic * inner(div(u_sol), self.rho * div(v)) * dx
+        F_lsic = tau_lsic * inner(div(u_mid), self.rho * div(v)) * dx
 
         F += F_supg + F_lsic
         F += F_pspg
