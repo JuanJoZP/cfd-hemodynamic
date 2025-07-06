@@ -15,6 +15,7 @@ from dolfinx.fem import (
     form,
 )
 from ufl import (
+    FacetNormal,
     MixedFunctionSpace,
     TrialFunctions,
     derivative,
@@ -39,6 +40,8 @@ from dolfinx.fem.petsc import (
     assemble_vector_block,
 )
 
+from src.solvers.stokes import StokesSolver
+from src.boundaryCondition import BoundaryCondition
 from src.solverBase import SolverBase
 
 
@@ -60,7 +63,7 @@ class Solver(SolverBase):
         self.rho = Constant(mesh, PETSc.ScalarType(rho))
         self.mu = Constant(mesh, PETSc.ScalarType(mu))
         self.f = Constant(mesh, PETSc.ScalarType(f))
-        if h is None:
+        if h == None:
             self.h = Constant(mesh, PETSc.ScalarType([0.0] * mesh.geometry.dim))
         else:
             self.h = Constant(mesh, PETSc.ScalarType(h))
@@ -79,7 +82,8 @@ class Solver(SolverBase):
 
         v, q = TestFunctions(self.VQ)
 
-        self.u_sol, self.p_sol = Function(self.V), Function(self.Q)
+        self.u_sol: Function = Function(self.V)
+        self.p_sol: Function = Function(self.Q)
         self.u_prev, self.p_prev = Function(self.V), Function(self.Q)
 
         if initial_velocity:
@@ -91,12 +95,15 @@ class Solver(SolverBase):
         p_sol = self.p_sol
         u_prev = self.u_prev
         u_mid = 0.5 * (u_sol + u_prev)
+        n = FacetNormal(self.mesh)
 
         F = self.rho * inner(v, (u_sol - u_prev) / self.dt) * dx
         F += self.rho * dot(v, dot(u_mid, nabla_grad(u_mid))) * dx
         F -= inner(v, self.rho * self.f) * dx
         F += inner(self.epsilon(v), self.sigma(u_mid, p_sol, self.mu)) * dx
-        F -= inner(v, self.h) * ds
+        # F -= inner(v, self.h) * ds
+        # probar p_prev en vez de p_sol
+        F += dot(p_sol * n, v) * ds - dot(mu * nabla_grad(u_mid) * n, v) * ds
         F += inner(q, div(u_mid)) * dx
 
         # stabilization terms
@@ -158,7 +165,7 @@ class Solver(SolverBase):
         )
 
     def assembleTimeIndependent(
-        self, bcu: list[DirichletBC], bcp: list[DirichletBC]
+        self, bcu: list[BoundaryCondition], bcp: list[BoundaryCondition]
     ) -> None:
         # create linealizated problem
         du, dp = TrialFunctions(self.VQ)
@@ -175,14 +182,21 @@ class Solver(SolverBase):
             self.V.dofmap.index_map.size_local * self.V.dofmap.index_map_bs
         )  # after this index values of x correspond to pressure, before to velocity
 
-        # !!!!!
-        # solve x_0 the initial guess in the first timestep
-        # self.x_0 = self.b.duplicate()
-        # self.x0.set ...
-        # then make u_sol, p_sol = x_0 so it is assembled in the first iteration
+        # initial guess for the first iteration
+        stokes_solver = StokesSolver(self.mesh, self.rho, self.mu, self.f)
+        bcu_stokes = [bc.getBC(stokes_solver.V) for bc in bcu]
+        bcp_stokes = [bc.getBC(stokes_solver.Q) for bc in bcp]
+        stokes_solver.solve([*bcu_stokes, *bcp_stokes])
 
-        self.assembleJacobian([*bcu, *bcp])
-        self.assembleResidual([*bcu, *bcp])
+        self.u_sol.interpolate(stokes_solver.u_sol)
+        self.u_prev.interpolate(stokes_solver.u_sol)
+        self.p_sol.interpolate(stokes_solver.p_sol)
+        self.p_prev.interpolate(stokes_solver.p_sol)
+
+        bcu_d = [bc.getBC(self.V) for bc in bcu]
+        bcp_d = [bc.getBC(self.Q) for bc in bcp]
+        self.assembleJacobian([*bcu_d, *bcp_d])
+        self.assembleResidual([*bcu_d, *bcp_d])
 
         # gmres global solver with field split preconditioner
         ksp = PETSc.KSP().create(self.mesh.comm)
@@ -204,26 +218,48 @@ class Solver(SolverBase):
         is_p = IS().createStride(p_size, u_size, 1, self.mesh.comm)
         pc.setFieldSplitIS(("u", is_u), ("p", is_p))
 
+        # create pressure null space
+        with self.A.createVecs()[0].localForm() as vec_const:
+            vec_const.set(0.0)  # 0 on u part
+
+            start, end = is_p.getIndices()[0], is_p.getIndices()[-1] + 1
+            vec_const.array[start:end] = 1.0  # 1 on p part (constant)
+            vec_const.assemble()
+
+            norm = vec_const.norm(PETSc.NormType.NORM_2)
+            vec_const.scale(1.0 / norm)  # normalize
+
+            self.nullsp = PETSc.NullSpace().create(
+                vectors=[vec_const], comm=self.mesh.comm
+            )
+
+        if self.nullsp.test(self.A):
+            self.A.setNullSpace(self.nullsp)
+
         # solve the schur block with gmres and the pressure block with cg
         pc.setUp()
         ksp_u, ksp_p = pc.getFieldSplitSchurGetSubKSP()
-        ksp_u.setType("gmres")
-        ksp_u.getPC().setType("ilu")
-        ksp_p.setType("cg")
-        ksp_p.getPC().setType("hypre")
+        ksp_u.setType("preonly")
+        ksp_u.getPC().setType("lu")
+        ksp_p.setType("preonly")
+        ksp_p.getPC().setType("lu")
+        ksp.setFromOptions()
         self.solver = ksp
 
     def solveIteration(self, bcu: list[DirichletBC], bcp: list[DirichletBC]) -> float:
         "Solve one newton iteration with the current bcs. It assumes that the previous guess (or initial guess) is the one in u_sol and p_sol."
+        bcu = [bc.getBC(self.V) for bc in bcu]
+        bcp = [bc.getBC(self.Q) for bc in bcp]
         self.assembleJacobian(bcs=[*bcu, *bcp])
         self.assembleResidual(bcs=[*bcu, *bcp])
 
-        solver = self.solver
-        solver.setOperators(self.A)
-        solver.solve(self.b, self.x_n)  # use x_n by now as dx
+        self.solver.setOperators(self.A)
+        if self.A.getNullSpace() is not None:
+            self.nullsp.remove(self.b)
+        self.solver.solve(self.b, self.x_n)  # use x_n by now as dx
 
-        x_u_array = self.x_n.array_r[: self.offset]
-        x_p_array = self.x_n.array_r[self.offset :]
+        x_u_array = self.x_n.array[: self.offset]
+        x_p_array = self.x_n.array[self.offset :]
 
         self.u_sol.x.array[:] -= x_u_array
         self.p_sol.x.array[:] -= x_p_array
@@ -233,22 +269,21 @@ class Solver(SolverBase):
         return self.x_n.norm()
 
     def solveStep(self, bcu: list[DirichletBC], bcp: list[DirichletBC]):
-        # get x0 for this t: interpolation or oseen
-        # self.x0.set ...
-        # then set u_sol, p_sol to x0
         norm_dx = self.solveIteration(bcu, bcp)
+        print(f"Iteration 0: |dx| = {norm_dx:.3e}")
 
         it = 1
         if norm_dx >= 1e-8:
             while it <= self.MAX_ITER:
                 norm_dx = self.solveIteration(bcu, bcp)
+                print(f"Iteration {it}: |dx| = {norm_dx:.3e}")
                 if norm_dx < 1e-8:
                     break
 
                 it += 1
 
         if norm_dx < 1e-8:
-            print(f"Converged after {it} iterations. |dx| = {norm_dx:.3e}")
+            print(f"Converged after {it+1} iterations. |dx| = {norm_dx:.3e}")
 
             self.u_prev.x.array[:] = self.u_sol.x.array[:]
             self.p_prev.x.array[:] = self.p_sol.x.array[:]
