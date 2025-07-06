@@ -6,15 +6,16 @@ from matplotlib import pyplot as plt
 from src.simulation import Simulation
 from dolfinx.geometry import bb_tree, compute_collisions_points, compute_colliding_cells
 from dolfinx.mesh import create_unit_square, locate_entities_boundary, Mesh
-from dolfinx.fem import dirichletbc, locate_dofs_topological, Constant, DirichletBC
+from dolfinx.fem import Function
 
+from src.boundaryCondition import BoundaryCondition
 
-solver_name = "solver2"
+solver_name = "stabilized_schur_full"
 simulation_name = "lid_driven2D"
 n_cells = 50
 rho = 1
 T = 10
-dt = 1 / 100
+dt = 1 / 200
 
 
 class LidDriven2DSimulation(Simulation):
@@ -22,8 +23,8 @@ class LidDriven2DSimulation(Simulation):
         self, solver_name, rho=1, mu=1, dt=1 / 100, T=5, f: tuple[float, float] = (0, 0)
     ):
         self._mesh: Mesh = None
-        self._bcu: list[DirichletBC] = None
-        self._bcp: list[DirichletBC] = None
+        self._bcu: list[BoundaryCondition] = None
+        self._bcp: list[BoundaryCondition] = None
         self.Re = str(int(1 / mu))
         super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
 
@@ -39,18 +40,21 @@ class LidDriven2DSimulation(Simulation):
     @property
     def bcu(self):
         if not self._bcu:
+            u_noslip = Function(self.solver.V)
+            u_noslip.x.array[:] = 0
             fdim = self.mesh.topology.dim - 1
             walls_facets = locate_entities_boundary(self.mesh, fdim, self.walls)
-            dofs_walls = locate_dofs_topological(self.solver.V, fdim, walls_facets)
-            bc_noslip = dirichletbc(
-                Constant(self.mesh, PETSc.ScalarType((0, 0))), dofs_walls, self.solver.V
-            )
+            bc_noslip = BoundaryCondition(u_noslip)
+            bc_noslip.initTopological(fdim, walls_facets)
 
-            lid_facets = locate_entities_boundary(self.mesh, fdim, self.lid)
-            dofs_lid = locate_dofs_topological(self.solver.V, fdim, lid_facets)
-            bc_lid = dirichletbc(
-                Constant(self.mesh, PETSc.ScalarType((1, 0))), dofs_lid, self.solver.V
+            u_lid = Function(self.solver.V)
+            u_lid.interpolate(
+                lambda x: np.vstack((np.ones(x.shape[1]), np.zeros(x.shape[1])))
             )
+            lid_facets = locate_entities_boundary(self.mesh, fdim, self.lid)
+            bc_lid = BoundaryCondition(u_lid)
+            bc_lid.initTopological(fdim, lid_facets)
+
             self._bcu = [bc_noslip, bc_lid]
 
         return self._bcu
@@ -58,15 +62,7 @@ class LidDriven2DSimulation(Simulation):
     @property
     def bcp(self):
         if not self._bcp:
-            fdim = self.mesh.topology.dim - 1
-            corner_facets = locate_entities_boundary(self.mesh, fdim, self.corner)
-            dofs_corner = locate_dofs_topological(self.solver.Q, fdim, corner_facets)
-            bc_pfix = dirichletbc(
-                Constant(self.mesh, PETSc.ScalarType(0)),
-                dofs_corner,
-                self.solver.Q,
-            )
-            self._bcp = [bc_pfix]
+            self._bcp = []
 
         return self._bcp
 

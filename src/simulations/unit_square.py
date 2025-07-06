@@ -3,13 +3,9 @@ from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
 from dolfinx.mesh import create_unit_square, locate_entities_boundary, Mesh
-from dolfinx.fem import (
-    dirichletbc,
-    locate_dofs_topological,
-    Constant,
-    DirichletBC,
-    Function,
-)
+from dolfinx.fem import Function
+
+from src.boundaryCondition import BoundaryCondition
 
 
 solver_name = "stabilized_schur_full"
@@ -26,8 +22,8 @@ class UnitSquareSimulation(Simulation):
         self, solver_name, rho=1, mu=1, dt=1 / 100, T=5, f: tuple[float, float] = (0, 0)
     ):
         self._mesh: Mesh = None
-        self._bcu: list[DirichletBC] = None
-        self._bcp: list[DirichletBC] = None
+        self._bcu: list[BoundaryCondition] = None
+        self._bcp: list[BoundaryCondition] = None
         super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
 
         self.setup()
@@ -46,14 +42,14 @@ class UnitSquareSimulation(Simulation):
             uD.x.array[:] = 0
             fdim = self.mesh.topology.dim - 1
             walls_facets = locate_entities_boundary(self.mesh, fdim, self.walls)
-            dofs_walls = locate_dofs_topological(self.solver.V, fdim, walls_facets)
-            bc_noslip = dirichletbc(uD, dofs_walls)
+            bc_noslip = BoundaryCondition(uD)
+            bc_noslip.initTopological(fdim, walls_facets)
 
             ul = Function(self.solver.V)
             ul.interpolate(self.exact_velocity(0))
             inflow_facets = locate_entities_boundary(self.mesh, fdim, self.inflow)
-            dofs_inflow = locate_dofs_topological(self.solver.V, fdim, inflow_facets)
-            bc_inflow = dirichletbc(ul, dofs_inflow)
+            bc_inflow = BoundaryCondition(ul)
+            bc_inflow.initTopological(fdim, inflow_facets)
 
             self._bcu = [bc_inflow, bc_noslip]
 
@@ -66,11 +62,8 @@ class UnitSquareSimulation(Simulation):
             pr = Function(self.solver.Q)
             pr.x.array[:] = 0
             outflow_facets = locate_entities_boundary(self.mesh, fdim, self.outflow)
-            dofs_outflow = locate_dofs_topological(self.solver.Q, fdim, outflow_facets)
-            bc_outflow = dirichletbc(
-                pr,
-                dofs_outflow,
-            )
+            bc_outflow = BoundaryCondition(pr)
+            bc_outflow.initTopological(fdim, outflow_facets)
 
             self._bcp = [bc_outflow]
 

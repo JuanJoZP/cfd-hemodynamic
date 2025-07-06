@@ -6,12 +6,13 @@ from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
 from dolfinx.io import gmshio, XDMFFile
-from dolfinx.mesh import create_unit_square, locate_entities_boundary, Mesh
-from dolfinx.fem import dirichletbc, locate_dofs_topological, Function, DirichletBC
+from dolfinx.mesh import Mesh
+from dolfinx.fem import Function
 import os
 
+from src.boundaryCondition import BoundaryCondition
 
-solver_name = "solver2"
+solver_name = "stabilized_schur_full"
 simulation_name = "pipe_cylinder"
 rho = 1
 mu = 1 / 1000
@@ -29,8 +30,8 @@ class PipeCylinderSimulation(Simulation):
     ):
         self._mesh: Mesh = None
         self._ft = None
-        self._bcu: list[DirichletBC] = None
-        self._bcp: list[DirichletBC] = None
+        self._bcu: list[BoundaryCondition] = None
+        self._bcp: list[BoundaryCondition] = None
         super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
 
         self.mesh.topology.create_connectivity(
@@ -59,23 +60,19 @@ class PipeCylinderSimulation(Simulation):
             fdim = self.mesh.topology.dim - 1
             u_inlet = Function(self.solver.V)
             u_inlet.interpolate(self.inlet_velocity)
-            bcu_inflow = dirichletbc(
-                u_inlet,
-                locate_dofs_topological(
-                    self.solver.V, fdim, self._ft.find(self.inlet_marker)
-                ),
-            )
+            entities_inflow = self._ft.find(self.inlet_marker)
+            bcu_inflow = BoundaryCondition(u_inlet)
+            bcu_inflow.initTopological(fdim, entities_inflow)
 
-            u_nonslip = np.array((0,) * self.mesh.geometry.dim, dtype=PETSc.ScalarType)
-            dofs_walls = locate_dofs_topological(
-                self.solver.V, fdim, self._ft.find(self.wall_marker)
-            )
-            bcu_walls = dirichletbc(u_nonslip, dofs_walls, self.solver.V)
+            u_nonslip = Function(self.solver.V)
+            u_nonslip.x.array[:] = 0
+            entities_walls = self._ft.find(self.wall_marker)
+            bcu_walls = BoundaryCondition(u_nonslip)
+            bcu_walls.initTopological(fdim, entities_walls)
 
-            dofs_obstacle = locate_dofs_topological(
-                self.solver.V, fdim, self._ft.find(self.obstacle_marker)
-            )
-            bcu_obstacle = dirichletbc(u_nonslip, dofs_obstacle, self.solver.V)
+            entities_obstacle = self._ft.find(self.obstacle_marker)
+            bcu_obstacle = BoundaryCondition(u_nonslip)
+            bcu_obstacle.initTopological(fdim, entities_obstacle)
 
             self._bcu = [bcu_inflow, bcu_obstacle, bcu_walls]
 
@@ -111,16 +108,12 @@ class PipeCylinderSimulation(Simulation):
         if mesh_comm.rank == model_rank:
             volumes = gmsh.model.getEntities(dim=gdim)
             assert len(volumes) == 1
-            gmsh.model.addPhysicalGroup(
-                volumes[0][0], [volumes[0][1]], self.fluid_marker
-            )
+            gmsh.model.addPhysicalGroup(volumes[0][0], [volumes[0][1]], self.fluid_marker)
             gmsh.model.setPhysicalName(volumes[0][0], self.fluid_marker, "Fluid")
 
             boundaries = gmsh.model.getBoundary(volumes, oriented=False)
             for boundary in boundaries:
-                center_of_mass = gmsh.model.occ.getCenterOfMass(
-                    boundary[0], boundary[1]
-                )
+                center_of_mass = gmsh.model.occ.getCenterOfMass(boundary[0], boundary[1])
                 if np.allclose(center_of_mass, [0, H / 2, 0]):
                     inflow.append(boundary[1])
                 elif np.allclose(center_of_mass, [L, H / 2, 0]):
