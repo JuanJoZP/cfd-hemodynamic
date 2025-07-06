@@ -1,15 +1,14 @@
 from src.simulation import Simulation
 from mpi4py import MPI
-from petsc4py import PETSc
 import numpy as np
 from dolfinx.mesh import (
     create_unit_cube,
-    locate_entities_boundary,
     exterior_facet_indices,
     Mesh,
 )
-from dolfinx.fem import dirichletbc, locate_dofs_topological, Function, DirichletBC
+from dolfinx.fem import Function
 
+from src.boundaryCondition import BoundaryCondition
 
 solver_name = "solver2"
 simulation_name = "taylor_green"
@@ -25,8 +24,8 @@ class TaylorGreenSimulation(Simulation):
         self, solver_name, rho, mu, dt, T, f: tuple[float, float, float] = (0, 0, 0)
     ):
         self._mesh: Mesh = None
-        self._bcu: list[DirichletBC] = None
-        self._bcp: list[DirichletBC] = None
+        self._bcu: list[BoundaryCondition] = None
+        self._bcp: list[BoundaryCondition] = None
         self._boundary_facets = None
 
         super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
@@ -52,20 +51,20 @@ class TaylorGreenSimulation(Simulation):
     @property
     def bcu(self):
         if not self._bcu:
-            dofs_boundary_u = locate_dofs_topological(
-                self.solver.V, self.mesh.topology.dim - 1, self._boundary_facets
-            )
-            self._bcu = [dirichletbc(self._u_bc, dofs_boundary_u)]
+            bcu = BoundaryCondition(self._u_bc)
+            bcu.initTopological(self.mesh.topology.dim - 1, self._boundary_facets)
+
+            self._bcu = [bcu]
 
         return self._bcu
 
     @property
     def bcp(self):
         if not self._bcp:
-            dofs_boundary_p = locate_dofs_topological(
-                self.solver.Q, self.mesh.topology.dim - 1, self._boundary_facets
-            )
-            self._bcp = [dirichletbc(self._p_bc, dofs_boundary_p)]
+            bcp = BoundaryCondition(self._p_bc)
+            bcp.initTopological(self.mesh.topology.dim - 1, self._boundary_facets)
+
+            self._bcp = [bcp]
 
         return self._bcp
 

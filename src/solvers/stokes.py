@@ -40,14 +40,14 @@ class StokesSolver:
     def __init__(
         self,
         mesh: Mesh,
-        rho: float,
-        mu: float,
-        f: list,
+        rho: Constant,
+        mu: Constant,
+        f: Constant,
     ):
         self.mesh = mesh
-        self.rho = Constant(mesh, PETSc.ScalarType(rho))
-        self.mu = Constant(mesh, PETSc.ScalarType(mu))
-        self.f = Constant(mesh, PETSc.ScalarType(f))
+        self.rho = rho
+        self.mu = mu
+        self.f = f
 
         element_velocity = element(
             "Lagrange",
