@@ -188,9 +188,7 @@ class Solver(SolverBase):
         bcp_stokes = [bc.getBC(stokes_solver.Q) for bc in bcp]
         stokes_solver.solve([*bcu_stokes, *bcp_stokes])
 
-        self.u_sol.interpolate(stokes_solver.u_sol)
         self.u_prev.interpolate(stokes_solver.u_sol)
-        self.p_sol.interpolate(stokes_solver.p_sol)
         self.p_prev.interpolate(stokes_solver.p_sol)
 
         bcu_d = [bc.getBC(self.V) for bc in bcu]
