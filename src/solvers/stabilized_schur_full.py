@@ -2,10 +2,9 @@
 
 from typing import Callable
 from petsc4py import PETSc
-from mpi4py import MPI
 import numpy as np
 
-from basix.ufl import element, mixed_element
+from basix.ufl import element
 from dolfinx.mesh import Mesh
 from dolfinx.fem import (
     DirichletBC,
@@ -115,7 +114,9 @@ class Solver(SolverBase):
         R -= self.rho * self.f
 
         # SUPG
-        tau_supg1 = h / (2.0 * vnorm)
+        tau_supg1 = h / (
+            (2.0 * vnorm) + Constant(self.mesh, PETSc.ScalarType(1e-10))
+        )  # avoid division by zero
         tau_supg2 = self.dt / 2.0
         tau_supg3 = (h * h) / (4.0 * (self.mu / self.rho))
         tau_supg = (
@@ -137,32 +138,29 @@ class Solver(SolverBase):
         F += F_pspg
         self.F = F
 
-    def assembleJacobian(self, bcs: list[DirichletBC]) -> None:
+    def updateSolution(self, x) -> None:
+        "Updates the solution functions u_sol and p_sol with the values in x."
+        x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+        self.u_sol.x.array[:] = x[: self.offset]
+        self.p_sol.x.array[:] = x[self.offset :]
+        self.u_sol.x.scatter_forward()
+        self.p_sol.x.scatter_forward()
+
+    def assembleJacobian(
+        self, snes, x, J_mat, P_mat, bcs: list[DirichletBC] = []
+    ) -> None:
         "Assembles the Jacobian matrix evaluated at u_sol and p_sol."
-        self.A.zeroEntries()
-        assemble_matrix_block(self.A, self.J_form, bcs)
-        self.A.assemble()
+        J_mat.zeroEntries()
+        assemble_matrix_block(J_mat, self.J_form, bcs)
+        J_mat.assemble()
 
-    def assembleResidual(self, bcs: list[DirichletBC]) -> None:
+    def assembleResidual(self, snes, x, F_vec, bcs: list[DirichletBC] = []) -> None:
         "Assembles the residual vector evaluated at u_sol and p_sol, applies lifting and set_bcs so that the constrained dofs are x_n - g."
-        with self.b.localForm() as b_local:
-            b_local.set(0.0)
+        self.updateSolution(x)
+        with F_vec.localForm() as F_local:
+            F_local.set(0.0)
 
-        # set x_n to the solution in previous newton iteration
-        self.x_n.setValues(range(0, self.offset), self.u_sol.x.petsc_vec)
-        self.x_n.setValues(
-            range(
-                self.offset,
-                self.offset
-                + self.Q.dofmap.index_map.size_local * self.Q.dofmap.index_map_bs,
-            ),
-            self.p_sol.x.petsc_vec,
-        )
-        self.x_n.assemble()
-
-        assemble_vector_block(
-            self.b, self.F_form, self.J_form, bcs=bcs, x0=self.x_n, alpha=-1.0
-        )
+        assemble_vector_block(F_vec, self.F_form, self.J_form, bcs=bcs, x0=x, alpha=-1.0)
 
     def assembleTimeIndependent(
         self, bcu: list[BoundaryCondition], bcp: list[BoundaryCondition]
@@ -182,7 +180,8 @@ class Solver(SolverBase):
             self.V.dofmap.index_map.size_local * self.V.dofmap.index_map_bs
         )  # after this index values of x correspond to pressure, before to velocity
 
-        # initial guess for the first iteration
+        # guess for the soltion at t = 0
+        # !!! solamente deberia si no se provee initial_solution
         stokes_solver = StokesSolver(self.mesh, self.rho, self.mu, self.f)
         bcu_stokes = [bc.getBC(stokes_solver.V) for bc in bcu]
         bcp_stokes = [bc.getBC(stokes_solver.Q) for bc in bcp]
@@ -193,13 +192,31 @@ class Solver(SolverBase):
 
         bcu_d = [bc.getBC(self.V) for bc in bcu]
         bcp_d = [bc.getBC(self.Q) for bc in bcp]
-        self.assembleJacobian([*bcu_d, *bcp_d])
-        self.assembleResidual([*bcu_d, *bcp_d])
+
+        # newton solver
+        snes = PETSc.SNES().create(self.mesh.comm)
+        snes.setType("newtonls")
+        snes.setFunction(self.assembleResidual, f=self.b, kargs={"bcs": [*bcu_d, *bcp_d]})
+        snes.setJacobian(
+            self.assembleJacobian, J=self.A, P=None, kargs={"bcs": [*bcu_d, *bcp_d]}
+        )
+
+        # x is the initial guess for the newton iteration = solution at previous time step
+        self.x_n.setValues(range(0, self.offset), self.u_prev.x.petsc_vec)
+        self.x_n.setValues(
+            range(
+                self.offset,
+                self.offset
+                + self.Q.dofmap.index_map.size_local * self.Q.dofmap.index_map_bs,
+            ),
+            self.p_prev.x.petsc_vec,
+        )
+        self.x_n.assemble()
 
         # gmres global solver with field split preconditioner
-        ksp = PETSc.KSP().create(self.mesh.comm)
+        ksp = snes.getKSP()
         ksp.setType("gmres")
-        ksp.setTolerances(rtol=1e-4)
+        snes.computeJacobian(self.x_n, self.A)  # asemble A in order to set up PC
         ksp.setOperators(self.A)
 
         pc = ksp.getPC()
@@ -215,6 +232,19 @@ class Solver(SolverBase):
         is_u = IS().createStride(u_size, 0, 1, self.mesh.comm)
         is_p = IS().createStride(p_size, u_size, 1, self.mesh.comm)
         pc.setFieldSplitIS(("u", is_u), ("p", is_p))
+        pc.setUp()
+
+        # solve the schur block with gmres and the pressure block with cg
+        ksp_u, ksp_p = pc.getFieldSplitSchurGetSubKSP()
+        ksp_u.setType("preonly")
+        ksp_u.getPC().setType("lu")
+        ksp_p.setType("preonly")
+        ksp_p.getPC().setType("lu")
+
+        snes.setMonitor(lambda snes, its, rnorm: print(f"Iter {its}: ||F(u)|| = {rnorm}"))
+        snes.setFromOptions()
+        snes.setUp()
+        self.solver = snes
 
         # create pressure null space
         with self.A.createVecs()[0].localForm() as vec_const:
@@ -231,61 +261,22 @@ class Solver(SolverBase):
                 vectors=[vec_const], comm=self.mesh.comm
             )
 
+    def solveStep(self, bcu: list[DirichletBC], bcp: list[DirichletBC]):
         if self.nullsp.test(self.A):
             self.A.setNullSpace(self.nullsp)
 
-        # solve the schur block with gmres and the pressure block with cg
-        pc.setUp()
-        ksp_u, ksp_p = pc.getFieldSplitSchurGetSubKSP()
-        ksp_u.setType("preonly")
-        ksp_u.getPC().setType("lu")
-        ksp_p.setType("preonly")
-        ksp_p.getPC().setType("lu")
-        ksp.setFromOptions()
-        self.solver = ksp
+        # nullspace.remove(self.x_n) ???
 
-    def solveIteration(self, bcu: list[DirichletBC], bcp: list[DirichletBC]) -> float:
-        "Solve one newton iteration with the current bcs. It assumes that the previous guess (or initial guess) is the one in u_sol and p_sol."
-        bcu = [bc.getBC(self.V) for bc in bcu]
-        bcp = [bc.getBC(self.Q) for bc in bcp]
-        self.assembleJacobian(bcs=[*bcu, *bcp])
-        self.assembleResidual(bcs=[*bcu, *bcp])
+        self.solver.solve(None, self.x_n)
+        self.updateSolution(self.x_n)
 
-        self.solver.setOperators(self.A)
-        if self.A.getNullSpace() is not None:
-            self.nullsp.remove(self.b)
-        self.solver.solve(self.b, self.x_n)  # use x_n by now as dx
-
-        x_u_array = self.x_n.array[: self.offset]
-        x_p_array = self.x_n.array[self.offset :]
-
-        self.u_sol.x.array[:] -= x_u_array
-        self.p_sol.x.array[:] -= x_p_array
-        self.u_sol.x.scatter_forward()
-        self.p_sol.x.scatter_forward()
-
-        return self.x_n.norm()
-
-    def solveStep(self, bcu: list[DirichletBC], bcp: list[DirichletBC]):
-        norm_dx = self.solveIteration(bcu, bcp)
-        print(f"Iteration 0: |dx| = {norm_dx:.3e}")
-
-        it = 1
-        if norm_dx >= 1e-8:
-            while it <= self.MAX_ITER:
-                norm_dx = self.solveIteration(bcu, bcp)
-                print(f"Iteration {it}: |dx| = {norm_dx:.3e}")
-                if norm_dx < 1e-8:
-                    break
-
-                it += 1
-
-        if norm_dx < 1e-8:
-            print(f"Converged after {it+1} iterations. |dx| = {norm_dx:.3e}")
+        reason = self.solver.getConvergedReason()
+        if reason < 0:
+            raise RuntimeError(f"Did not converge, reason: {reason}.")
+        else:
+            print(
+                f"Converged after {self.solver.getIterationNumber()} iterations. residual: {self.solver.getFunctionNorm()}."
+            )
 
             self.u_prev.x.array[:] = self.u_sol.x.array[:]
             self.p_prev.x.array[:] = self.p_sol.x.array[:]
-        else:
-            raise RuntimeError(
-                f"Did not converge after {it} iterations. |dx| = {norm_dx:.3e}"
-            )
