@@ -195,6 +195,7 @@ class Solver(SolverBase):
 
         # newton solver
         snes = PETSc.SNES().create(self.mesh.comm)
+        snes.setOptionsPrefix("nonlinear_")
         snes.setType("newtonls")
         snes.setFunction(self.assembleResidual, f=self.b, kargs={"bcs": [*bcu_d, *bcp_d]})
         snes.setJacobian(
@@ -265,7 +266,7 @@ class Solver(SolverBase):
         if self.nullsp.test(self.A):
             self.A.setNullSpace(self.nullsp)
 
-        # nullspace.remove(self.x_n) ???
+        self.nullsp.remove(self.x_n)  # creo que se puede quitar?
 
         self.solver.solve(None, self.x_n)
         self.updateSolution(self.x_n)
