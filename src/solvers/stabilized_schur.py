@@ -107,7 +107,9 @@ class Solver(SolverBase):
 
         # stabilization terms
         h = CellDiameter(mesh)
-        vnorm = sqrt(inner(u_mid, u_mid))
+        vnorm = sqrt(
+            inner(u_prev, u_prev)
+        )  # u_prev instead of u_sol to avoid nonlinearity after derivation
 
         R = self.rho * ((u_sol - u_prev) / self.dt + dot(u_mid, nabla_grad(u_mid)))
         R -= div(self.sigma(u_mid, p_sol, self.mu))
@@ -223,8 +225,8 @@ class Solver(SolverBase):
         pc = ksp.getPC()
         pc.setType("fieldsplit")
         pc.setFieldSplitType(PETSc.PC.CompositeType.SCHUR)
-        pc.setFieldSplitSchurFactType(PETSc.PC.SchurFactType.FULL)  # temporal
-        pc.setFieldSplitSchurPreType(PETSc.PC.SchurPreType.FULL)  # temporal
+        pc.setFieldSplitSchurFactType(PETSc.PC.SchurFactType.DIAG)  # temporal
+        pc.setFieldSplitSchurPreType(PETSc.PC.SchurPreType.SELFP)  # temporal
 
         IS = PETSc.IS
         fields = self.V.dofmap.index_map, self.Q.dofmap.index_map
@@ -237,10 +239,10 @@ class Solver(SolverBase):
 
         # solve the schur block with gmres and the pressure block with cg
         ksp_u, ksp_p = pc.getFieldSplitSchurGetSubKSP()
-        ksp_u.setType("preonly")
-        ksp_u.getPC().setType("lu")
-        ksp_p.setType("preonly")
-        ksp_p.getPC().setType("lu")
+        ksp_u.setType("gmres")
+        ksp_u.getPC().setType("ilu")
+        ksp_p.setType("cg")
+        ksp_p.getPC().setType("ilu")
 
         snes.setMonitor(lambda snes, its, rnorm: print(f"Iter {its}: ||F(u)|| = {rnorm}"))
         snes.setFromOptions()

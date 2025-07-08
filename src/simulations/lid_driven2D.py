@@ -10,7 +10,7 @@ from dolfinx.fem import Function
 
 from src.boundaryCondition import BoundaryCondition
 
-solver_name = "stabilized_schur_full"
+solver_name = "stabilized_schur"
 simulation_name = "lid_driven2D"
 n_cells = 50
 rho = 1
