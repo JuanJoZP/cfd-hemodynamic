@@ -72,18 +72,12 @@ class LidDriven2DSimulation(Simulation):
 
     @staticmethod
     def lid(x):
-        return np.isclose(x[1], 1)
+        return np.isclose(x[1], 1.0) & (x[0] > 1e-10) & (x[0] < 1.0 - 1e-10)
 
     @staticmethod
     def walls(x):
         return np.logical_or.reduce(
             (np.isclose(x[0], 0), np.isclose(x[0], 1), np.isclose(x[1], 0))
-        )
-
-    @staticmethod
-    def corner(x):
-        return np.logical_and.reduce(
-            (np.isclose(x[0], 0), np.isclose(x[1], 0), np.isclose(x[2], 0))
         )
 
     def save_benchmark_plot(self, results_path):
