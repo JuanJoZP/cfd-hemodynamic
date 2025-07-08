@@ -22,6 +22,7 @@ from ufl import (
     ds,
     dot,
     extract_blocks,
+    ge,
     inner,
     nabla_grad,
     grad,
@@ -116,8 +117,9 @@ class Solver(SolverBase):
         R -= self.rho * self.f
 
         # SUPG
-        tau_supg1 = h / (
-            (2.0 * vnorm) + Constant(self.mesh, PETSc.ScalarType(1e-10))
+        eps = Constant(self.mesh, np.finfo(PETSc.ScalarType()).resolution)
+        tau_supg1 = h / conditional(
+            ge((2.0 * vnorm), eps), (2.0 * vnorm), eps
         )  # avoid division by zero
         tau_supg2 = self.dt / 2.0
         tau_supg3 = (h * h) / (4.0 * (self.mu / self.rho))
@@ -244,7 +246,7 @@ class Solver(SolverBase):
         ksp_p.setType("cg")
         ksp_p.getPC().setType("ilu")
 
-        snes.setMonitor(lambda snes, its, rnorm: print(f"Iter {its}: ||F(u)|| = {rnorm}"))
+        # snes.setMonitor(lambda snes, its, rnorm: print(f"Iter {its}: residual = {rnorm}"))
         snes.setFromOptions()
         snes.setUp()
         self.solver = snes
