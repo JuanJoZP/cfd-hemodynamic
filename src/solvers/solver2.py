@@ -34,6 +34,7 @@ from ufl import (
     inner,
 )
 
+from src.boundaryCondition import BoundaryCondition
 from src.solverBase import SolverBase
 
 
@@ -108,12 +109,15 @@ class Solver(SolverBase):
         )
 
     def assembleTimeIndependent(
-        self, bcu: list[DirichletBC], bcp: list[DirichletBC]
+        self, bcu: list[BoundaryCondition], bcp: list[BoundaryCondition]
     ) -> None:
+        bcu_d = [bc.getBC(self.V) for bc in bcu]
+        bcp_d = [bc.getBC(self.Q) for bc in bcp]
+
         self.A1 = create_matrix(self.a1)
         self.b1 = create_vector(self.L1)
 
-        self.A2 = assemble_matrix(self.a2, bcs=bcp)
+        self.A2 = assemble_matrix(self.a2, bcs=bcp_d)
         self.A2.assemble()
         self.b2 = create_vector(self.L2)
 
@@ -140,19 +144,24 @@ class Solver(SolverBase):
         pc3 = self.solver3.getPC()
         pc3.setType(PETSc.PC.Type.SOR)
 
-    def solveStep(self, bcu: list[DirichletBC], bcp: list[DirichletBC]) -> None:
+    def solveStep(
+        self, bcu: list[BoundaryCondition], bcp: list[BoundaryCondition]
+    ) -> None:
+        bcu_d = [bc.getBC(self.V) for bc in bcu]
+        bcp_d = [bc.getBC(self.Q) for bc in bcp]
+
         # step 1
         self.A1.zeroEntries()
-        assemble_matrix(self.A1, self.a1, bcs=bcu)
+        assemble_matrix(self.A1, self.a1, bcs=bcu_d)
         self.A1.assemble()
         with self.b1.localForm() as loc_1:
             loc_1.set(0)
         assemble_vector(self.b1, self.L1)
-        apply_lifting(self.b1, [self.a1], [bcu])
+        apply_lifting(self.b1, [self.a1], [bcu_d])
         self.b1.ghostUpdate(
             addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
         )
-        set_bc(self.b1, bcu)
+        set_bc(self.b1, bcu_d)
         self.solver1.solve(self.b1, self.u_star.x.petsc_vec)
         self.u_star.x.scatter_forward()
 
@@ -160,11 +169,11 @@ class Solver(SolverBase):
         with self.b2.localForm() as loc_2:
             loc_2.set(0)
         assemble_vector(self.b2, self.L2)
-        apply_lifting(self.b2, [self.a2], [bcp])
+        apply_lifting(self.b2, [self.a2], [bcp_d])
         self.b2.ghostUpdate(
             addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
         )
-        set_bc(self.b2, bcp)
+        set_bc(self.b2, bcp_d)
         self.solver2.solve(self.b2, self.phi.x.petsc_vec)
         self.phi.x.scatter_forward()
 
