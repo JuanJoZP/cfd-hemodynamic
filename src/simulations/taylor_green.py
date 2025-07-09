@@ -1,4 +1,4 @@
-from src.simulation import Simulation
+from src.simulationBase import SimulationBase
 from mpi4py import MPI
 import numpy as np
 from dolfinx.mesh import (
@@ -10,16 +10,16 @@ from dolfinx.fem import Function
 
 from src.boundaryCondition import BoundaryCondition
 
-solver_name = "solver2"
+solver_name = "solver1"
 simulation_name = "taylor_green"
 n_cells = 32
 rho = 1
 mu = 1 / 50  # Re = 50
 dt = 1 / 1000
-T = 0.1
+T = 0.01
 
 
-class TaylorGreenSimulation(Simulation):
+class TaylorGreenSimulation(SimulationBase):
     def __init__(
         self, solver_name, rho, mu, dt, T, f: tuple[float, float, float] = (0, 0, 0)
     ):
