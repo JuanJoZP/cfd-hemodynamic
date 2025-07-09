@@ -1,13 +1,10 @@
 # IPCS con método del punto medio y linealización del término convectivo mediante la solución en el paso anterior
 
 from typing import Callable
-
 from petsc4py import PETSc
 import numpy as np
-
-from basix.ufl import element
 from dolfinx.mesh import Mesh
-from dolfinx.fem import form, DirichletBC, Constant, Function, functionspace
+from dolfinx.fem import form, Function
 from dolfinx.fem.petsc import (
     assemble_matrix,
     assemble_vector,
@@ -17,14 +14,10 @@ from dolfinx.fem.petsc import (
     set_bc,
 )
 from ufl import (
-    FacetNormal,
     dx,
-    ds,
     dot,
     inner,
-    sym,
     nabla_grad,
-    Identity,
     lhs,
     rhs,
     div,
@@ -33,7 +26,6 @@ from ufl import (
     grad,
     inner,
 )
-
 from src.boundaryCondition import BoundaryCondition
 from src.solverBase import SolverBase
 
@@ -46,21 +38,14 @@ class Solver(SolverBase):
         rho: float,
         mu: float,
         f: list,
-        h: list = None,
         initial_velocity: Callable[[np.ndarray], np.ndarray] = None,
     ):
-        self.mesh = mesh
-        self.dt = Constant(mesh, PETSc.ScalarType(dt))
-        self.rho = Constant(mesh, PETSc.ScalarType(rho))
-        self.mu = Constant(mesh, PETSc.ScalarType(mu))
-        self.f = Constant(mesh, PETSc.ScalarType(f))
+        super().__init__(mesh, dt, rho, mu, f, initial_velocity)
 
-        element_velocity = element(
+        super().initVelocitySpace(
             "Lagrange", mesh.topology.cell_name(), 2, shape=(mesh.geometry.dim,)
         )
-        element_pressure = element("Lagrange", mesh.topology.cell_name(), 1)
-        self.V = functionspace(mesh, element_velocity)
-        self.Q = functionspace(mesh, element_pressure)
+        super().initPressureSpace("Lagrange", mesh.topology.cell_name(), 1)
 
         u = TrialFunction(self.V)
         v = TestFunction(self.V)
@@ -68,20 +53,15 @@ class Solver(SolverBase):
         p = TrialFunction(self.Q)
         q = TestFunction(self.Q)
 
-        self.u_sol = Function(self.V)
-        self.u_sol.name = "u"
         self.u_star = Function(self.V)
         self.u_n = Function(self.V)
         self.u_n1 = Function(self.V)
 
-        self.p_sol = Function(self.Q)
-        self.p_sol.name = "p"
         self.phi = Function(self.Q)  # pressure correction
 
         if initial_velocity:
             self.u_n.interpolate(initial_velocity)
             self.u_n1.interpolate(initial_velocity)
-            self.u_sol.interpolate(initial_velocity)
 
         # weak form
         F1 = self.rho / self.dt * dot(u - self.u_n, v) * dx
@@ -108,16 +88,14 @@ class Solver(SolverBase):
             - self.dt * dot(nabla_grad(self.phi), v) * dx
         )
 
-    def assembleTimeIndependent(
-        self, bcu: list[BoundaryCondition], bcp: list[BoundaryCondition]
-    ) -> None:
-        bcu_d = [bc.getBC(self.V) for bc in bcu]
-        bcp_d = [bc.getBC(self.Q) for bc in bcp]
+    def setup(self, bcu: list[BoundaryCondition], bcp: list[BoundaryCondition]) -> None:
+        self.bcu_d = [bc.getBC(self.V) for bc in bcu]
+        self.bcp_d = [bc.getBC(self.Q) for bc in bcp]
 
         self.A1 = create_matrix(self.a1)
         self.b1 = create_vector(self.L1)
 
-        self.A2 = assemble_matrix(self.a2, bcs=bcp_d)
+        self.A2 = assemble_matrix(self.a2, bcs=self.bcp_d)
         self.A2.assemble()
         self.b2 = create_vector(self.L2)
 
@@ -144,24 +122,19 @@ class Solver(SolverBase):
         pc3 = self.solver3.getPC()
         pc3.setType(PETSc.PC.Type.SOR)
 
-    def solveStep(
-        self, bcu: list[BoundaryCondition], bcp: list[BoundaryCondition]
-    ) -> None:
-        bcu_d = [bc.getBC(self.V) for bc in bcu]
-        bcp_d = [bc.getBC(self.Q) for bc in bcp]
-
+    def solveStep(self) -> None:
         # step 1
         self.A1.zeroEntries()
-        assemble_matrix(self.A1, self.a1, bcs=bcu_d)
+        assemble_matrix(self.A1, self.a1, bcs=self.bcu_d)
         self.A1.assemble()
         with self.b1.localForm() as loc_1:
             loc_1.set(0)
         assemble_vector(self.b1, self.L1)
-        apply_lifting(self.b1, [self.a1], [bcu_d])
+        apply_lifting(self.b1, [self.a1], [self.bcu_d])
         self.b1.ghostUpdate(
             addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
         )
-        set_bc(self.b1, bcu_d)
+        set_bc(self.b1, self.bcu_d)
         self.solver1.solve(self.b1, self.u_star.x.petsc_vec)
         self.u_star.x.scatter_forward()
 
@@ -169,11 +142,11 @@ class Solver(SolverBase):
         with self.b2.localForm() as loc_2:
             loc_2.set(0)
         assemble_vector(self.b2, self.L2)
-        apply_lifting(self.b2, [self.a2], [bcp_d])
+        apply_lifting(self.b2, [self.a2], [self.bcp_d])
         self.b2.ghostUpdate(
             addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
         )
-        set_bc(self.b2, bcp_d)
+        set_bc(self.b2, self.bcp_d)
         self.solver2.solve(self.b2, self.phi.x.petsc_vec)
         self.phi.x.scatter_forward()
 

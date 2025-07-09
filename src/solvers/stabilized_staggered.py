@@ -44,7 +44,7 @@ from dolfinx.fem.petsc import (
 from src.solverBase import SolverBase
 
 
-class Solver(SolverBase):
+class SolverBase(SolverBase):
     MAX_ITER = 50
     ALPHA = 3  # regularization
     BETA = 0.5  # regularization
