@@ -1,4 +1,4 @@
-from src.simulation import Simulation
+from src.simulationBase import SimulationBase
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
@@ -8,7 +8,7 @@ from dolfinx.fem import Function
 from src.boundaryCondition import BoundaryCondition
 
 
-solver_name = "stabilized_schur_full"
+solver_name = "solver2"
 simulation_name = "unit_square"
 n_cells = 32
 rho = 1
@@ -17,7 +17,7 @@ dt = 1 / 200
 T = 2
 
 
-class UnitSquareSimulation(Simulation):
+class UnitSquareSimulation(SimulationBase):
     def __init__(
         self, solver_name, rho=1, mu=1, dt=1 / 100, T=5, f: tuple[float, float] = (0, 0)
     ):

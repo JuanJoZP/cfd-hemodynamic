@@ -4,6 +4,7 @@ from typing import Callable
 
 import os
 import numpy as np
+from src.boundaryCondition import BoundaryCondition
 from src.solverBase import SolverBase
 from datetime import datetime, timezone, timedelta
 from mpi4py import MPI
@@ -13,7 +14,7 @@ from dolfinx.mesh import Mesh
 from dolfinx.fem import DirichletBC, form, assemble_scalar, Function, Expression
 
 
-class Simulation(ABC):
+class SimulationBase(ABC):
     @property
     @abstractmethod
     def mesh(self) -> Mesh:
@@ -21,12 +22,12 @@ class Simulation(ABC):
 
     @property
     @abstractmethod
-    def bcu(self) -> list[DirichletBC]:
+    def bcu(self) -> list[BoundaryCondition]:
         pass
 
     @property
     @abstractmethod
-    def bcp(self) -> list[DirichletBC]:
+    def bcp(self) -> list[BoundaryCondition]:
         pass
 
     @abstractmethod
@@ -45,37 +46,45 @@ class Simulation(ABC):
         dt: float,
         T: float,
         f: list,
-        h: list = None,
     ):
         self.solver_name = solver_name
         self.solverClass: type[SolverBase] = getattr(
             import_module(f"src.solvers.{solver_name}"), "Solver"
         )
         self.solver = self.solverClass(
-            self.mesh, dt, rho, mu, f, h=h, initial_velocity=self.initial_velocity
+            self.mesh, dt, rho, mu, f, initial_velocity=self.initial_velocity
         )
 
         self.num_steps = int(T / dt)
         self.has_exact_solution = (
-            self.__class__.exact_velocity is not Simulation.exact_velocity
+            self.__class__.exact_velocity is not SimulationBase.exact_velocity
         )
 
         self.dt = dt
         self.simulation_name = simulation_name
 
     def setup(self):
-        self.solver.assembleTimeIndependent(self.bcu, self.bcp)
+        self.solver.setup(self.bcu, self.bcp)
 
     def solve(self, afterStepCallback: Callable[[float], None] = None) -> str:
-        """Returns the path to the results directory."""
+        """
+        Runs the time-stepping simulation, returns the path to directory with results in VTX
+        format and an error log if the method `exact_velocity` is implemented.
+
+        Args:
+            afterStepCallback (Callable[[float], None], optional): A function to be called
+                after each time step, receiving the current simulation time as an argument.
+
+        Returns:
+            str: The absolute path to the directory where simulation results are stored.
+        """
+
         tqdm = self.get_tqdm()
         mesh = self.mesh
         num_steps = self.num_steps
         solver = self.solver
 
-        progress = (
-            tqdm(desc="Resolviendo", total=num_steps) if mesh.comm.rank == 0 else None
-        )
+        progress = tqdm(desc="Solving", total=num_steps) if mesh.comm.rank == 0 else None
 
         date = (
             datetime.now(tz=timezone(-timedelta(hours=5))).isoformat(timespec="seconds")
@@ -106,10 +115,10 @@ class Simulation(ABC):
             error_log.write("t = %.3f: error = %.3g" % (t, error) + "\n")
 
         for _ in range(num_steps):
+            solver.solveStep()
+
             if progress:
                 progress.update()
-
-            solver.solveStep(self.bcu, self.bcp)
 
             t += self.dt
 

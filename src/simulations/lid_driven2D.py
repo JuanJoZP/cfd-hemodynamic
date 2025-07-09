@@ -3,7 +3,7 @@ import pandas as pd
 from mpi4py import MPI
 from petsc4py import PETSc
 from matplotlib import pyplot as plt
-from src.simulation import Simulation
+from src.simulationBase import SimulationBase
 from dolfinx.geometry import bb_tree, compute_collisions_points, compute_colliding_cells
 from dolfinx.mesh import create_unit_square, locate_entities_boundary, Mesh
 from dolfinx.fem import Function
@@ -18,7 +18,7 @@ T = 10
 dt = 1 / 200
 
 
-class LidDriven2DSimulation(Simulation):
+class LidDriven2DSimulation(SimulationBase):
     def __init__(
         self, solver_name, rho=1, mu=1, dt=1 / 100, T=5, f: tuple[float, float] = (0, 0)
     ):

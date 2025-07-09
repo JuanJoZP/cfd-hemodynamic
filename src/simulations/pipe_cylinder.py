@@ -1,6 +1,6 @@
 # https://wwwold.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark2_re100.html
 
-from src.simulation import Simulation
+from src.simulationBase import SimulationBase
 import gmsh
 from mpi4py import MPI
 from petsc4py import PETSc
@@ -18,7 +18,7 @@ rho = 1
 mu = 1 / 1000
 
 
-class PipeCylinderSimulation(Simulation):
+class PipeCylinderSimulation(SimulationBase):
     fluid_marker = 1
     inlet_marker = 2
     outlet_marker = 3
