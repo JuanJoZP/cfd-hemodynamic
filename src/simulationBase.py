@@ -99,6 +99,7 @@ class SimulationBase(ABC):
         p_file = VTXWriter(mesh.comm, f"{parent_route}/p.bp", self.solver.p_sol)
 
         t = 0.0
+        self.solver.u_sol.interpolate(self.initial_velocity)
         u_file.write(t)
         p_file.write(t)
 
