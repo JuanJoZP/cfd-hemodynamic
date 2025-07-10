@@ -37,7 +37,7 @@ from dolfinx.fem.petsc import (
     assemble_vector_block,
 )
 
-from src.solvers.stokes import StokesSolver
+from src.solvers_aux.stokes import StokesSolver
 from src.boundaryCondition import BoundaryCondition
 from src.solverBase import SolverBase
 
@@ -71,6 +71,7 @@ class Solver(SolverBase):
             self.u_prev.interpolate(initial_velocity)
 
         # weak form
+        # !! REVISAR BIEN RHO EN LA FORMA VARIACIONAL
         u_sol = self.u_sol
         p_sol = self.p_sol
         u_prev = self.u_prev
@@ -79,7 +80,7 @@ class Solver(SolverBase):
 
         F = self.rho * inner(v, (u_sol - u_prev) / self.dt) * dx
         F += self.rho * dot(v, dot(u_mid, nabla_grad(u_mid))) * dx
-        F -= inner(v, self.rho * self.f) * dx
+        F -= inner(v, self.f) * dx
         F += inner(self.epsilon(v), self.sigma(u_mid, p_sol, self.mu)) * dx
         # probar p_prev en vez de p_sol
         F += dot(p_sol * n, v) * ds - dot(mu * nabla_grad(u_mid) * n, v) * ds
@@ -93,7 +94,7 @@ class Solver(SolverBase):
 
         R = self.rho * ((u_sol - u_prev) / self.dt + dot(u_mid, nabla_grad(u_mid)))
         R -= div(self.sigma(u_mid, p_sol, self.mu))
-        R -= self.rho * self.f
+        R -= self.f
 
         # SUPG
         eps = Constant(self.mesh, np.finfo(PETSc.ScalarType()).resolution)
@@ -171,15 +172,15 @@ class Solver(SolverBase):
             self.V.dofmap.index_map.size_local * self.V.dofmap.index_map_bs
         )  # after this index values of x correspond to pressure, before to velocity
 
-        # guess for the soltion at t = 0
-        # !!! solamente deberia si no se provee initial_solution
+        # initial guess with forward euler for newton iterations at t = 0
+        # x^{n+1}_0 = x^n + dt * F(x^n)
         stokes_solver = StokesSolver(self.mesh, self.rho, self.mu, self.f)
         bcu_stokes = [bc.getBC(stokes_solver.V) for bc in bcu]
         bcp_stokes = [bc.getBC(stokes_solver.Q) for bc in bcp]
         stokes_solver.solve([*bcu_stokes, *bcp_stokes])
 
-        self.u_prev.interpolate(stokes_solver.u_sol)
-        self.p_prev.interpolate(stokes_solver.p_sol)
+        # self.u_prev.interpolate(stokes_solver.u_sol)
+        # self.p_prev.interpolate(stokes_solver.p_sol)
 
         self.bcu_d = [bc.getBC(self.V) for bc in bcu]
         self.bcp_d = [bc.getBC(self.Q) for bc in bcp]
@@ -272,7 +273,7 @@ class Solver(SolverBase):
             raise RuntimeError(f"Did not converge, reason: {reason}.")
         else:
             print(
-                f"Converged after {self.solver.getIterationNumber()} iterations. residual: {self.solver.getFunctionNorm()}."
+                f"Converged after {self.solver.getIterationNumber()} iterations. residual: {self.solver.getFunctionNorm():.1e}."
             )
 
             self.u_prev.x.array[:] = self.u_sol.x.array[:]
