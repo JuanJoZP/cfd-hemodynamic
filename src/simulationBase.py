@@ -123,10 +123,11 @@ class SimulationBase(ABC):
 
             t += self.dt
 
-            if error_log:
+            if self.has_exact_solution:
                 u_e.interpolate(self.exact_velocity(t))
                 error = self.compute_error(u_e, solver.u_sol, mesh)
-                error_log.write("t = %.3f: error = %.3g" % (t, error) + "\n")
+                if error_log:
+                    error_log.write("t = %.3f: error = %.3g" % (t, error) + "\n")
 
             u_file.write(t)
             p_file.write(t)
