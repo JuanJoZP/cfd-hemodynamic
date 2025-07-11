@@ -37,7 +37,7 @@ from dolfinx.fem.petsc import (
     assemble_vector_block,
 )
 
-from src.solvers.stokes import StokesSolver
+from src.solvers_aux.stokes import StokesSolver
 from src.boundaryCondition import BoundaryCondition
 from src.solverBase import SolverBase
 
