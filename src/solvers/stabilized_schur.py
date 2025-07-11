@@ -123,7 +123,6 @@ class Solver(SolverBase):
 
     def updateSolution(self, x: PETSc.Vec) -> None:
         "Updates the solution functions u_sol and p_sol with the values in x."
-        x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
         self.u_sol.x.array[:] = x[: self.offset]
         self.p_sol.x.array[:] = x[self.offset :]
         self.u_sol.x.scatter_forward()
@@ -150,11 +149,14 @@ class Solver(SolverBase):
         bcs: list[DirichletBC] = [],
     ) -> None:
         "Assembles the residual vector evaluated at u_sol and p_sol, applies lifting and set_bcs so that the constrained dofs are = x_n - g."
-        self.updateSolution(x)
         with F_vec.localForm() as F_local:
             F_local.set(0.0)
 
+        x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+        self.updateSolution(x)
+
         assemble_vector_block(F_vec, self.F_form, self.J_form, bcs=bcs, x0=x, alpha=-1.0)
+        F_vec.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
 
     def setup(self, bcu: list[BoundaryCondition], bcp: list[BoundaryCondition]) -> None:
         # create linealizated problem
@@ -168,18 +170,18 @@ class Solver(SolverBase):
         self.b = create_vector_block(self.F_form)
         self.x_n = self.b.duplicate()  # solution to the nth newton iteration
         self.offset = (
-            self.V.dofmap.index_map.size_local * self.V.dofmap.index_map_bs
+            self.u_sol.x.petsc_vec.getLocalSize()
         )  # after this index values of x correspond to pressure, before to velocity
 
         # guess for the soltion at t = 0
         # !!! solamente deberia si no se provee initial_solution
-        stokes_solver = StokesSolver(self.mesh, self.rho, self.mu, self.f)
-        bcu_stokes = [bc.getBC(stokes_solver.V) for bc in bcu]
-        bcp_stokes = [bc.getBC(stokes_solver.Q) for bc in bcp]
-        stokes_solver.solve([*bcu_stokes, *bcp_stokes])
+        # stokes_solver = StokesSolver(self.mesh, self.rho, self.mu, self.f)
+        # bcu_stokes = [bc.getBC(stokes_solver.V) for bc in bcu]
+        # bcp_stokes = [bc.getBC(stokes_solver.Q) for bc in bcp]
+        # stokes_solver.solve([*bcu_stokes, *bcp_stokes])
 
-        self.u_prev.interpolate(stokes_solver.u_sol)
-        self.p_prev.interpolate(stokes_solver.p_sol)
+        # self.u_prev.interpolate(stokes_solver.u_sol)
+        # self.p_prev.interpolate(stokes_solver.p_sol)
 
         self.bcu_d = [bc.getBC(self.V) for bc in bcu]
         self.bcp_d = [bc.getBC(self.Q) for bc in bcp]
