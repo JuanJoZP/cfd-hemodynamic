@@ -86,7 +86,13 @@ class Solver(SolverBase):
         F += inner(q, div(u_mid)) * dx
 
         # stabilization terms
-        h = CellDiameter(mesh)
+        V_dg0 = functionspace(mesh, ("DG", 0))
+        h = Function(V_dg0)
+        h.x.array[:] = mesh.h(
+            mesh.topology.dim,
+            np.arange(h.x.index_map.size_local + h.x.index_map.num_ghosts),
+        )
+
         vnorm = sqrt(
             inner(u_prev, u_prev)
         )  # u_prev instead of u_sol to avoid nonlinearity after derivation
