@@ -8,6 +8,7 @@ from dolfinx.fem import (
     DirichletBC,
     Constant,
     Function,
+    functionspace,
     form,
 )
 from ufl import (
