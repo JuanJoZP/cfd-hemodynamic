@@ -152,7 +152,3 @@ class Solver(SolverBase):
         )
         self.solver3.solve(self.b3, self.u_sol.x.petsc_vec)
         self.u_sol.x.scatter_forward()
-
-        # update u_prev p_prev
-        self.u_prev.x.array[:] = self.u_sol.x.array[:]
-        self.p_prev.x.array[:] = self.p_sol.x.array[:]

@@ -54,25 +54,27 @@ class Solver(SolverBase):
         q = TestFunction(self.Q)
 
         self.u_star = Function(self.V)
-        self.u_n = Function(self.V)
         self.u_n1 = Function(self.V)
 
         self.phi = Function(self.Q)  # pressure correction
 
         if initial_velocity:
-            self.u_n.interpolate(initial_velocity)
+            self.u_prev.interpolate(initial_velocity)
             self.u_n1.interpolate(initial_velocity)
 
         # weak form
-        F1 = self.rho / self.dt * dot(u - self.u_n, v) * dx
+        F1 = self.rho / self.dt * dot(u - self.u_prev, v) * dx
         F1 += (
             inner(
-                dot(1.5 * self.u_n - 0.5 * self.u_n1, 0.5 * nabla_grad(u + self.u_n)), v
+                dot(
+                    1.5 * self.u_prev - 0.5 * self.u_n1, 0.5 * nabla_grad(u + self.u_prev)
+                ),
+                v,
             )
             * dx
         )
         F1 += (
-            0.5 * self.mu * inner(grad(u + self.u_n), grad(v)) * dx
+            0.5 * self.mu * inner(grad(u + self.u_prev), grad(v)) * dx
             - dot(self.p_sol, div(v)) * dx
         )
         F1 += dot(self.f, v) * dx
@@ -163,7 +165,6 @@ class Solver(SolverBase):
         self.solver3.solve(self.b3, self.u_sol.x.petsc_vec)
         self.u_sol.x.scatter_forward()
 
-        # update u_n u_n1
-        with self.u_sol.x.petsc_vec.localForm() as loc_, self.u_n.x.petsc_vec.localForm() as loc_n, self.u_n1.x.petsc_vec.localForm() as loc_n1:
+        # update u_n1
+        with self.u_prev.x.petsc_vec.localForm() as loc_n, self.u_n1.x.petsc_vec.localForm() as loc_n1:
             loc_n.copy(loc_n1)
-            loc_.copy(loc_n)

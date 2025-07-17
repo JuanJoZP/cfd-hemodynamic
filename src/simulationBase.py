@@ -4,17 +4,20 @@ from typing import Callable
 
 import os
 import numpy as np
+from mpi4py import MPI
+from petsc4py import PETSc
 from src.boundaryCondition import BoundaryCondition
 from src.solverBase import SolverBase
 from datetime import datetime, timezone, timedelta
-from mpi4py import MPI
 from ufl import inner, dx
 from dolfinx.io import VTXWriter
 from dolfinx.mesh import Mesh
-from dolfinx.fem import DirichletBC, form, assemble_scalar, Function, Expression
+from dolfinx.fem import form, assemble_scalar, Function, Expression
 
 
 class SimulationBase(ABC):
+    EARLY_STOP_TOLERANCE = 1e-10
+
     @property
     @abstractmethod
     def mesh(self) -> Mesh:
@@ -115,7 +118,7 @@ class SimulationBase(ABC):
         if error_log:
             error_log.write("t = %.3f: error = %.3g" % (t, error) + "\n")
 
-        for _ in range(num_steps):
+        for i in range(num_steps):
             solver.solveStep()
 
             if progress:
@@ -134,6 +137,16 @@ class SimulationBase(ABC):
 
             if afterStepCallback:
                 afterStepCallback(t)
+
+            if (i + 1) % 10 == 0:
+                u_diff = solver.u_sol.x.array - solver.u_prev.x.array
+                u_diff_norm = np.linalg.norm(u_diff, ord=np.inf)
+                u_diff_norm = mesh.comm.allreduce(u_diff_norm, op=MPI.MAX)
+                if u_diff_norm < self.EARLY_STOP_TOLERANCE:
+                    break
+
+            solver.u_prev.x.array[:] = solver.u_sol.x.array[:]
+            solver.p_prev.x.array[:] = solver.p_sol.x.array[:]
 
         u_file.close()
         p_file.close()
