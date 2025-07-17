@@ -32,6 +32,8 @@ class SolverBase(ABC):
         self.f = Constant(mesh, PETSc.ScalarType(f))
         self._u_sol: Function | None = None
         self._p_sol: Function | None = None
+        self._u_prev: Function | None = None
+        self._p_prev: Function | None = None
         self._V: FunctionSpace | None = None
         self._Q: FunctionSpace | None = None
 
@@ -47,6 +49,22 @@ class SolverBase(ABC):
     def p_sol(self):
         assert (
             self._p_sol is not None
+        ), "Pressure solution function is not initialized. call initPressureSpace() first."
+
+        return self._p_sol
+
+    @property
+    def u_prev(self):
+        assert (
+            self._u_prev is not None
+        ), "Velocity solution function is not initialized. call initVelocitySpace() first."
+
+        return self._u_prev
+
+    @property
+    def p_prev(self):
+        assert (
+            self._p_prev is not None
         ), "Pressure solution function is not initialized. call initPressureSpace() first."
 
         return self._p_sol
@@ -90,6 +108,7 @@ class SolverBase(ABC):
         self._V = functionspace(self.mesh, element_v)
         self._u_sol = Function(self.V)
         self._u_sol.name = "velocity"
+        self._u_prev = Function(self.V)
 
     def initPressureSpace(
         self,
@@ -106,6 +125,7 @@ class SolverBase(ABC):
         self._Q = functionspace(self.mesh, element_p)
         self._p_sol = Function(self.Q)
         self._p_sol.name = "pressure"
+        self._p_prev = Function(self.Q)
 
     @staticmethod
     def epsilon(u):

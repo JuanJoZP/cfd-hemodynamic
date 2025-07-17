@@ -280,6 +280,3 @@ class Solver(SolverBase):
         reason = self.solver.getConvergedReason()
         if reason < 0:
             raise RuntimeError(f"Did not converge, reason: {reason}.")
-        else:
-            self.u_prev.x.array[:] = self.u_sol.x.array[:]
-            self.p_prev.x.array[:] = self.p_sol.x.array[:]
