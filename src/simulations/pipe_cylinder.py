@@ -12,7 +12,7 @@ import os
 
 from src.boundaryCondition import BoundaryCondition
 
-solver_name = "stabilized_schur_full"
+solver_name = "stabilized_schur"
 simulation_name = "pipe_cylinder"
 rho = 1
 mu = 1 / 1000
@@ -170,10 +170,7 @@ class PipeCylinderSimulation(SimulationBase):
     @staticmethod
     def inlet_velocity(x):
         values = np.zeros((2, x.shape[1]), dtype=PETSc.ScalarType)
-        values[0] = 4 * 1.5 * x[1] * (0.41 - x[1]) / (0.41**2) + 0.1 * np.sin(
-            np.pi * x[1] / 0.1
-        )
-        values[1] = 0.05 * np.sin(np.pi * x[1] / 0.05)
+        values[0] = 4 * 1.5 * x[1] * (0.41 - x[1]) / (0.41**2)
         return values
 
 
