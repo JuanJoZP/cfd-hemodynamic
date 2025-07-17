@@ -26,7 +26,6 @@ from ufl import (
     div,
     TestFunctions,
     sqrt,
-    CellDiameter,
     conditional,
     le,
 )
@@ -37,7 +36,6 @@ from dolfinx.fem.petsc import (
     assemble_vector_block,
 )
 
-from src.solvers_aux.stokes import StokesSolver
 from src.boundaryCondition import BoundaryCondition
 from src.solverBase import SolverBase
 
@@ -129,10 +127,18 @@ class Solver(SolverBase):
 
     def updateSolution(self, x: PETSc.Vec) -> None:
         "Updates the solution functions u_sol and p_sol with the values in x."
-        self.u_sol.x.array[:] = x[: self.offset]
-        self.p_sol.x.array[:] = x[self.offset :]
-        self.u_sol.x.scatter_forward()
-        self.p_sol.x.scatter_forward()
+        start_u, end_u = self.u_prev.x.petsc_vec.getOwnershipRange()
+        start_p, end_p = self.p_prev.x.petsc_vec.getOwnershipRange()
+        u_size_local = self.u_prev.x.petsc_vec.getLocalSize()
+
+        self.u_sol.x.petsc_vec.setValues(range(start_u, end_u), x.array_r[:u_size_local])
+        self.p_sol.x.petsc_vec.setValues(range(start_p, end_p), x.array_r[u_size_local:])
+        self.u_sol.x.petsc_vec.ghostUpdate(
+            addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
+        )
+        self.p_sol.x.petsc_vec.ghostUpdate(
+            addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
+        )
 
     def assembleJacobian(
         self,
@@ -176,18 +182,8 @@ class Solver(SolverBase):
         self.b = create_vector_block(self.F_form)
         self.x_n = self.b.duplicate()  # solution to the nth newton iteration
         self.offset = (
-            self.u_sol.x.petsc_vec.getLocalSize()
-        )  # after this index values of x correspond to pressure, before to velocity
-
-        # guess for the soltion at t = 0
-        # !!! solamente deberia si no se provee initial_solution
-        # stokes_solver = StokesSolver(self.mesh, self.rho, self.mu, self.f)
-        # bcu_stokes = [bc.getBC(stokes_solver.V) for bc in bcu]
-        # bcp_stokes = [bc.getBC(stokes_solver.Q) for bc in bcp]
-        # stokes_solver.solve([*bcu_stokes, *bcp_stokes])
-
-        # self.u_prev.interpolate(stokes_solver.u_sol)
-        # self.p_prev.interpolate(stokes_solver.p_sol)
+            self.V.dofmap.index_map.size_local + self.V.dofmap.index_map.num_ghosts
+        ) * self.V.dofmap.index_map_bs  # after this index values of x correspond to pressure, before to velocity
 
         self.bcu_d = [bc.getBC(self.V) for bc in bcu]
         self.bcp_d = [bc.getBC(self.Q) for bc in bcp]
@@ -207,64 +203,69 @@ class Solver(SolverBase):
         )
 
         # x is the initial guess for the newton iteration = solution at previous time step
-        self.x_n.setValues(range(0, self.offset), self.u_prev.x.petsc_vec)
+        start, end = self.x_n.getOwnershipRange()
+        u_size_local = self.u_prev.x.petsc_vec.getLocalSize()
+        self.x_n.setValues(range(start, start + u_size_local), self.u_prev.x.petsc_vec)
         self.x_n.setValues(
-            range(
-                self.offset,
-                self.offset
-                + self.Q.dofmap.index_map.size_local * self.Q.dofmap.index_map_bs,
-            ),
+            range(start + u_size_local, end),
             self.p_prev.x.petsc_vec,
         )
         self.x_n.assemble()
 
-        # gmres global solver with field split (schur) preconditioner
+        # fgmres global solver with field split (schur) preconditioner
         ksp = snes.getKSP()
-        ksp.setType("gmres")
+        ksp.setType("fgmres")
         snes.computeJacobian(self.x_n, self.A)  # asemble A in order to set up PC
         ksp.setOperators(self.A)
 
         pc = ksp.getPC()
         pc.setType("fieldsplit")
         pc.setFieldSplitType(PETSc.PC.CompositeType.SCHUR)
-        pc.setFieldSplitSchurFactType(PETSc.PC.SchurFactType.DIAG)
+        pc.setFieldSplitSchurFactType(PETSc.PC.SchurFactType.LOWER)
         pc.setFieldSplitSchurPreType(PETSc.PC.SchurPreType.SELFP)
 
-        IS = PETSc.IS
-        fields = self.V.dofmap.index_map, self.Q.dofmap.index_map
-        u_size = fields[0].size_local * self.V.dofmap.index_map_bs
-        p_size = fields[1].size_local * self.Q.dofmap.index_map_bs
-        is_u = IS().createStride(u_size, 0, 1, self.mesh.comm)
-        is_p = IS().createStride(p_size, u_size, 1, self.mesh.comm)
+        V_map = self.V.dofmap.index_map
+        Q_map = self.Q.dofmap.index_map
+        offset_u = (
+            V_map.local_range[0] * self.V.dofmap.index_map_bs + Q_map.local_range[0]
+        )
+        offset_p = offset_u + V_map.size_local * self.V.dofmap.index_map_bs
+        is_u = PETSc.IS().createStride(
+            V_map.size_local * self.V.dofmap.index_map_bs,
+            offset_u,
+            1,
+            comm=self.mesh.comm,
+        )
+        is_p = PETSc.IS().createStride(Q_map.size_local, offset_p, 1, comm=self.mesh.comm)
         pc.setFieldSplitIS(("u", is_u), ("p", is_p))
         pc.setUp()
 
-        # solve the schur block with gmres and the pressure block with cg
+        # set solvers for schur and pressure blocks
         ksp_u, ksp_p = pc.getFieldSplitSchurGetSubKSP()
         ksp_u.setType("gmres")
-        ksp_u.getPC().setType("ilu")
-        ksp_p.setType("cg")
-        ksp_p.getPC().setType("ilu")
+        ksp_u.getPC().setType("asm")
+        ksp_p.setType("preonly")
+        ksp_p.getPC().setType("asm")
 
-        # snes.setMonitor(lambda snes, its, rnorm: print(f"Iter {its}: residual = {rnorm}")) if --debug ??
+        ksp_u.getPC().setUp()
+        ksp_p.getPC().setUp()
+
         snes.setFromOptions()
         snes.setUp()
         self.solver = snes
 
-        # create pressure null space
-        with self.A.createVecs()[0].localForm() as vec_const:
-            vec_const.set(0.0)  # 0 on u part
+        # constant pressure null space
+        vec_const = self.A.createVecs()[0]
+        vec_const.set(0.0)
+        indices_p = is_p.getIndices()
+        for i in indices_p:
+            vec_const.setValue(i, 1.0)
+        vec_const.assemble()
 
-            start, end = is_p.getIndices()[0], is_p.getIndices()[-1] + 1
-            vec_const.array[start:end] = 1.0  # 1 on p part (constant)
-            vec_const.assemble()
+        norm = vec_const.norm(PETSc.NormType.NORM_2)
+        vec_const.scale(1.0 / norm)  # normalize
 
-            norm = vec_const.norm(PETSc.NormType.NORM_2)
-            vec_const.scale(1.0 / norm)  # normalize
-
-            self.nullsp = PETSc.NullSpace().create(
-                vectors=[vec_const], comm=self.mesh.comm
-            )
+        self.nullsp = PETSc.NullSpace().create(vectors=[vec_const], comm=self.mesh.comm)
 
     def solveStep(self):
         if self.nullsp.test(self.A):
@@ -279,9 +280,5 @@ class Solver(SolverBase):
         if reason < 0:
             raise RuntimeError(f"Did not converge, reason: {reason}.")
         else:
-            print(
-                f"Converged after {self.solver.getIterationNumber()} iterations. residual: {self.solver.getFunctionNorm()}."
-            )
-
             self.u_prev.x.array[:] = self.u_sol.x.array[:]
             self.p_prev.x.array[:] = self.p_sol.x.array[:]
