@@ -16,7 +16,9 @@ from dolfinx.fem import form, assemble_scalar, Function, Expression
 
 
 class SimulationBase(ABC):
-    EARLY_STOP_TOLERANCE = 1e-10
+    EARLY_STOP_TOLERANCE = (
+        1e-5  # if |(u_sol-u_prev)|_inf < EARLY_STOP_TOLERANCE, stop simulation
+    )
 
     @property
     @abstractmethod
