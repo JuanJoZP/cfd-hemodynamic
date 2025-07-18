@@ -63,8 +63,6 @@ class Solver(SolverBase):
         self.VQ = MixedFunctionSpace(self.V, self.Q)
 
         v, q = TestFunctions(self.VQ)
-        self.u_prev = Function(self.V)
-        self.p_prev = Function(self.Q)
 
         if initial_velocity:
             self.u_prev.interpolate(initial_velocity)
@@ -167,6 +165,7 @@ class Solver(SolverBase):
 
         x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
         self.updateSolution(x)
+        [bc.update() for bc in bcs]
 
         assemble_vector_block(F_vec, self.F_form, self.J_form, bcs=bcs, x0=x, alpha=-1.0)
         F_vec.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)

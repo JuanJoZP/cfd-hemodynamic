@@ -53,9 +53,6 @@ class Solver(SolverBase):
         v = TestFunction(self.V)
         q = TestFunction(self.Q)
 
-        self.u_prev = Function(self.V)
-        self.p_prev = Function(self.Q)
-
         if initial_velocity:
             self.u_prev.interpolate(initial_velocity)
 
@@ -119,6 +116,8 @@ class Solver(SolverBase):
         pc3.setType(PETSc.PC.Type.SOR)
 
     def solveStep(self):
+        [bc.update() for bc in self.bcu_d]
+        [bc.update() for bc in self.bcp_d]
         # step 1
         with self.b1.localForm() as loc_1:
             loc_1.set(0)

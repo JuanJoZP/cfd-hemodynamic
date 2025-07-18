@@ -125,6 +125,8 @@ class Solver(SolverBase):
         pc3.setType(PETSc.PC.Type.SOR)
 
     def solveStep(self) -> None:
+        [bc.update() for bc in self.bcu_d]
+        [bc.update() for bc in self.bcp_d]
         # step 1
         self.A1.zeroEntries()
         assemble_matrix(self.A1, self.a1, bcs=self.bcu_d)
