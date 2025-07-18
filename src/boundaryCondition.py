@@ -7,6 +7,7 @@ from dolfinx.fem import (
     locate_dofs_topological,
 )
 from typing import Callable
+from types import MethodType
 from numpy import ndarray, dtype, int32
 
 
@@ -39,6 +40,16 @@ class BoundaryCondition:
 
     def getBC(self, V: FunctionSpace) -> DirichletBC:
         dofs = self._getDofs(V)
-        f_V = Function(V)
-        f_V.interpolate(self.f)
-        return dirichletbc(f_V, dofs)
+        self._f_V = Function(V)
+        self._f_V.interpolate(self.f)
+
+        bc = dirichletbc(self._f_V, dofs)
+
+        def update(inner_self):
+            self._f_V.interpolate(self.f)
+
+        bc.update = MethodType(update, bc)
+        return bc
+
+    def updateBCValues(self, f: Function) -> None:
+        assert self._f_V, "Boundary condition values have not been initialized."
