@@ -102,11 +102,17 @@ class SimulationBase(ABC):
         parent_route = f"results/{self.simulation_name}/{self.solver_name}/{safe_date}"
         u_file = VTXWriter(mesh.comm, f"{parent_route}/v.bp", self.solver.u_sol)
         p_file = VTXWriter(mesh.comm, f"{parent_route}/p.bp", self.solver.p_sol)
+        solver.initStressForm()
+        wss_file = VTXWriter(
+            mesh.comm, f"{parent_route}/wss.bp", self.solver.shear_stress
+        )
 
         t = 0.0
         self.solver.u_sol.interpolate(self.initial_velocity)
+        solver.assemble_wss()
         u_file.write(t)
         p_file.write(t)
+        wss_file.write(t)
 
         error_log = None
         if self.has_exact_solution:
@@ -134,8 +140,10 @@ class SimulationBase(ABC):
                 if error_log:
                     error_log.write("t = %.3f: error = %.3g" % (t, error) + "\n")
 
+            solver.assemble_wss()
             u_file.write(t)
             p_file.write(t)
+            wss_file.write(t)
 
             if afterStepCallback:
                 afterStepCallback(t)
@@ -152,6 +160,7 @@ class SimulationBase(ABC):
 
         u_file.close()
         p_file.close()
+        wss_file.close()
         if error_log:
             error_log.close()
         if progress:
