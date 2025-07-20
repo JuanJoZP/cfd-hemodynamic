@@ -8,9 +8,15 @@ from ufl import (
     Identity,
     nabla_grad,
     sym,
+    FacetNormal,
+    inner,
+    TestFunction,
+    ds,
+    FacetArea,
 )
 from dolfinx.mesh import Mesh
-from dolfinx.fem import Constant, functionspace, Function, FunctionSpace
+from dolfinx.fem import Constant, functionspace, Function, FunctionSpace, form
+from dolfinx.fem.petsc import assemble_vector
 from src.boundaryCondition import BoundaryCondition
 
 
@@ -127,6 +133,35 @@ class SolverBase(ABC):
         self._p_sol.name = "pressure"
         self._p_prev = Function(self.Q)
 
+    def initStressForm(self):
+        scalar = functionspace(
+            self.mesh, element("CG", self.mesh.topology.cell_name(), 1)
+        )
+        vector = functionspace(
+            self.mesh,
+            element(
+                "CG", self.mesh.topology.cell_name(), 1, shape=(self.mesh.geometry.dim,)
+            ),
+        )
+
+        self.normal_stress = Function(scalar)
+        self.normal_stress.name = "normal_stress"
+        self.shear_stress = Function(vector)
+        self.shear_stress.name = "shear_stress"
+
+        # stress forms
+        n = FacetNormal(self.mesh)
+        T = -self.sigma(self.u_sol, self.p_sol, self.mu) * n
+
+        Tn = inner(T, n)
+        Tt = T - Tn * n
+
+        v = TestFunction(scalar)
+        w = TestFunction(vector)
+
+        self.Ln = (1 / FacetArea(self.mesh)) * v * Tn * ds
+        self.Lt = (1 / FacetArea(self.mesh)) * inner(w, Tt) * ds
+
     @staticmethod
     def epsilon(u):
         return sym(nabla_grad(u))
@@ -134,3 +169,15 @@ class SolverBase(ABC):
     @staticmethod
     def sigma(u, p, mu):
         return 2 * mu * sym(nabla_grad(u)) - p * Identity(len(u))
+
+    def assemble_wss(self):
+        # self.normal_stress.x.petsc_vec.zeroEntries()
+        # assemble_vector(self.normal_stress.x.petsc_vec, form(self.Ln))
+        # self.normal_stress.x.petsc_vec.ghostUpdate(
+        #     addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
+        # )
+        self.shear_stress.x.petsc_vec.zeroEntries()
+        assemble_vector(self.shear_stress.x.petsc_vec, form(self.Lt))
+        self.shear_stress.x.petsc_vec.ghostUpdate(
+            addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
+        )
