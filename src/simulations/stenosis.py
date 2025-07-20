@@ -175,7 +175,7 @@ class StenosisSimulation(SimulationBase):
         if mesh_comm.rank == model_rank:
             gmsh.option.setNumber("Mesh.Algorithm", 8)
             gmsh.model.mesh.generate(gdim)
-            gmsh.model.mesh.setOrder(2)
+            gmsh.model.mesh.setOrder(1)
             gmsh.model.mesh.optimize("Netgen")
 
         mesh, _, ft = gmshio.model_to_mesh(gmsh.model, mesh_comm, model_rank, gdim=gdim)
