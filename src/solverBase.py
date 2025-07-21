@@ -178,6 +178,4 @@ class SolverBase(ABC):
         # )
         self.shear_stress.x.petsc_vec.zeroEntries()
         assemble_vector(self.shear_stress.x.petsc_vec, form(self.Lt))
-        self.shear_stress.x.petsc_vec.ghostUpdate(
-            addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
-        )
+        self.shear_stress.x.scatter_forward()
