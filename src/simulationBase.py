@@ -60,7 +60,7 @@ class SimulationBase(ABC):
             self.mesh, dt, rho, mu, f, initial_velocity=self.initial_velocity
         )
 
-        self.num_steps = int(T / dt)
+        self.T = T
         self.has_exact_solution = (
             self.__class__.exact_velocity is not SimulationBase.exact_velocity
         )
@@ -86,10 +86,18 @@ class SimulationBase(ABC):
 
         tqdm = self.get_tqdm()
         mesh = self.mesh
-        num_steps = self.num_steps
+        T = self.T
         solver = self.solver
 
-        progress = tqdm(desc="Solving", total=num_steps) if mesh.comm.rank == 0 else None
+        progress = (
+            tqdm(
+                desc="Solving",
+                total=float(T),
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+            )
+            if mesh.comm.rank == 0
+            else None
+        )
 
         date = (
             datetime.now(tz=timezone(-timedelta(hours=5))).isoformat(timespec="seconds")
@@ -126,12 +134,14 @@ class SimulationBase(ABC):
         if error_log:
             error_log.write("t = %.3f: error = %.3g" % (t, error) + "\n")
 
-        for i in range(num_steps):
+        i = 0
+        while t < T:
             solver.solveStep()
 
             if progress:
-                progress.update()
+                progress.update(self.dt)
 
+            i += 1
             t += self.dt
 
             if self.has_exact_solution:
