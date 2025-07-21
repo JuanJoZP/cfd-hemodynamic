@@ -14,13 +14,13 @@ simulation_name = "stenosis"
 # rho = 1055 kg/m^3; mu = 0.0035 Pa.s
 rho = 1  # scaled
 mu = 3.3e-6
-dt = 1 / 1200
+dt = 1 / 2500
 T = 10
 
 res = 0.0001
 L = 0.03
 H = 0.003
-x_position_stenosis = 0.01
+x_position_stenosis = 0.005
 inlet_max_velocity = 0.22
 stenosis_grade = "severe"
 stenosis = {
@@ -90,6 +90,14 @@ class StenosisSimulation(SimulationBase):
             self._bcu = [bcu_inflow, bcu_walls]
 
         return self._bcu
+
+    def solve(self):
+        def update_dt(t):
+            if t > 10 * self.dt and self.dt < 1 / 1000:
+                self.dt = 1 / 200
+                self.solver.dt.value = self.dt
+
+        return super().solve(update_dt)
 
     @property
     def bcp(self):
