@@ -45,13 +45,15 @@ p_c = rho_real * U_c**2
 r_in = r_mesh_in * L_c
 r_out2 = r_mesh_out2 * L_c
 
+v_inlet = 1.5
+
 # presiones reales a preescribir (Pascales)
-p_inlet = 5300  # ~40mmHg
-p_outlet1 = 4200  # ~ 31mmHg
-p_outlet2 = 4200  # ~ 10mmHg
+# p_inlet = 5300  # ~40mmHg
+p_outlet1 = 0  # ~ 31mmHg
+p_outlet2 = 0  # ~ 10mmHg
 
 # pasamos a valores adimensionales
-p_inlet_adim = p_inlet / p_c
+# p_inlet_adim = p_inlet / p_c
 p_outlet1_adim = p_outlet1 / p_c
 p_outlet2_adim = p_outlet2 / p_c
 
@@ -105,7 +107,13 @@ class MicrovasculatureSimulation(SimulationBase):
             bcu_walls = BoundaryCondition(u_nonslip)
             bcu_walls.initTopological(fdim, entities_walls)
 
-            self._bcu = [bcu_walls]
+            u_inlet = Function(self.solver.V)
+            u_inlet.interpolate(self.inlet_velocity(v_inlet, r_mesh_in))
+            entities_inflow = self._ft.find(self.inlet_tag)
+            bcu_inflow = BoundaryCondition(u_inlet)
+            bcu_inflow.initTopological(fdim, entities_inflow)
+
+            self._bcu = [bcu_walls, bcu_inflow]
 
         return self._bcu
 
@@ -113,13 +121,6 @@ class MicrovasculatureSimulation(SimulationBase):
     def bcp(self):
         if not self._bcp:
             fdim = self.mesh.topology.dim - 1
-
-            # inlet
-            p_inlet_func = Function(self.solver.Q)
-            p_inlet_func.x.array[:] = p_inlet_adim
-            inlet_entities = self._ft.find(self.inlet_tag)
-            bc_inlet = BoundaryCondition(p_inlet_func)
-            bc_inlet.initTopological(fdim, inlet_entities)
 
             # outlet 1
             p_outlet1_func = Function(self.solver.Q)
@@ -135,13 +136,23 @@ class MicrovasculatureSimulation(SimulationBase):
             bc_outlet2 = BoundaryCondition(p_outlet2_func)
             bc_outlet2.initTopological(fdim, outlet2_entities)
 
-            self._bcp = [bc_inlet, bc_outlet1, bc_outlet2]
+            self._bcp = [bc_outlet1, bc_outlet2]
 
         return self._bcp
 
     def initial_velocity(self, x):
         values = np.zeros((self.mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
         return values
+
+    @staticmethod
+    def inlet_velocity(v_max, r_max):
+        def velocity(x):
+            values = np.zeros((3, x.shape[1]), dtype=PETSc.ScalarType)
+            r = (x[0] ** 2 + x[2] ** 2) ** (1 / 2)
+            values[1] = v_max * (1 - (r / r_max) ** 2)
+            return values
+
+        return velocity
 
 
 simulation = MicrovasculatureSimulation(
