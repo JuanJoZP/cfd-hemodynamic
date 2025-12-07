@@ -1,10 +1,10 @@
 import numpy as np
 from lxml import etree  # type: ignore
+import gmsh
 
 GXL_FILE = "src/geom/tree_structure.xml"
 VOXEL_WIDTH = 0.04
 OUT_MSH = "vessels.msh"
-OUT_XDMF = "vessels.xdmf"
 
 import cadquery as cq
 
@@ -224,24 +224,97 @@ def build_mesh(
         queue.append((end1, r1))
         queue.append((end2, r2))
 
-    cq.exporters.export(result, "mesh.brep")
+    return result
 
+def tag_and_mesh_with_gmsh(brep_path: str, nodes: dict, node_types: dict, tol: float = VOXEL_WIDTH * 0.6):
+    """
+    Import the brep into gmsh, find surfaces nearest the requested node points (inlet + terminals),
+    create physical groups for inlet, outlets and walls, then mesh and write out_msh.
+    """
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Terminal", 1)
+    gmsh.merge(brep_path)
 
-# def convert_to_xdmf(msh_file):
-#     m = meshio.read(msh_file)
-#     cells = {c.type: c.data for c in m.cells}
-#     if "tetra" in cells:
-#         tet_mesh = meshio.Mesh(
-#             points=m.points,
-#             cells={"tetra": cells["tetra"]},
-#             cell_data={"gmsh:physical": [m.cell_data_dict["gmsh:physical"]["tetra"]]},
-#         )
-#         meshio.write(OUT_XDMF, tet_mesh)
-#         print(f"[OK] XDMF guardado en {OUT_XDMF}")
-#     else:
-#         print("[WARN] No tetrahedra en el msh, revisa la generación.")
+   #gmsh.option.setNumber("Mesh.CharacteristicLengthMax", 2e-3)
+    #gmsh.option.setNumber("Mesh.Smoothing", 3)
+    gmsh.option.setNumber("Mesh.CharacteristicLengthFromCurvature", 1)
+    gmsh.option.setNumber("Mesh.MinimumElementsPerTwoPi", 11)
 
+    # get all 2D entities (surfaces)
+    surfaces = gmsh.model.getEntities(2)  # list of (2, tag)
+
+    # precompute surface centers (bounding-box centers)
+    surf_centers = {}
+    for dim, s in surfaces:
+        xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(dim, s)
+        cx = 0.5 * (xmin + xmax)
+        cy = 0.5 * (ymin + ymax)
+        cz = 0.5 * (zmin + zmax)
+        surf_centers[s] = (cx, cy, cz)
+
+    assigned = {}  # node_id -> surface tag
+
+    # helper to find nearest surface to a point
+    def find_nearest_surface(pt):
+        best_s = None
+        best_d2 = float("inf")
+        for s, c in surf_centers.items():
+            d2 = (c[0] - pt[0]) ** 2 + (c[1] - pt[1]) ** 2 + (c[2] - pt[2]) ** 2
+            if d2 < best_d2:
+                best_d2 = d2
+                best_s = s
+        return best_s, best_d2 ** 0.5
+
+    # inlet: root node
+    root_id = next(filter(lambda n: node_types[n] == " root node ", nodes.keys()))
+    inlet_pt = tuple(nodes[root_id])
+    s_inlet, d_in = find_nearest_surface(inlet_pt)
+    if s_inlet is None or d_in > tol:
+        print(f"[WARN] inlet surface not found within tol ({d_in:.4g} > {tol}).")
+    else:
+        assigned[root_id] = s_inlet
+
+    # outlets: terminal nodes
+    for nid, ntype in node_types.items():
+        if ntype == " terminal node ":
+            pt = tuple(nodes[nid])
+            s_out, d_out = find_nearest_surface(pt)
+            if s_out is None or d_out > tol:
+                print(f"[WARN] outlet {nid} not found within tol ({d_out:.4g} > {tol}).")
+            else:
+                assigned[nid] = s_out
+
+    # create physical groups
+    used_surfaces = set(assigned.values())
+    # inlet
+    if root_id in assigned:
+        phys_in = gmsh.model.addPhysicalGroup(2, [assigned[root_id]])
+        gmsh.model.setPhysicalName(2, phys_in, "inlet")
+    # outlets (name by node id)
+    for nid, s in assigned.items():
+        if nid == root_id:
+            continue
+        phys = gmsh.model.addPhysicalGroup(2, [s])
+        gmsh.model.setPhysicalName(2, phys, f"outlet_{nid}")
+
+    # walls = all surfaces not used
+    all_surface_tags = [s for (_, s) in surfaces]
+    wall_surfaces = [s for s in all_surface_tags if s not in used_surfaces]
+    if wall_surfaces:
+        phys_walls = gmsh.model.addPhysicalGroup(2, wall_surfaces)
+        gmsh.model.setPhysicalName(2, phys_walls, "walls")
+
+    # generate 3D mesh (volumes must exist in the imported brep)
+    try:
+        gmsh.model.mesh.generate(3)
+    except Exception as e:
+        print(f"[ERROR] gmsh mesh generation failed: {e}")
+    gmsh.write(OUT_MSH)
+    gmsh.finalize()
+    print(f"[OK] Mesh with physical groups written to {OUT_MSH}")
 
 if __name__ == "__main__":
     nodes, node_types, edges = parse_gxl(GXL_FILE)
-    build_mesh(nodes, node_types, edges)
+    geom = build_mesh(nodes, node_types, edges)
+    cq.exporters.export(geom, "vessels.brep")
+    tag_and_mesh_with_gmsh("vessels.brep", nodes, node_types)

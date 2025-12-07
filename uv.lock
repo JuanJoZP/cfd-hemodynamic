@@ -259,6 +259,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "cadquery" },
+    { name = "gmsh" },
     { name = "lxml" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -267,6 +268,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "cadquery", specifier = ">=2.6.1" },
+    { name = "gmsh", specifier = ">=4.15.0" },
     { name = "lxml", specifier = ">=6.0.2" },
     { name = "numpy", specifier = ">=2.2.6" },
 ]
@@ -659,6 +661,17 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/89/76/c615883b7b521ead2944bb3480398cbb07e12b7b4e4d073d3752eb721558/frozenlist-1.8.0-cp314-cp314t-win_amd64.whl", hash = "sha256:06be8f67f39c8b1dc671f5d83aaefd3358ae5cdcf8314552c57e7ed3e6475bdd", size = 49451, upload-time = "2025-10-06T05:37:53.425Z" },
     { url = "https://files.pythonhosted.org/packages/e0/a3/5982da14e113d07b325230f95060e2169f5311b1017ea8af2a29b374c289/frozenlist-1.8.0-cp314-cp314t-win_arm64.whl", hash = "sha256:102e6314ca4da683dca92e3b1355490fed5f313b768500084fbe6371fddfdb79", size = 42507, upload-time = "2025-10-06T05:37:54.513Z" },
     { url = "https://files.pythonhosted.org/packages/9a/9a/e35b4a917281c0b8419d4207f4334c8e8c5dbf4f3f5f9ada73958d937dcc/frozenlist-1.8.0-py3-none-any.whl", hash = "sha256:0c18a16eab41e82c295618a77502e17b195883241c563b00f0aa5106fc4eaa0d", size = 13409, upload-time = "2025-10-06T05:38:16.721Z" },
+]
+
+[[package]]
+name = "gmsh"
+version = "4.15.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/95/01df2f928b4498bd4705c5cf81b0ed191b6d3b6ce4eaa6fddf6890f4f7cd/gmsh-4.15.0-py2.py3-none-macosx_10_15_x86_64.whl", hash = "sha256:1a7951836982f97e21e8b2de106fe1e8455cde53719191a3950784b56e2606af", size = 40170061, upload-time = "2025-10-26T20:30:21.097Z" },
+    { url = "https://files.pythonhosted.org/packages/29/a4/b1e9b4997c6f4a29fb8a9736851430bf306701e5f7f1266eafc1f860cbfe/gmsh-4.15.0-py2.py3-none-macosx_12_0_arm64.whl", hash = "sha256:042f76562244dfbad46edfeacaa092c8c95a9df8fb4fd7611771477f0031be0d", size = 36425180, upload-time = "2025-10-26T20:30:25.241Z" },
+    { url = "https://files.pythonhosted.org/packages/63/22/27f88a5a1c48b833c5893a23b71cf74b5270fac82d88e337ec2c138e8853/gmsh-4.15.0-py2.py3-none-manylinux_2_24_x86_64.whl", hash = "sha256:998527cb172f2529c6beca7334a6ca788fa54fbb3d4f817deb0903005d49344d", size = 40003017, upload-time = "2025-10-26T20:30:28.718Z" },
+    { url = "https://files.pythonhosted.org/packages/23/51/21175eb9c6a592431a5c87f288ce447af1cea68a6ad4169765dc7ab7a9e7/gmsh-4.15.0-py2.py3-none-win_amd64.whl", hash = "sha256:a5b9867f88af59aff269a93abbd009551fbc263eb94a165a25a0c8072bae13db", size = 42233991, upload-time = "2025-10-26T20:30:32.722Z" },
 ]
 
 [[package]]

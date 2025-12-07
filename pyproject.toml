@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "cadquery>=2.6.1",
+    "gmsh>=4.15.0",
     "lxml>=6.0.2",
     "numpy>=2.2.6",
 ]
