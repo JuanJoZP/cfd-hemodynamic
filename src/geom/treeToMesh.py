@@ -1,12 +1,15 @@
 import numpy as np
 from lxml import etree  # type: ignore
 import gmsh
+import cadquery as cq
 
 GXL_FILE = "src/geom/tree_structure.xml"
 VOXEL_WIDTH = 0.04
-OUT_MSH = "vessels.msh"
+OUT_MSH = "src/geom/vessels.msh"
 
-import cadquery as cq
+inlet_tag = 1
+outlet_tag = 2
+wall_tag = 3
 
 
 def magnitude(v: cq.Vector) -> float:
@@ -28,6 +31,8 @@ def create_root_bifurcation(root_node, bif_node, r1, end1_node, end2_node, r2, r
     plane_circle = cq.Plane(
         origin=start_inlet, xDir=(1, 0, 0), normal=end_inlet - start_inlet
     )
+    print(end_inlet - start_inlet)
+    print(start_inlet)
     inlet_line = cq.Workplane("XY").spline([start_inlet, end_inlet])
     inlet_volume = (
         cq.Workplane(plane_circle).workplane(offset=0).circle(r1).sweep(inlet_line)
@@ -47,9 +52,7 @@ def create_root_bifurcation(root_node, bif_node, r1, end1_node, end2_node, r2, r
     end_b = end_b1 if r2 >= r3 else end_b2
     r = r2 if r2 >= r3 else r3
 
-    plane_circle = cq.Plane(
-        origin=start_b, xDir=(1, 0, 0), normal=start_b - start_inlet
-    )
+    plane_circle = cq.Plane(origin=start_b, xDir=(1, 0, 0), normal=start_b - start_inlet)
     bif1_line = cq.Workplane("XY").spline(
         [start_b, end_b], tangents=[start_b - start_inlet, end_b - start_b]
     )
@@ -226,7 +229,10 @@ def build_mesh(
 
     return result
 
-def tag_and_mesh_with_gmsh(brep_path: str, nodes: dict, node_types: dict, tol: float = VOXEL_WIDTH * 0.6):
+
+def tag_and_mesh_with_gmsh(
+    brep_path: str, nodes: dict, node_types: dict, tol: float = VOXEL_WIDTH * 0.6
+):
     """
     Import the brep into gmsh, find surfaces nearest the requested node points (inlet + terminals),
     create physical groups for inlet, outlets and walls, then mesh and write out_msh.
@@ -235,8 +241,8 @@ def tag_and_mesh_with_gmsh(brep_path: str, nodes: dict, node_types: dict, tol: f
     gmsh.option.setNumber("General.Terminal", 1)
     gmsh.merge(brep_path)
 
-   #gmsh.option.setNumber("Mesh.CharacteristicLengthMax", 2e-3)
-    #gmsh.option.setNumber("Mesh.Smoothing", 3)
+    # gmsh.option.setNumber("Mesh.CharacteristicLengthMax", 2e-3)
+    # gmsh.option.setNumber("Mesh.Smoothing", 3)
     gmsh.option.setNumber("Mesh.CharacteristicLengthFromCurvature", 1)
     gmsh.option.setNumber("Mesh.MinimumElementsPerTwoPi", 11)
 
@@ -263,7 +269,7 @@ def tag_and_mesh_with_gmsh(brep_path: str, nodes: dict, node_types: dict, tol: f
             if d2 < best_d2:
                 best_d2 = d2
                 best_s = s
-        return best_s, best_d2 ** 0.5
+        return best_s, best_d2**0.5
 
     # inlet: root node
     root_id = next(filter(lambda n: node_types[n] == " root node ", nodes.keys()))
@@ -288,21 +294,20 @@ def tag_and_mesh_with_gmsh(brep_path: str, nodes: dict, node_types: dict, tol: f
     used_surfaces = set(assigned.values())
     # inlet
     if root_id in assigned:
-        phys_in = gmsh.model.addPhysicalGroup(2, [assigned[root_id]])
-        gmsh.model.setPhysicalName(2, phys_in, "inlet")
+        phys_in = gmsh.model.addPhysicalGroup(2, [assigned[root_id]], inlet_tag)
+        gmsh.model.setPhysicalName(2, inlet_tag, "inlet")
     # outlets (name by node id)
-    for nid, s in assigned.items():
-        if nid == root_id:
-            continue
-        phys = gmsh.model.addPhysicalGroup(2, [s])
-        gmsh.model.setPhysicalName(2, phys, f"outlet_{nid}")
+    outlet_surfaces = [s for nid, s in assigned.items() if nid != root_id]
+    if outlet_surfaces:
+        phys_outlets = gmsh.model.addPhysicalGroup(2, outlet_surfaces, outlet_tag)
+        gmsh.model.setPhysicalName(2, outlet_tag, "outlets")
 
     # walls = all surfaces not used
     all_surface_tags = [s for (_, s) in surfaces]
     wall_surfaces = [s for s in all_surface_tags if s not in used_surfaces]
     if wall_surfaces:
-        phys_walls = gmsh.model.addPhysicalGroup(2, wall_surfaces)
-        gmsh.model.setPhysicalName(2, phys_walls, "walls")
+        phys_walls = gmsh.model.addPhysicalGroup(2, wall_surfaces, wall_tag)
+        gmsh.model.setPhysicalName(2, wall_tag, "walls")
 
     # generate 3D mesh (volumes must exist in the imported brep)
     try:
@@ -313,8 +318,9 @@ def tag_and_mesh_with_gmsh(brep_path: str, nodes: dict, node_types: dict, tol: f
     gmsh.finalize()
     print(f"[OK] Mesh with physical groups written to {OUT_MSH}")
 
+
 if __name__ == "__main__":
     nodes, node_types, edges = parse_gxl(GXL_FILE)
     geom = build_mesh(nodes, node_types, edges)
-    cq.exporters.export(geom, "vessels.brep")
-    tag_and_mesh_with_gmsh("vessels.brep", nodes, node_types)
+    cq.exporters.export(geom, "src/geom/vessels.brep")
+    tag_and_mesh_with_gmsh("src/geom/vessels.brep", nodes, node_types)
