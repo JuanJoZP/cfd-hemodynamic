@@ -163,6 +163,11 @@ class SimulationBase(ABC):
                 u_diff_norm = np.linalg.norm(u_diff, ord=np.inf)
                 u_diff_norm = mesh.comm.allreduce(u_diff_norm, op=MPI.MAX)
                 if u_diff_norm < self.EARLY_STOP_TOLERANCE:
+                    print(
+                        f"Early stopping at t={t:.3f}, "
+                        f"because ||u_sol - u_prev||_inf = {u_diff_norm:.3g} < "
+                        f"{self.EARLY_STOP_TOLERANCE}"
+                    )
                     break
 
             solver.u_prev.x.array[:] = solver.u_sol.x.array[:]
