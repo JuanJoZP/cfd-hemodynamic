@@ -11,7 +11,7 @@ from src.boundaryCondition import BoundaryCondition
 solver_name = "stabilized_schur"
 simulation_name = "vascular_tree"
 
-dt = 1 / 100
+dt = 1 / 200
 T = 10
 
 rho_real = 1055.0  # kg/m^3
@@ -38,25 +38,13 @@ Re = rho_real * U_c * L_c / mu_real
 
 rho_adim = 1
 mu_adim = 1 / Re
-
 p_c = rho_real * U_c**2
 
 r_in = r_mesh_in * L_c
 # r_out2 = r_mesh_out2 * L_c
 
-# presiones reales a preescribir (Pascales)
-p_inlet = 5300  # ~40mmHg
-p_outlet1 = 4200  # ~ 31mmHg
-p_outlet2 = 1333  # ~ 10mmHg
-
-# pasamos a valores adimensionales
-p_inlet_adim = p_inlet / p_c
-p_outlet1_adim = p_outlet1 / p_c
-p_outlet2_adim = p_outlet2 / p_c
 
 print("Número de Reynolds para los parametros dados:", Re)
-
-v_inlet = 5
 
 
 class MicrovasculatureSimulation(SimulationBase):
@@ -87,7 +75,7 @@ class MicrovasculatureSimulation(SimulationBase):
     @property
     def mesh(self):
         if not self._mesh:
-            self._mesh, _, self._ft = gmshio.read_from_msh(
+            self._mesh, self._ft, _ = gmshio.read_from_msh(
                 "src/geom/vessels.msh", MPI.COMM_WORLD, 0, gdim=3
             )
 
@@ -96,7 +84,8 @@ class MicrovasculatureSimulation(SimulationBase):
     @property
     def bcu(self):
         if not self._bcu:
-            fdim = self.mesh.topology.dim - 1
+            fdim = self.mesh.geometry.dim - 1
+            self.mesh.topology.create_connectivity(2, 2)
 
             u_nonslip = Function(self.solver.V)
             u_nonslip.x.array[:] = 0
@@ -105,7 +94,7 @@ class MicrovasculatureSimulation(SimulationBase):
             bcu_walls.initTopological(fdim, entities_walls)
 
             u_inlet = Function(self.solver.V)
-            u_inlet.interpolate(self.inlet_velocity(v_inlet, r_mesh_in))
+            u_inlet.interpolate(self.inlet_velocity(U_c, r_mesh_in))
             entities_inflow = self._ft.find(self.inlet_tag)
             bcu_inflow = BoundaryCondition(u_inlet)
             bcu_inflow.initTopological(fdim, entities_inflow)
