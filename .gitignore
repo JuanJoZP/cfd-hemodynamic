@@ -8,5 +8,6 @@ meshes
 
 # carpetas con nombre tipo fecha (e.g., "2025-04-12")
 [0-9][0-9][0-9][0-9]?**/
-*.png
-*.txt
+results/
+.devcontainer/
+.dockerignore
