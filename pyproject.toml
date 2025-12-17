@@ -8,5 +8,6 @@ dependencies = [
     "cadquery>=2.6.1",
     "gmsh>=4.15.0",
     "lxml>=6.0.2",
+    "meshio>=5.3.5",
     "numpy>=2.2.6",
 ]

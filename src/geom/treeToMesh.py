@@ -10,6 +10,7 @@ OUT_MSH = "src/geom/vessels.msh"
 inlet_tag = 1
 outlet_tag = 2
 wall_tag = 3
+fluid_tag = 4
 
 
 def magnitude(v: cq.Vector) -> float:
@@ -31,8 +32,6 @@ def create_root_bifurcation(root_node, bif_node, r1, end1_node, end2_node, r2, r
     plane_circle = cq.Plane(
         origin=start_inlet, xDir=(1, 0, 0), normal=end_inlet - start_inlet
     )
-    print(end_inlet - start_inlet)
-    print(start_inlet)
     inlet_line = cq.Workplane("XY").spline([start_inlet, end_inlet])
     inlet_volume = (
         cq.Workplane(plane_circle).workplane(offset=0).circle(r1).sweep(inlet_line)
@@ -241,13 +240,21 @@ def tag_and_mesh_with_gmsh(
     gmsh.option.setNumber("General.Terminal", 1)
     gmsh.merge(brep_path)
 
-    # gmsh.option.setNumber("Mesh.CharacteristicLengthMax", 2e-3)
-    # gmsh.option.setNumber("Mesh.Smoothing", 3)
-    gmsh.option.setNumber("Mesh.CharacteristicLengthFromCurvature", 1)
-    gmsh.option.setNumber("Mesh.MinimumElementsPerTwoPi", 11)
+    # Ensure OCC internal model is synchronized after importing the BREP
+    try:
+        gmsh.model.occ.synchronize()
+    except Exception:
+        # not all gmsh builds require/allow explicit occ sync after merge
+        pass
+
+    volumes = gmsh.model.getEntities(dim=3)
+    assert len(volumes) == 1
+    gmsh.model.addPhysicalGroup(volumes[0][0], [volumes[0][1]], fluid_tag)
+    gmsh.model.setPhysicalName(volumes[0][0], fluid_tag, "Fluid")
+    print(f"[INFO] Fluid volume assigned to volume {volumes[0][1]}")
 
     # get all 2D entities (surfaces)
-    surfaces = gmsh.model.getEntities(2)  # list of (2, tag)
+    surfaces = gmsh.model.getBoundary(volumes, oriented=False)  # list of (2, tag)
 
     # precompute surface centers (bounding-box centers)
     surf_centers = {}
@@ -294,26 +301,30 @@ def tag_and_mesh_with_gmsh(
     used_surfaces = set(assigned.values())
     # inlet
     if root_id in assigned:
-        phys_in = gmsh.model.addPhysicalGroup(2, [assigned[root_id]], inlet_tag)
+        print(f"[INFO] Inlet assigned to surface {assigned[root_id]}")
+        gmsh.model.addPhysicalGroup(2, [assigned[root_id]], inlet_tag)
         gmsh.model.setPhysicalName(2, inlet_tag, "inlet")
     # outlets (name by node id)
     outlet_surfaces = [s for nid, s in assigned.items() if nid != root_id]
     if outlet_surfaces:
-        phys_outlets = gmsh.model.addPhysicalGroup(2, outlet_surfaces, outlet_tag)
+        print(f"[INFO] Outlets assigned to surfaces {outlet_surfaces}")
+        gmsh.model.addPhysicalGroup(2, outlet_surfaces, outlet_tag)
         gmsh.model.setPhysicalName(2, outlet_tag, "outlets")
 
     # walls = all surfaces not used
     all_surface_tags = [s for (_, s) in surfaces]
     wall_surfaces = [s for s in all_surface_tags if s not in used_surfaces]
     if wall_surfaces:
-        phys_walls = gmsh.model.addPhysicalGroup(2, wall_surfaces, wall_tag)
+        print(f"[INFO] Walls assigned to surfaces {wall_surfaces}")
+        gmsh.model.addPhysicalGroup(2, wall_surfaces, wall_tag)
         gmsh.model.setPhysicalName(2, wall_tag, "walls")
 
-    # generate 3D mesh (volumes must exist in the imported brep)
-    try:
-        gmsh.model.mesh.generate(3)
-    except Exception as e:
-        print(f"[ERROR] gmsh mesh generation failed: {e}")
+    gmsh.option.setNumber("Mesh.Smoothing", 50)
+    gmsh.option.setNumber("Mesh.CharacteristicLengthFromCurvature", 1)
+    gmsh.option.setNumber("Mesh.MinimumElementsPerTwoPi", 11)
+    gmsh.model.mesh.generate(3)
+    gmsh.model.mesh.optimize("Netgen")
+
     gmsh.write(OUT_MSH)
     gmsh.finalize()
     print(f"[OK] Mesh with physical groups written to {OUT_MSH}")
