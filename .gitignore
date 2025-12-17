@@ -11,3 +11,4 @@ meshes
 results/
 .devcontainer/
 .dockerignore
+.venv/
