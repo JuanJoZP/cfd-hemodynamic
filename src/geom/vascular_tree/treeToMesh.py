@@ -51,7 +51,9 @@ def create_root_bifurcation(root_node, bif_node, r1, end1_node, end2_node, r2, r
     end_b = end_b1 if r2 >= r3 else end_b2
     r = r2 if r2 >= r3 else r3
 
-    plane_circle = cq.Plane(origin=start_b, xDir=(1, 0, 0), normal=start_b - start_inlet)
+    plane_circle = cq.Plane(
+        origin=start_b, xDir=(1, 0, 0), normal=start_b - start_inlet
+    )
     bif1_line = cq.Workplane("XY").spline(
         [start_b, end_b], tangents=[start_b - start_inlet, end_b - start_b]
     )
@@ -293,7 +295,9 @@ def tag_and_mesh_with_gmsh(
             pt = tuple(nodes[nid])
             s_out, d_out = find_nearest_surface(pt)
             if s_out is None or d_out > tol:
-                print(f"[WARN] outlet {nid} not found within tol ({d_out:.4g} > {tol}).")
+                print(
+                    f"[WARN] outlet {nid} not found within tol ({d_out:.4g} > {tol})."
+                )
             else:
                 assigned[nid] = s_out
 
