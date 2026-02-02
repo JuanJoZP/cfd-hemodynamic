@@ -6,7 +6,7 @@ from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
 from dolfinx.io import gmshio, XDMFFile
-from dolfinx.mesh import Mesh
+from dolfinx.mesh import Mesh, locate_entities_boundary
 from dolfinx.fem import Function
 import os
 
@@ -81,7 +81,14 @@ class PipeCylinderSimulation(SimulationBase):
     @property
     def bcp(self):
         if not self._bcp:
-            self._bcp = []
+            fdim = self.mesh.topology.dim - 1
+            pr = Function(self.solver.Q)
+            pr.x.array[:] = 0
+            outflow_facets = self._ft.find(self.outlet_marker)
+            bc_outflow = BoundaryCondition(pr)
+            bc_outflow.initTopological(fdim, outflow_facets)
+
+            self._bcp = [bc_outflow]
 
         return self._bcp
 
@@ -108,12 +115,16 @@ class PipeCylinderSimulation(SimulationBase):
         if mesh_comm.rank == model_rank:
             volumes = gmsh.model.getEntities(dim=gdim)
             assert len(volumes) == 1
-            gmsh.model.addPhysicalGroup(volumes[0][0], [volumes[0][1]], self.fluid_marker)
+            gmsh.model.addPhysicalGroup(
+                volumes[0][0], [volumes[0][1]], self.fluid_marker
+            )
             gmsh.model.setPhysicalName(volumes[0][0], self.fluid_marker, "Fluid")
 
             boundaries = gmsh.model.getBoundary(volumes, oriented=False)
             for boundary in boundaries:
-                center_of_mass = gmsh.model.occ.getCenterOfMass(boundary[0], boundary[1])
+                center_of_mass = gmsh.model.occ.getCenterOfMass(
+                    boundary[0], boundary[1]
+                )
                 if np.allclose(center_of_mass, [0, H / 2, 0]):
                     inflow.append(boundary[1])
                 elif np.allclose(center_of_mass, [L, H / 2, 0]):
@@ -134,14 +145,14 @@ class PipeCylinderSimulation(SimulationBase):
             gmsh.model.setPhysicalName(1, self.obstacle_marker, "Obstacle")
 
         # variable resolution, finer near the obstacle
-        res_min = r / 3
+        res_min = r / 10
         if mesh_comm.rank == model_rank:
             distance_field = gmsh.model.mesh.field.add("Distance")
             gmsh.model.mesh.field.setNumbers(distance_field, "EdgesList", obstacle)
             threshold_field = gmsh.model.mesh.field.add("Threshold")
             gmsh.model.mesh.field.setNumber(threshold_field, "IField", distance_field)
             gmsh.model.mesh.field.setNumber(threshold_field, "LcMin", res_min)
-            gmsh.model.mesh.field.setNumber(threshold_field, "LcMax", 0.25 * H)
+            gmsh.model.mesh.field.setNumber(threshold_field, "LcMax", r / 5)
             gmsh.model.mesh.field.setNumber(threshold_field, "DistMin", r)
             gmsh.model.mesh.field.setNumber(threshold_field, "DistMax", 2 * H)
             min_field = gmsh.model.mesh.field.add("Min")
@@ -150,11 +161,11 @@ class PipeCylinderSimulation(SimulationBase):
 
         if mesh_comm.rank == model_rank:
             gmsh.option.setNumber("Mesh.Algorithm", 8)
-            gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 2)
-            gmsh.option.setNumber("Mesh.RecombineAll", 1)
-            gmsh.option.setNumber("Mesh.SubdivisionAlgorithm", 1)
+            # gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 1)
+            # gmsh.option.setNumber("Mesh.RecombineAll", 0)
+            # gmsh.option.setNumber("Mesh.SubdivisionAlgorithm", 1)
             gmsh.model.mesh.generate(gdim)
-            gmsh.model.mesh.setOrder(2)
+            gmsh.model.mesh.setOrder(1)
             gmsh.model.mesh.optimize("Netgen")
 
         mesh, _, ft = gmshio.model_to_mesh(gmsh.model, mesh_comm, model_rank, gdim=gdim)
@@ -174,21 +185,7 @@ class PipeCylinderSimulation(SimulationBase):
         return values
 
 
-dt = 1 / 400
-T = 3.5
+dt = 1 / 200
+T = 50
 simulation = PipeCylinderSimulation(solver_name, rho, mu, dt, T)
-simulation.solve()
-
-
-dt = 1 / 800
-T = 25
-simulation.num_steps = int(T / dt)
-simulation.solver.dt.value = dt
-simulation.solve()
-
-
-dt = 1 / 800
-T = 10
-simulation.num_steps = int(T / dt)
-simulation.solver.dt.value = dt
 simulation.solve()
