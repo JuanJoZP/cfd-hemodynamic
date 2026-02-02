@@ -73,7 +73,7 @@ class SolverBase(ABC):
             self._p_prev is not None
         ), "Pressure solution function is not initialized. call initPressureSpace() first."
 
-        return self._p_sol
+        return self._p_prev
 
     @property
     def V(self):
