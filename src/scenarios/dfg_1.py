@@ -2,24 +2,20 @@ import os
 
 import gmsh
 import numpy as np
-from ufl import Measure, FacetNormal, grad, Identity, dot, inner, as_vector
+from ufl import Measure, FacetNormal, grad, inner, as_vector
 from dolfinx.geometry import bb_tree, compute_collisions_points, compute_colliding_cells
 from dolfinx.fem import Function, form, assemble_scalar
-from dolfinx.io import XDMFFile, gmshio
+from dolfinx.io import XDMFFile
+from dolfinx.io import gmshio
 from dolfinx.mesh import Mesh
 from mpi4py import MPI
 from petsc4py import PETSc
 
 from src.boundaryCondition import BoundaryCondition
-from src.simulationBase import SimulationBase
-
-solver_name = "stabilized_schur"
-simulation_name = "dfg_1"
-rho = 1
-mu = 1 / 1000
+from src.scenario import Scenario
 
 
-class DFG1Benchmark(SimulationBase):
+class DFG1Benchmark(Scenario):
     fluid_marker = 1
     inlet_marker = 2
     outlet_marker = 3
@@ -27,13 +23,15 @@ class DFG1Benchmark(SimulationBase):
     obstacle_marker = 5
 
     def __init__(
-        self, solver_name, rho, mu, dt, T, f: tuple[float, float] = (0, 0)
+        self, solver_name, dt, T, f: tuple[float, float] = (0, 0), *, rho=1, mu=1 / 1000
     ):
         self._mesh: Mesh = None
         self._ft = None
         self._bcu: list[BoundaryCondition] = None
         self._bcp: list[BoundaryCondition] = None
-        super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
+        self.mu = mu
+        self.rho = rho
+        super().__init__(solver_name, "dfg_1", rho, mu, dt, T, f)
 
         self.mesh.topology.create_connectivity(
             self.mesh.topology.dim - 1, self.mesh.topology.dim
@@ -153,7 +151,7 @@ class DFG1Benchmark(SimulationBase):
             threshold_field = gmsh.model.mesh.field.add("Threshold")
             gmsh.model.mesh.field.setNumber(threshold_field, "IField", distance_field)
             gmsh.model.mesh.field.setNumber(threshold_field, "LcMin", res_min)
-            gmsh.model.mesh.field.setNumber(threshold_field, "LcMax", H/13)
+            gmsh.model.mesh.field.setNumber(threshold_field, "LcMax", H / 13)
             gmsh.model.mesh.field.setNumber(threshold_field, "DistMin", r)
             gmsh.model.mesh.field.setNumber(threshold_field, "DistMax", 2 * H)
             min_field = gmsh.model.mesh.field.add("Min")
@@ -179,53 +177,80 @@ class DFG1Benchmark(SimulationBase):
         values[0] = 4 * 0.3 * x[1] * (0.41 - x[1]) / (0.41**2)
         return values
 
+    def solve(self, output_folder, afterStepCallback=None):
+        out_path = super().solve(output_folder, afterStepCallback)
 
-dt = 1 / 50
-T = 20
-simulation = DFG1Benchmark(solver_name, rho, mu, dt, T)
-simulation.solve()
+        # Post-processing calculations
+        dObs = Measure(
+            "ds",
+            domain=self.mesh,
+            subdomain_data=self._ft,
+            subdomain_id=self.obstacle_marker,
+        )
+        u = self.solver.u_sol
+        p = self.solver.p_sol
+        n = -FacetNormal(self.mesh)
 
-dObs = Measure("ds", domain=simulation.mesh, subdomain_data=simulation._ft, subdomain_id=simulation.obstacle_marker)
-u = simulation.solver.u_sol
-p = simulation.solver.p_sol
-n = -FacetNormal(simulation.mesh)
+        tangent = as_vector((n[1], -n[0]))
+        u_t = inner(tangent, u)
 
-tangent = as_vector((n[1], -n[0]))
-u_t = inner(tangent, u)
+        mu = self.mu
 
-F_D_form = form((mu * inner(grad(u_t), n) * n[1] - p * n[0]) * dObs)
-F_L_form = form(-(mu * inner(grad(u_t), n) * n[0] + p * n[1]) * dObs)
+        F_D_form = form((mu * inner(grad(u_t), n) * n[1] - p * n[0]) * dObs)
+        F_L_form = form(-(mu * inner(grad(u_t), n) * n[0] + p * n[1]) * dObs)
 
-F_D = simulation.mesh.comm.allreduce(assemble_scalar(F_D_form), op=MPI.SUM)
-F_L = simulation.mesh.comm.allreduce(assemble_scalar(F_L_form), op=MPI.SUM)
+        F_D = self.mesh.comm.allreduce(assemble_scalar(F_D_form), op=MPI.SUM)
+        F_L = self.mesh.comm.allreduce(assemble_scalar(F_L_form), op=MPI.SUM)
 
-if simulation.mesh.comm.rank == 0:
-    print(f"Drag: {500*F_D}")
-    print(f"Lift: {500*F_L}")
+        if self.mesh.comm.rank == 0:
+            print(f"Drag: {500*F_D}")
+            print(f"Lift: {500*F_L}")
 
-tree = bb_tree(simulation.mesh, simulation.mesh.geometry.dim)
-points = np.array([[0.15, 0.2, 0], [0.25, 0.2, 0]])
-cell_candidates = compute_collisions_points(tree, points)
-colliding_cells = compute_colliding_cells(simulation.mesh, cell_candidates, points)
-front_cells = colliding_cells.links(0)
-back_cells = colliding_cells.links(1)
+            # Save to file in output_folder
+            with open(f"{out_path}/drag_lift.txt", "w") as f:
+                f.write(f"Drag: {500*F_D}\n")
+                f.write(f"Lift: {500*F_L}\n")
 
-p_front = None
-if len(front_cells) > 0:
-    p_front = p.eval(points[0], front_cells[:1])
-p_front = simulation.mesh.comm.gather(p_front, root=0)
-p_back = None
-if len(back_cells) > 0:
-    p_back = p.eval(points[1], back_cells[:1])
-p_back = simulation.mesh.comm.gather(p_back, root=0)
+        tree = bb_tree(self.mesh, self.mesh.geometry.dim)
+        points = np.array([[0.15, 0.2, 0], [0.25, 0.2, 0]])
+        cell_candidates = compute_collisions_points(tree, points)
+        colliding_cells = compute_colliding_cells(self.mesh, cell_candidates, points)
+        front_cells = colliding_cells.links(0)
+        back_cells = colliding_cells.links(1)
 
-if simulation.mesh.comm.rank == 0:
-    for pressure in p_front:
-        if pressure is not None:
-            p_diff = pressure[0]
-            break
-    for pressure in p_back:
-        if pressure is not None:
-            p_diff -= pressure[0]
-            break
-    print(f"Pressure difference: {p_diff}")
+        p_front = None
+        if len(front_cells) > 0:
+            p_front = p.eval(points[0], front_cells[:1])
+        p_front = self.mesh.comm.gather(p_front, root=0)
+        p_back = None
+        if len(back_cells) > 0:
+            p_back = p.eval(points[1], back_cells[:1])
+        p_back = self.mesh.comm.gather(p_back, root=0)
+
+        if self.mesh.comm.rank == 0:
+            p_diff = 0
+            # Simplify gathering logic
+            found_front = False
+            for pressure in p_front:
+                if pressure is not None:
+                    p_diff = pressure[0]
+                    found_front = True
+                    break
+
+            found_back = False
+            for pressure in p_back:
+                if pressure is not None:
+                    p_diff -= pressure[0]
+                    found_back = True
+                    break
+
+            if found_front and found_back:
+                print(f"Pressure difference: {p_diff}")
+                with open(f"{out_path}/pressure_diff.txt", "w") as f:
+                    f.write(f"Pressure difference: {p_diff}\n")
+            else:
+                print(
+                    "Could not calculate pressure difference (points not found on rank 0 or gathered correctly)"
+                )
+
+        return out_path
