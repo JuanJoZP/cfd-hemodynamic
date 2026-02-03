@@ -130,8 +130,12 @@ class Solver(SolverBase):
         start_p, end_p = self.p_prev.x.petsc_vec.getOwnershipRange()
         u_size_local = self.u_prev.x.petsc_vec.getLocalSize()
 
-        self.u_sol.x.petsc_vec.setValues(range(start_u, end_u), x.array_r[:u_size_local])
-        self.p_sol.x.petsc_vec.setValues(range(start_p, end_p), x.array_r[u_size_local:])
+        self.u_sol.x.petsc_vec.setValues(
+            range(start_u, end_u), x.array_r[:u_size_local]
+        )
+        self.p_sol.x.petsc_vec.setValues(
+            range(start_p, end_p), x.array_r[u_size_local:]
+        )
         self.u_sol.x.petsc_vec.ghostUpdate(
             addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
         )
@@ -167,7 +171,9 @@ class Solver(SolverBase):
         self.updateSolution(x)
         [bc.update() for bc in bcs]
 
-        assemble_vector_block(F_vec, self.F_form, self.J_form, bcs=bcs, x0=x, alpha=-1.0)
+        assemble_vector_block(
+            F_vec, self.F_form, self.J_form, bcs=bcs, x0=x, alpha=-1.0
+        )
         F_vec.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
 
     def setup(self, bcu: list[BoundaryCondition], bcp: list[BoundaryCondition]) -> None:
@@ -236,7 +242,9 @@ class Solver(SolverBase):
             1,
             comm=self.mesh.comm,
         )
-        is_p = PETSc.IS().createStride(Q_map.size_local, offset_p, 1, comm=self.mesh.comm)
+        is_p = PETSc.IS().createStride(
+            Q_map.size_local, offset_p, 1, comm=self.mesh.comm
+        )
         pc.setFieldSplitIS(("u", is_u), ("p", is_p))
         pc.setUp()
 
@@ -269,7 +277,9 @@ class Solver(SolverBase):
 
     def solveStep(self):
         if self.nullsp.test(self.A):
-            self.A.setNullSpace(self.nullsp)  # esto deberia moverse a setup pero da error
+            self.A.setNullSpace(
+                self.nullsp
+            )  # esto deberia moverse a setup pero da error
 
         self.nullsp.remove(self.x_n)  # creo que se puede quitar?
 
