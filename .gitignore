@@ -11,3 +11,5 @@ meshes
 results/
 .devcontainer/
 .dockerignore
+fenicsx.sif
+*.gz
