@@ -1,0 +1,16 @@
+Bootstrap: docker
+From: dolfinx/dolfinx:v0.9.0
+
+%files
+    pyproject.toml /opt/project/pyproject.toml
+
+%post
+    pip install uv
+
+    cd /opt/project
+    uv export --format requirements-txt --output-file requirements.txt
+    pip install --ignore-installed -r requirements.txt
+
+%labels
+    Author cfd-hemodynamic
+    Version 0.1.0
