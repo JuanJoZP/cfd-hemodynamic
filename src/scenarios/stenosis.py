@@ -1,4 +1,4 @@
-from src.simulationBase import SimulationBase
+from src.scenario import Scenario
 import gmsh
 from mpi4py import MPI
 from petsc4py import PETSc
@@ -6,54 +6,59 @@ import numpy as np
 from dolfinx.io import gmshio, XDMFFile
 from dolfinx.mesh import Mesh
 from dolfinx.fem import Function
+from dolfinx.io import VTXWriter
 
 from src.boundaryCondition import BoundaryCondition
 
-solver_name = "stabilized_schur"
-simulation_name = "stenosis"
-# rho = 1055 kg/m^3; mu = 0.0035 Pa.s
-rho = 1  # scaled
-mu = 3.3e-6
-dt = 1 / 2500
-T = 10
 
-res = 0.0001
-L = 0.03
-H = 0.003
-x_position_stenosis = 0.005
-inlet_max_velocity = 0.22
-stenosis_grade = "severe"
-stenosis = {
-    "mild": {"major_axis": 0.0024, "minor_axis": 0.000375, "y_offset": 0.0},
-    "moderate": {"major_axis": 0.0024, "minor_axis": 0.00075, "y_offset": 0.0},
-    "severe": {"major_axis": 0.0044, "minor_axis": 0.001125, "y_offset": 0.001},
-}
-
-
-class StenosisSimulation(SimulationBase):
+class StenosisSimulation(Scenario):
     fluid_marker = 1
     inlet_marker = 2
     outlet_marker = 3
     wall_marker = 4
 
+    stenosis_grades = {
+        "mild": {"major_axis": 0.0024, "minor_axis": 0.000375, "y_offset": 0.0},
+        "moderate": {"major_axis": 0.0024, "minor_axis": 0.00075, "y_offset": 0.0},
+        "severe": {"major_axis": 0.0044, "minor_axis": 0.001125, "y_offset": 0.001},
+    }
+
     def __init__(
         self,
         solver_name,
-        rho,
-        mu,
         dt,
         T,
         f: tuple[float, float] = (0, 0),
+        grade="severe",
         inlet_max_velocity=1.5,
-        mesh_options={},
+        *,
+        rho=1,
+        mu=3.3e-6,
+        **kwargs,
     ):
         self._mesh: Mesh = None
         self._ft = None
-        self.mesh_options = mesh_options
-        self.inlet_max_velocity = inlet_max_velocity
+        self.inlet_max_velocity = float(inlet_max_velocity)
+
+        # Setup mesh options
+        self.mesh_options = kwargs.copy()
+
+        # Defaults
+        defaults = {"L": 0.03, "H": 0.003, "res": 0.0001, "x_position_stenosis": 0.005}
+        for k, v in defaults.items():
+            if k not in self.mesh_options:
+                self.mesh_options[k] = v
+
+        # Apply grade parameters
+        grade_params = self.stenosis_grades.get(grade, self.stenosis_grades["severe"])
+        for k, v in grade_params.items():
+            # If user explicitly provided e.g. major_axis, keep it. Otherwise use grade default.
+            if k not in kwargs:
+                self.mesh_options[k] = v
+
         self._bcu: list[BoundaryCondition] = None
         self._bcp: list[BoundaryCondition] = None
-        super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
+        super().__init__(solver_name, "stenosis", rho, mu, dt, T, f)
 
         self.mesh.topology.create_connectivity(
             self.mesh.topology.dim - 1, self.mesh.topology.dim
@@ -91,13 +96,15 @@ class StenosisSimulation(SimulationBase):
 
         return self._bcu
 
-    def solve(self):
+    def solve(self, output_folder, afterStepCallback=None):
         def update_dt(t):
             if t > 10 * self.dt and self.dt < 1 / 1000:
                 self.dt = 1 / 200
                 self.solver.dt.value = self.dt
+            if afterStepCallback:
+                afterStepCallback(t)
 
-        return super().solve(update_dt)
+        return super().solve(output_folder, update_dt)
 
     @property
     def bcp(self):
@@ -156,12 +163,16 @@ class StenosisSimulation(SimulationBase):
         if mesh_comm.rank == model_rank:
             volumes = gmsh.model.getEntities(dim=gdim)
             assert len(volumes) == 1
-            gmsh.model.addPhysicalGroup(volumes[0][0], [volumes[0][1]], self.fluid_marker)
+            gmsh.model.addPhysicalGroup(
+                volumes[0][0], [volumes[0][1]], self.fluid_marker
+            )
             gmsh.model.setPhysicalName(volumes[0][0], self.fluid_marker, "Fluid")
 
             boundaries = gmsh.model.getBoundary(volumes, oriented=False)
             for boundary in boundaries:
-                center_of_mass = gmsh.model.occ.getCenterOfMass(boundary[0], boundary[1])
+                center_of_mass = gmsh.model.occ.getCenterOfMass(
+                    boundary[0], boundary[1]
+                )
                 if np.allclose(center_of_mass, [0, H / 2, 0]):
                     inflow.append(boundary[1])
                 elif np.allclose(center_of_mass, [L, H / 2, 0]):
@@ -191,19 +202,6 @@ class StenosisSimulation(SimulationBase):
         ft.name = "Facet markers"
         gmsh.finalize()
 
-        with XDMFFile(
-            mesh_comm, f"meshes/stenosis{major_axis}_{minor_axis}.xdmf", "w"
-        ) as xdmf_file:
-            xdmf_file.write_mesh(mesh)
-            xdmf_file.write_meshtags(ft, mesh.geometry)
-
-        from dolfinx.io import VTXWriter
-
-        mesh_file = VTXWriter(
-            mesh_comm, f"meshes/stenosis{major_axis}_{minor_axis}.bp", mesh
-        )
-        mesh_file.write(0)
-
         return mesh, ft
 
     @staticmethod
@@ -214,28 +212,3 @@ class StenosisSimulation(SimulationBase):
             return values
 
         return velocity
-
-
-simulation = StenosisSimulation(
-    solver_name,
-    rho,
-    mu,
-    dt,
-    T,
-    f=(0, 0),
-    mesh_options={
-        "L": L,
-        "H": H,
-        "res": res,
-        "major_axis": stenosis[stenosis_grade]["major_axis"],
-        "minor_axis": stenosis[stenosis_grade]["minor_axis"],
-        "y_offset": stenosis[stenosis_grade]["y_offset"],
-        "x_position_stenosis": x_position_stenosis,
-    },
-    inlet_max_velocity=inlet_max_velocity,
-)
-print(
-    simulation.solver.V.dofmap.index_map.size_global
-    + simulation.solver.Q.dofmap.index_map.size_global
-)
-simulation.solve()

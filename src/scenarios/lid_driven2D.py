@@ -3,37 +3,30 @@ import pandas as pd
 from mpi4py import MPI
 from petsc4py import PETSc
 from matplotlib import pyplot as plt
-from src.simulationBase import SimulationBase
+from src.scenario import Scenario
 from dolfinx.geometry import bb_tree, compute_collisions_points, compute_colliding_cells
 from dolfinx.mesh import create_unit_square, locate_entities_boundary, Mesh
 from dolfinx.fem import Function
+import os
 
 from src.boundaryCondition import BoundaryCondition
 
-solver_name = "stabilized_schur"
-simulation_name = "lid_driven2D"
-n_cells = 50
-rho = 1
-T = 10
-dt = 1 / 200
-
-
-class LidDriven2DSimulation(SimulationBase):
+class LidDriven2DSimulation(Scenario):
     def __init__(
-        self, solver_name, rho=1, mu=1, dt=1 / 100, T=5, f: tuple[float, float] = (0, 0)
+        self, solver_name, dt, T, f: tuple[float, float] = (0, 0), *, rho=1, mu=1
     ):
         self._mesh: Mesh = None
         self._bcu: list[BoundaryCondition] = None
         self._bcp: list[BoundaryCondition] = None
         self.Re = str(int(1 / mu))
-        super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
+        super().__init__(solver_name, "lid_driven2D", rho, mu, dt, T, f)
 
         self.setup()
 
     @property
     def mesh(self):
         if not self._mesh:
-            self._mesh = create_unit_square(MPI.COMM_WORLD, n_cells, n_cells)
+            self._mesh = create_unit_square(MPI.COMM_WORLD, 50, 50)
 
         return self._mesh
 
@@ -79,9 +72,22 @@ class LidDriven2DSimulation(SimulationBase):
         return np.logical_or.reduce(
             (np.isclose(x[0], 0), np.isclose(x[0], 1), np.isclose(x[1], 0))
         )
+    
+    def solve(self, output_folder, afterStepCallback=None):
+        out_path = super().solve(output_folder, afterStepCallback)
+        self.save_benchmark_plot(out_path)
+        return out_path
 
     def save_benchmark_plot(self, results_path):
-        data = pd.read_csv(f"src/benchmark_data/lid_driven2D/plot_u_y_Ghia{self.Re}.csv")
+        if self.mesh.comm.rank != 0:
+            return
+
+        csv_path = f"src/benchmark_data/lid_driven2D/plot_u_y_Ghia{self.Re}.csv"
+        if not os.path.exists(csv_path):
+            print(f"Benchmark data for Re={self.Re} not found at {csv_path}. Skipping plot.")
+            return
+
+        data = pd.read_csv(csv_path)
         points = np.column_stack(
             (
                 np.array((0.5,) * data["y"].size, dtype=np.float64),
@@ -115,19 +121,3 @@ class LidDriven2DSimulation(SimulationBase):
         )
         ax.set_title("Componente x de la velocidad en x=0.5")
         fig.savefig(f"{results_path}/benchmark_{self.Re}.png")
-
-
-simulation = LidDriven2DSimulation(solver_name, rho, 1 / 100, dt, T)
-results_path = simulation.solve()
-simulation.save_benchmark_plot(results_path)
-print(f"Resultados guardados en: {results_path}")
-
-simulation = LidDriven2DSimulation(solver_name, rho, 1 / 400, dt, T)
-results_path = simulation.solve()
-simulation.save_benchmark_plot(results_path)
-print(f"Resultados guardados en: {results_path}")
-
-simulation = LidDriven2DSimulation(solver_name, rho, 1 / 1000, dt, T)
-results_path = simulation.solve()
-simulation.save_benchmark_plot(results_path)
-print(f"Resultados guardados en: {results_path}")

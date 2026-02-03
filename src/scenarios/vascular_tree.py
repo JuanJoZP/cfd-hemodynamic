@@ -1,19 +1,18 @@
-from src.simulationBase import SimulationBase
-import gmsh
+from src.scenario import Scenario
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
-from dolfinx.io import gmshio, XDMFFile
+from dolfinx.io import gmshio
 from dolfinx.mesh import Mesh
 from dolfinx.fem import Function
 
 from src.boundaryCondition import BoundaryCondition
 
 solver_name = "stabilized_schur"
-simulation_name = "simple_bifurcation"
+simulation_name = "vascular_tree"
 
 dt = 1 / 200
-T = 1
+T = 10
 
 rho_real = 1055.0  # kg/m^3
 mu_real = 3.5e-3  # Pa·s
@@ -21,7 +20,7 @@ mu_real = 3.5e-3  # Pa·s
 
 # radio de los vasos en unidades de la malla
 r_mesh_in = 0.003918604
-r_mesh_out2 = 0.000922768
+# r_mesh_out2 = 0.000922768
 
 # reescalamos la ecuación
 # U_real = U * U_c (donde U es adimensional solucion de la ec), igual para L y p
@@ -39,48 +38,54 @@ Re = rho_real * U_c * L_c / mu_real
 
 rho_adim = 1
 mu_adim = 1 / Re
-
 p_c = rho_real * U_c**2
 
 r_in = r_mesh_in * L_c
-r_out2 = r_mesh_out2 * L_c
+# r_out2 = r_mesh_out2 * L_c
 
-v_inlet = 1.5
-
-# presiones reales a preescribir (Pascales)
-# p_inlet = 5300  # ~40mmHg
-p_outlet1 = 0  # ~ 31mmHg
-p_outlet2 = 0  # ~ 10mmHg
-
-# pasamos a valores adimensionales
-# p_inlet_adim = p_inlet / p_c
-p_outlet1_adim = p_outlet1 / p_c
-p_outlet2_adim = p_outlet2 / p_c
 
 print("Número de Reynolds para los parametros dados:", Re)
 
 
 class MicrovasculatureSimulation(SimulationBase):
-    fluid_tag = 7
-    inlet_tag = 8
-    outlet1_tag = 9
-    outlet2_tag = 10
-    wall_tag = 11
+    inlet_tag = 1
+    outlet_tag = 2
+    wall_tag = 3
+
+    # Constants
+    rho_real = 1055.0  # kg/m^3
+    mu_real = 3.5e-3  # Pa·s
+    r_mesh_in = 0.003918604
+    L_c = (100 / r_mesh_in) / 1e6  # 100 micrometers reference
+    U_c = 0.01  # m/s
 
     def __init__(
         self,
         solver_name,
-        rho,
-        mu,
         dt,
         T,
-        f: tuple[float, float] = (0, 0),
+        f: tuple[float, float, float] = (0, 0, 0),
+        *,
+        rho=None,
+        mu=None,
+        **kwargs,
     ):
         self._mesh: Mesh = None
         self._ft = None
         self._bcu: list[BoundaryCondition] = None
         self._bcp: list[BoundaryCondition] = None
-        super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
+
+        Re = self.rho_real * self.U_c * self.L_c / self.mu_real
+        rho_adim = 1
+        mu_adim = 1 / Re
+
+        if MPI.COMM_WORLD.rank == 0:
+            print(f"MicrovasculatureSimulation: Reynolds = {Re}")
+            print(
+                f"Using calculated rho={rho_adim}, mu={mu_adim} (Ignoring passed arguments)"
+            )
+
+        super().__init__(solver_name, "vascular_tree", rho_adim, mu_adim, dt, T, f)
 
         self.mesh.topology.create_connectivity(
             self.mesh.topology.dim - 1, self.mesh.topology.dim
@@ -90,16 +95,23 @@ class MicrovasculatureSimulation(SimulationBase):
     @property
     def mesh(self):
         if not self._mesh:
-            self._mesh, _, self._ft = gmshio.read_from_msh(
-                "simple_bifurcation.msh", MPI.COMM_WORLD, 0, gdim=3
-            )
+            # Assumes running from root of shared/
+            try:
+                self._mesh, self._ft, _ = gmshio.read_from_msh(
+                    "src/geom/vessels.msh", MPI.COMM_WORLD, 0, gdim=3
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    "Could not read src/geom/vessels.msh. Ensure the file exists."
+                ) from e
 
         return self._mesh
 
     @property
     def bcu(self):
         if not self._bcu:
-            fdim = self.mesh.topology.dim - 1
+            fdim = self.mesh.geometry.dim - 1
+            self.mesh.topology.create_connectivity(2, 2)
 
             u_nonslip = Function(self.solver.V)
             u_nonslip.x.array[:] = 0
@@ -108,12 +120,12 @@ class MicrovasculatureSimulation(SimulationBase):
             bcu_walls.initTopological(fdim, entities_walls)
 
             u_inlet = Function(self.solver.V)
-            u_inlet.interpolate(self.inlet_velocity(v_inlet, r_mesh_in))
+            u_inlet.interpolate(self.inlet_velocity(self.U_c, self.r_mesh_in))
             entities_inflow = self._ft.find(self.inlet_tag)
             bcu_inflow = BoundaryCondition(u_inlet)
             bcu_inflow.initTopological(fdim, entities_inflow)
 
-            self._bcu = [bcu_walls, bcu_inflow]
+            self._bcu = [bcu_inflow, bcu_walls]
 
         return self._bcu
 
@@ -122,21 +134,14 @@ class MicrovasculatureSimulation(SimulationBase):
         if not self._bcp:
             fdim = self.mesh.topology.dim - 1
 
-            # outlet 1
-            p_outlet1_func = Function(self.solver.Q)
-            p_outlet1_func.x.array[:] = p_outlet1_adim
-            outlet1_entities = self._ft.find(self.outlet1_tag)
-            bc_outlet1 = BoundaryCondition(p_outlet1_func)
-            bc_outlet1.initTopological(fdim, outlet1_entities)
+            # outlets
+            p_outlet_func = Function(self.solver.Q)
+            p_outlet_func.x.array[:] = 0
+            outlet_entities = self._ft.find(self.outlet_tag)
+            bc_outlet = BoundaryCondition(p_outlet_func)
+            bc_outlet.initTopological(fdim, outlet_entities)
 
-            # outlet 2
-            p_outlet2_func = Function(self.solver.Q)
-            p_outlet2_func.x.array[:] = p_outlet2_adim
-            outlet2_entities = self._ft.find(self.outlet2_tag)
-            bc_outlet2 = BoundaryCondition(p_outlet2_func)
-            bc_outlet2.initTopological(fdim, outlet2_entities)
-
-            self._bcp = [bc_outlet1, bc_outlet2]
+            self._bcp = [bc_outlet]
 
         return self._bcp
 
@@ -146,25 +151,19 @@ class MicrovasculatureSimulation(SimulationBase):
 
     @staticmethod
     def inlet_velocity(v_max, r_max):
+        inlet_normal = np.array(
+            [[0.07961727999999998], [-0.10554240000000004], [0.015753600000000034]]
+        )
+        inlet_center = np.array([[0.0], [2.0], [2.0]])
+
+        # TODO: este codigo esta sin probar
         def velocity(x):
-            values = np.zeros((3, x.shape[1]), dtype=PETSc.ScalarType)
-            r = (x[0] ** 2 + x[2] ** 2) ** (1 / 2)
-            values[1] = v_max * (1 - (r / r_max) ** 2)
+            values = np.zeros((3, x.shape[1]), dtype=np.float64)
+            inlet_normal_unit = inlet_normal / np.linalg.norm(inlet_normal)
+            r_vector = x - inlet_center
+            r = np.linalg.norm(r_vector)
+            magnitude = v_max * (1 - (r / r_max) ** 2)
+            values[:] = magnitude * inlet_normal_unit
             return values
 
         return velocity
-
-
-simulation = MicrovasculatureSimulation(
-    solver_name,
-    rho_adim,
-    mu_adim,
-    dt,
-    T,
-    f=(0, 0, 0),
-)
-print(
-    simulation.solver.V.dofmap.index_map.size_global
-    + simulation.solver.Q.dofmap.index_map.size_global
-)
-simulation.solve()

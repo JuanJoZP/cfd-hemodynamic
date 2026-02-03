@@ -1,4 +1,4 @@
-from src.simulationBase import SimulationBase
+from src.scenario import Scenario
 from mpi4py import MPI
 import numpy as np
 from dolfinx.mesh import (
@@ -10,25 +10,16 @@ from dolfinx.fem import Function
 
 from src.boundaryCondition import BoundaryCondition
 
-solver_name = "solver1"
-simulation_name = "taylor_green"
-n_cells = 32
-rho = 1
-mu = 1 / 50  # Re = 50
-dt = 1 / 1000
-T = 0.01
-
-
-class TaylorGreenSimulation(SimulationBase):
+class TaylorGreenSimulation(Scenario):
     def __init__(
-        self, solver_name, rho, mu, dt, T, f: tuple[float, float, float] = (0, 0, 0)
+        self, solver_name, dt, T, f: tuple[float, float, float] = (0, 0, 0), *, rho=1, mu=1/50
     ):
         self._mesh: Mesh = None
         self._bcu: list[BoundaryCondition] = None
         self._bcp: list[BoundaryCondition] = None
         self._boundary_facets = None
 
-        super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
+        super().__init__(solver_name, "taylor_green", rho, mu, dt, T, f)
 
         self._u_bc = Function(self.solver.V)
         self._p_bc = Function(self.solver.Q)
@@ -40,7 +31,7 @@ class TaylorGreenSimulation(SimulationBase):
     @property
     def mesh(self):
         if not self._mesh:
-            self._mesh = create_unit_cube(MPI.COMM_WORLD, n_cells, n_cells, n_cells)
+            self._mesh = create_unit_cube(MPI.COMM_WORLD, 32, 32, 32)
             self._mesh.topology.create_connectivity(
                 self._mesh.topology.dim - 1, self._mesh.topology.dim
             )
@@ -71,12 +62,14 @@ class TaylorGreenSimulation(SimulationBase):
     def initial_velocity(self, x):
         return self.exact_velocity(0)(x)
 
-    def solve(self):
+    def solve(self, output_folder, afterStepCallback=None):
         def update_boundary_conditions(t):
             self._u_bc.interpolate(self.exact_velocity(t))
             self._p_bc.interpolate(self.exact_pressure(t))
+            if afterStepCallback:
+                afterStepCallback(t)
 
-        return super().solve(update_boundary_conditions)
+        return super().solve(output_folder, update_boundary_conditions)
 
     def exact_velocity(self, t):
         def velocity(x):
@@ -139,8 +132,3 @@ class TaylorGreenSimulation(SimulationBase):
             )
 
         return pressure
-
-
-simulation = TaylorGreenSimulation(solver_name, rho, mu, dt, T)
-results_path = simulation.solve()
-print(f"Resultados guardados en: {results_path}")

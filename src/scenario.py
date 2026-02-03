@@ -1,21 +1,22 @@
-from importlib import import_module
+import os
+import sys
 from abc import ABC, abstractmethod
+from importlib import import_module
 from typing import Callable
 
-import os
 import numpy as np
-from mpi4py import MPI
-from petsc4py import PETSc
-from src.boundaryCondition import BoundaryCondition
-from src.solverBase import SolverBase
-from datetime import datetime, timezone, timedelta
-from ufl import inner, dx
+from dolfinx.fem import Expression, Function, assemble_scalar, form
 from dolfinx.io import VTXWriter
 from dolfinx.mesh import Mesh
-from dolfinx.fem import form, assemble_scalar, Function, Expression
+from mpi4py import MPI
+from petsc4py import PETSc
+from ufl import dx, inner
+
+from src.boundaryCondition import BoundaryCondition
+from src.solverBase import SolverBase
 
 
-class SimulationBase(ABC):
+class Scenario(ABC):
     EARLY_STOP_TOLERANCE = (
         1e-5  # if |(u_sol-u_prev)|_inf < EARLY_STOP_TOLERANCE, stop simulation
     )
@@ -45,7 +46,7 @@ class SimulationBase(ABC):
     def __init__(
         self,
         solver_name: str,
-        simulation_name: str,
+        scenario_name: str,
         rho: float,
         mu: float,
         dt: float,
@@ -53,30 +54,76 @@ class SimulationBase(ABC):
         f: list,
     ):
         self.solver_name = solver_name
-        self.solverClass: type[SolverBase] = getattr(
-            import_module(f"src.solvers.{solver_name}"), "Solver"
-        )
-        self.solver = self.solverClass(
-            self.mesh, dt, rho, mu, f, initial_velocity=self.initial_velocity
-        )
+        self.scenario_name = scenario_name
+
+        # Load the solver class
+        try:
+            solver_module = import_module(f"src.solvers.{solver_name}")
+        except ImportError as e:
+            available = self._list_available_solvers()
+            raise ImportError(
+                f"Could not import solver '{solver_name}'. "
+                f"Ensure src/solvers/{solver_name}.py exists and all its dependencies are available.\n"
+                f"Underlying error: {e}\n"
+                f"Available solvers: {available}"
+            ) from e
+
+        if not hasattr(solver_module, "Solver"):
+            raise ValueError(
+                f"Solver module 'src/solvers/{solver_name}.py' does not define a 'Solver' class."
+            )
+
+        self.solverClass: type[SolverBase] = solver_module.Solver
+
+        # Instantiate the solver
+        try:
+            self.solver = self.solverClass(
+                self.mesh, dt, rho, mu, f, initial_velocity=self.initial_velocity
+            )
+        except TypeError as e:
+            raise RuntimeError(
+                f"Failed to instantiate solver '{solver_name}': {e}. "
+                f"Check that the Solver class has the correct constructor signature."
+            ) from e
+        except Exception as e:
+            raise RuntimeError(
+                f"Error while initializing solver '{solver_name}': {type(e).__name__}: {e}"
+            ) from e
 
         self.T = T
         self.has_exact_solution = (
-            self.__class__.exact_velocity is not SimulationBase.exact_velocity
+            self.__class__.exact_velocity is not Scenario.exact_velocity
         )
 
         self.dt = dt
-        self.simulation_name = simulation_name
+
+    @staticmethod
+    def _list_available_solvers():
+        """List available solver modules."""
+        import os
+
+        solvers_dir = os.path.join(os.path.dirname(__file__), "solvers")
+        try:
+            files = os.listdir(solvers_dir)
+            solvers = [
+                f[:-3] for f in files if f.endswith(".py") and not f.startswith("_")
+            ]
+            return solvers if solvers else ["(none found)"]
+        except OSError:
+            return ["(could not list)"]
 
     def setup(self):
         self.solver.setup(self.bcu, self.bcp)
 
-    def solve(self, afterStepCallback: Callable[[float], None] = None) -> str:
+    def solve(
+        self, output_folder: str, afterStepCallback: Callable[[float], None] = None
+    ) -> str:
         """
         Runs the time-stepping simulation, returns the path to directory with results in VTX
         format and an error log if the method `exact_velocity` is implemented.
 
         Args:
+            output_folder (str): The absolute path to the directory where simulation results are stored.
             afterStepCallback (Callable[[float], None], optional): A function to be called
                 after each time step, receiving the current simulation time as an argument.
 
@@ -94,25 +141,23 @@ class SimulationBase(ABC):
                 desc="Solving",
                 total=float(T),
                 bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+                file=sys.stdout,
             )
             if mesh.comm.rank == 0
             else None
         )
 
-        date = (
-            datetime.now(tz=timezone(-timedelta(hours=5))).isoformat(timespec="seconds")
-            if mesh.comm.rank == 0
-            else None
-        )
-        date = mesh.comm.bcast(date, root=0)
+        # Ensure output folder exists
+        if mesh.comm.rank == 0:
+            os.makedirs(output_folder, exist_ok=True)
 
-        safe_date = date.replace(":", ".")
-        parent_route = f"results/{self.simulation_name}/{self.solver_name}/{safe_date}"
-        u_file = VTXWriter(mesh.comm, f"{parent_route}/v.bp", self.solver.u_sol)
-        p_file = VTXWriter(mesh.comm, f"{parent_route}/p.bp", self.solver.p_sol)
+        mesh.comm.barrier()
+
+        u_file = VTXWriter(mesh.comm, f"{output_folder}/v.bp", self.solver.u_sol)
+        p_file = VTXWriter(mesh.comm, f"{output_folder}/p.bp", self.solver.p_sol)
         solver.initStressForm()
         wss_file = VTXWriter(
-            mesh.comm, f"{parent_route}/wss.bp", self.solver.shear_stress
+            mesh.comm, f"{output_folder}/wss.bp", self.solver.shear_stress
         )
 
         t = 0.0
@@ -125,7 +170,7 @@ class SimulationBase(ABC):
         error_log = None
         if self.has_exact_solution:
             error_log = (
-                open(f"{parent_route}/err.txt", "w") if mesh.comm.rank == 0 else None
+                open(f"{output_folder}/err.txt", "w") if mesh.comm.rank == 0 else None
             )
             u_e = Function(solver.V)
             u_e.interpolate(lambda x: self.exact_velocity(t)(x))
@@ -181,7 +226,7 @@ class SimulationBase(ABC):
         if progress:
             progress.close()
 
-        return os.path.abspath(parent_route)
+        return output_folder
 
     @staticmethod
     def get_tqdm():
@@ -205,7 +250,9 @@ class SimulationBase(ABC):
         """Compute the L2 relative error between u and u_aprox."""
 
         error_form = form(inner(u_aprox - u, u_aprox - u) * dx)
-        error_abs = np.sqrt(mesh.comm.allreduce(assemble_scalar(error_form), op=MPI.SUM))
+        error_abs = np.sqrt(
+            mesh.comm.allreduce(assemble_scalar(error_form), op=MPI.SUM)
+        )
         norm_form = form(inner(u, u) * dx)
         norm = np.sqrt(mesh.comm.allreduce(assemble_scalar(norm_form), op=MPI.SUM))
         return error_abs / norm

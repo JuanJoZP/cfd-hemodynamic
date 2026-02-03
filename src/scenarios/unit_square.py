@@ -1,4 +1,4 @@
-from src.simulationBase import SimulationBase
+from src.scenario import Scenario
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
@@ -7,31 +7,21 @@ from dolfinx.fem import Function
 
 from src.boundaryCondition import BoundaryCondition
 
-
-solver_name = "solver2"
-simulation_name = "unit_square"
-n_cells = 32
-rho = 1
-mu = 1
-dt = 1 / 200
-T = 2
-
-
-class UnitSquareSimulation(SimulationBase):
+class UnitSquareSimulation(Scenario):
     def __init__(
-        self, solver_name, rho=1, mu=1, dt=1 / 100, T=5, f: tuple[float, float] = (0, 0)
+        self, solver_name, dt, T, f: tuple[float, float] = (0, 0), *, rho=1, mu=1
     ):
         self._mesh: Mesh = None
         self._bcu: list[BoundaryCondition] = None
         self._bcp: list[BoundaryCondition] = None
-        super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
+        super().__init__(solver_name, "unit_square", rho, mu, dt, T, f)
 
         self.setup()
 
     @property
     def mesh(self):
         if not self._mesh:
-            self._mesh = create_unit_square(MPI.COMM_WORLD, n_cells, n_cells)
+            self._mesh = create_unit_square(MPI.COMM_WORLD, 32, 32)
 
         return self._mesh
 
@@ -91,8 +81,3 @@ class UnitSquareSimulation(SimulationBase):
     @staticmethod
     def walls(x):
         return np.logical_or(np.isclose(x[1], 0), np.isclose(x[1], 1))
-
-
-simulation = UnitSquareSimulation(solver_name, rho, mu, dt, T)
-results_path = simulation.solve()
-print(f"Resultados guardados en: {results_path}")

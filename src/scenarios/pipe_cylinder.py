@@ -1,24 +1,17 @@
-# https://wwwold.mathematik.tu-dortmund.de/~featflow/en/benchmarks/cfdbenchmarking/flow/dfg_benchmark2_re100.html
-
-from src.simulationBase import SimulationBase
+from src.scenario import Scenario
 import gmsh
 from mpi4py import MPI
 from petsc4py import PETSc
 import numpy as np
 from dolfinx.io import gmshio, XDMFFile
-from dolfinx.mesh import Mesh, locate_entities_boundary
+from dolfinx.mesh import Mesh
 from dolfinx.fem import Function
 import os
 
 from src.boundaryCondition import BoundaryCondition
 
-solver_name = "stabilized_schur"
-simulation_name = "pipe_cylinder"
-rho = 1
-mu = 1 / 1000
 
-
-class PipeCylinderSimulation(SimulationBase):
+class PipeCylinderSimulation(Scenario):
     fluid_marker = 1
     inlet_marker = 2
     outlet_marker = 3
@@ -26,13 +19,13 @@ class PipeCylinderSimulation(SimulationBase):
     obstacle_marker = 5
 
     def __init__(
-        self, solver_name, rho=1, mu=1, dt=1 / 100, T=5, f: tuple[float, float] = (0, 0)
+        self, solver_name, dt, T, f: tuple[float, float] = (0, 0), *, rho=1, mu=1e-3
     ):
         self._mesh: Mesh = None
         self._ft = None
         self._bcu: list[BoundaryCondition] = None
         self._bcp: list[BoundaryCondition] = None
-        super().__init__(solver_name, simulation_name, rho, mu, dt, T, f)
+        super().__init__(solver_name, "pipe_cylinder", rho, mu, dt, T, f)
 
         self.mesh.topology.create_connectivity(
             self.mesh.topology.dim - 1, self.mesh.topology.dim
@@ -161,9 +154,6 @@ class PipeCylinderSimulation(SimulationBase):
 
         if mesh_comm.rank == model_rank:
             gmsh.option.setNumber("Mesh.Algorithm", 8)
-            # gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 1)
-            # gmsh.option.setNumber("Mesh.RecombineAll", 0)
-            # gmsh.option.setNumber("Mesh.SubdivisionAlgorithm", 1)
             gmsh.model.mesh.generate(gdim)
             gmsh.model.mesh.setOrder(1)
             gmsh.model.mesh.optimize("Netgen")
@@ -172,10 +162,6 @@ class PipeCylinderSimulation(SimulationBase):
         mesh.name = "Grid"
         ft.name = "Facet markers"
 
-        with XDMFFile(mesh_comm, "meshes/pipe_cylinder.xdmf", "w") as xdmf_file:
-            xdmf_file.write_mesh(mesh)
-            xdmf_file.write_meshtags(ft, mesh.geometry)
-
         return mesh, ft
 
     @staticmethod
@@ -183,9 +169,3 @@ class PipeCylinderSimulation(SimulationBase):
         values = np.zeros((2, x.shape[1]), dtype=PETSc.ScalarType)
         values[0] = 4 * 1.5 * x[1] * (0.41 - x[1]) / (0.41**2)
         return values
-
-
-dt = 1 / 200
-T = 50
-simulation = PipeCylinderSimulation(solver_name, rho, mu, dt, T)
-simulation.solve()
