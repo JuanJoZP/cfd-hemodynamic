@@ -33,7 +33,18 @@ def parse_args():
         help="End point coordinates",
     )
     parser.add_argument(
-        "--radius", type=float, required=True, help="Healthy vessel radius (R_max)"
+        "--radius-in",
+        dest="radius_in",
+        type=float,
+        required=True,
+        help="Inlet vessel radius (at start)",
+    )
+    parser.add_argument(
+        "--radius-out",
+        dest="radius_out",
+        type=float,
+        required=True,
+        help="Outlet vessel radius (at end), must be <= radius_in",
     )
     parser.add_argument(
         "--severity",
@@ -48,11 +59,34 @@ def parse_args():
         required=True,
         help="Slope parameter (PENDIENTE)",
     )
+    parser.add_argument(
+        "--output_dir",
+        dest="output",
+        type=str,
+        required=True,
+    )
 
     return parser.parse_args()
 
 
-def generate_stenosis_geometry(start, end, max_radius, min_radius, slope):
+def generate_stenosis_geometry(start, end, radius_in, radius_out, min_radius, slope):
+    """
+    Generate a stenosis geometry with progressive tapering.
+    
+    Args:
+        start: Start point coordinates (x, y, z)
+        end: End point coordinates (x, y, z)
+        radius_in: Radius at the inlet (start)
+        radius_out: Radius at the outlet (end), must be <= radius_in
+        min_radius: Minimum radius at the stenosis center
+        slope: Slope parameter controlling stenosis steepness
+    """
+    if slope >= 0.85:
+        raise ValueError(f"Valores tan altos de slope generan geometrias dificiles de mallar, si gmsh logra mallarla por lo general es una malla de baja calidad")
+
+    if radius_out > radius_in:
+        raise ValueError(f"radius_out ({radius_out}) must be <= radius_in ({radius_in})")
+    
     start_v = np.array(start)
     end_v = np.array(end)
     vector = end_v - start_v
@@ -61,83 +95,69 @@ def generate_stenosis_geometry(start, end, max_radius, min_radius, slope):
     if length == 0:
         raise ValueError("Start and End points are identical.")
 
-    # Local 2D coordinates for the profile
-    # X axis -> Along the vessel (0 to L)
-    # Y axis -> Radial direction (Normal)
+    # local 2D coordinates (axial, radial)
 
-    # Points definition based on user prompt:
-    # Initial P: (0, max_radius)
-    # End P: (L, max_radius)
-    # Mid P: (L/2, -min_radius)  <-- "direccion opuesta al desfase inicial"
+    r_base_start = radius_in
+    r_base_mid = (radius_in + radius_out) / 2
+    r_base_end = radius_out
 
-    p_start = (0, max_radius)
-    p_end = (length, max_radius)
-    p_mid = (
-        length / 2,
-        min_radius,
-    )  # Stenosis narrows to min_radius (positive, toward axis)
+    p_start = (0, r_base_start)
+    p_end = (length, r_base_end)
+    p_mid = (length / 2, min_radius)
 
-    # Control Points (CP)
-    # y_coord = same as initial/final -> max_radius
-    # x_offset from center (L/2)
-    # Ratio: (Stenosis Height) / (Dist to Center) = Slope
-    # Stenosis Height = Y_max - Y_mid = max_radius - min_radius
-    # Dist to Center (tangent dir) = Height / Slope
+    # control points follow the line from (0, r_in) to (L, r_out)
+    # slope to determine how far the CPs are from center
+    height_at_mid = r_base_mid - min_radius
 
-    height = max_radius - min_radius
-    dist_x = height / slope
+    if height_at_mid < 0:
+        raise ValueError(f"El min_radius es muy grande, debe ser menor o igual a {r_base_mid}")
 
-    cp1 = (length / 2 - dist_x, max_radius)
-    cp2 = (length / 2 + dist_x, max_radius)
+    dist_x = height_at_mid / slope if slope != 0 else length / 4
 
-    # Validate CP order to ensure no loop-backs
-    # We need 0 <= cp1_x <= mid_x <= cp2_x <= L
-    if cp1[0] < 0 or cp2[0] > length:
-        print(
-            f"[WARN] Slope {slope} results in control points outside the segment length."
-        )
+    if dist_x >= length/2:
+        raise ValueError("La pendiente de la estenosis es muy pequeña, se sale de los limites. Pruebe con una pendiente mayor")
+
+    cp1_x = length / 2 - dist_x
+    cp2_x = length / 2 + dist_x
+    
+    cp1_r = radius_in + (radius_out - radius_in) * (cp1_x / length)
+    cp2_r = radius_in + (radius_out - radius_in) * (cp2_x / length)
+
+    cp1 = (cp1_x, cp1_r)
+    cp2 = (cp2_x, cp2_r)
+
 
     points_2d = [(float(p[0]), float(p[1])) for p in [p_start, cp1, p_mid, cp2, p_end]]
     print(f"[INFO] Profile Points (Local 2D): {points_2d}")
+    print(f"[INFO] Tapering from radius_in={radius_in} to radius_out={radius_out}")
 
-    # Build geometry with CadQuery
-    # We construct the profile in XY plane, then revolve around X axis
-    # Use piecewise approach: straight lines at extremes, spline only for stenosis
-    # This prevents the spline from curving outward at control points
+    # construct the profile in XY plane, then revolve around X axis
+    # straight lines at extremes, spline only for stenosis
 
-    # Profile segments:
-    # 1. Line: Start (0, Rmax) -> CP1
-    # 2. Spline: CP1 -> Mid -> CP2 (the stenosis section)
-    # 3. Line: CP2 -> End (L, Rmax)
-    # 4. Cap: End -> (L, 0)
-    # 5. Axis: (L, 0) -> (0, 0)
-    # 6. Cap: (0, 0) -> Start
-
-    # Convert points to 3D vectors
     v_start = cq.Vector(float(p_start[0]), float(p_start[1]), 0.0)
     v_cp1 = cq.Vector(float(cp1[0]), float(cp1[1]), 0.0)
     v_mid = cq.Vector(float(p_mid[0]), float(p_mid[1]), 0.0)
     v_cp2 = cq.Vector(float(cp2[0]), float(cp2[1]), 0.0)
     v_end = cq.Vector(float(p_end[0]), float(p_end[1]), 0.0)
 
-    # Create edges
-    edge_line_start = cq.Edge.makeLine(v_start, v_cp1)  # Horizontal line at max_radius
+    edge_line_start = cq.Edge.makeLine(v_start, v_cp1) 
 
-    # Spline for the stenosis section with tangents pointing inward/horizontal
+    taper_slope = (radius_out - radius_in) / length  
+    tangent_in = cq.Vector(1.0, taper_slope, 0.0)
+    tangent_out = cq.Vector(1.0, taper_slope, 0.0)
+    
     stenosis_points = [v_cp1, v_mid, v_cp2]
-    tangent_in = cq.Vector(1.0, 0.0, 0.0)  # Horizontal at entry
-    tangent_out = cq.Vector(1.0, 0.0, 0.0)  # Horizontal at exit
     edge_spline = cq.Edge.makeSpline(
         stenosis_points, tangents=[tangent_in, tangent_out]
     )
 
-    edge_line_end = cq.Edge.makeLine(v_cp2, v_end)  # Horizontal line at max_radius
+    edge_line_end = cq.Edge.makeLine(v_cp2, v_end) 
 
     edge_cap_end = cq.Edge.makeLine(
-        cq.Vector(length, max_radius, 0), cq.Vector(length, 0, 0)
+        cq.Vector(length, r_base_end, 0), cq.Vector(length, 0, 0)
     )
     edge_axis = cq.Edge.makeLine(cq.Vector(length, 0, 0), cq.Vector(0, 0, 0))
-    edge_cap_start = cq.Edge.makeLine(cq.Vector(0, 0, 0), cq.Vector(0, max_radius, 0))
+    edge_cap_start = cq.Edge.makeLine(cq.Vector(0, 0, 0), cq.Vector(0, r_base_start, 0))
 
     wire = cq.Wire.assembleEdges(
         [
@@ -150,8 +170,7 @@ def generate_stenosis_geometry(start, end, max_radius, min_radius, slope):
         ]
     )
 
-    # Revolve
-    # Revolve around X-axis (0,0,0) to (1,0,0)
+    # revolve
     solid_local = (
         cq.Workplane("XY")
         .newObject([wire])
@@ -159,15 +178,12 @@ def generate_stenosis_geometry(start, end, max_radius, min_radius, slope):
         .revolve(360, (0, 0, 0), (1, 0, 0))
     )
 
-    # Now we need to orient this solid from Local (X-axis) to Global (Start->End)
-    # Local Start is (0,0,0). Global Start is args.start.
-    # Local Dir is (1,0,0). Global Dir is (end - start).
+    # orient the solid from local (x-axis) to global (Start->End)
 
-    # Translation
+    # translate
     solid_moved = solid_local.translate(tuple(float(x) for x in start_v))
 
-    # Rotation
-    # We need to rotate (1,0,0) to match normalized(vector)
+    # rotate
     target_dir = vector / length
     initial_dir = np.array([1, 0, 0])
 
@@ -176,21 +192,15 @@ def generate_stenosis_geometry(start, end, max_radius, min_radius, slope):
     msg = np.linalg.norm(rot_axis)
 
     if msg > 1e-6:
-        # Check angle
-        # dot = cos(theta)
         dot = np.dot(initial_dir, target_dir)
         angle_deg = np.degrees(np.arccos(np.clip(dot, -1.0, 1.0)))
-
-        # Rotate
-        # CadQuery rotate about an axis at a point (Start)
         solid_final = solid_moved.rotate(
             tuple(start_v), tuple(start_v + rot_axis), angle_deg
         )
     else:
-        # Parallel or anti-parallel
+        # parallel or anti-parallel
         if np.dot(initial_dir, target_dir) < 0:
             # 180 degrees flip (anti-parallel)
-            # any axis perpendicular to X works, e.g., Y or Z
             solid_final = solid_moved.rotate(
                 tuple(start_v), tuple(start_v + np.array([0, 1, 0])), 180
             )
@@ -201,25 +211,19 @@ def generate_stenosis_geometry(start, end, max_radius, min_radius, slope):
 
 
 def mesh_and_export(solid, filename_brep, filename_msh, start_pt, end_pt):
-    # Export BREP
     cq.exporters.export(solid, filename_brep)
     print(f"[INFO] BREP exported to {filename_brep}")
 
-    # Initialize GMSH
     gmsh.initialize()
     gmsh.model.add("Stenosis")
 
-    # Import BREP
     gmsh.merge(filename_brep)
     try:
         gmsh.model.occ.synchronize()
     except:
         pass
 
-    # Tagging
-    # We need to identify Inlet, Outlet, and Wall faces
-    # Strategy: Find faces closest to Start Point (Inlet) and End Point (Outlet)
-
+    # tagging
     volumes = gmsh.model.getEntities(3)
     if not volumes:
         print("[ERROR] No volumes found.")
@@ -229,9 +233,8 @@ def mesh_and_export(solid, filename_brep, filename_msh, start_pt, end_pt):
     gmsh.model.addPhysicalGroup(3, [fluid_vol_tag], FLUID_TAG)
     gmsh.model.setPhysicalName(3, FLUID_TAG, "Fluid")
 
-    surfaces = gmsh.model.getBoundary(volumes)  # List of (dim, tag)
+    surfaces = gmsh.model.getBoundary(volumes)
 
-    # Helper for centroid distance
     def get_center_dist(tag, point):
         bbox = gmsh.model.getBoundingBox(2, tag)
         center = np.array(
@@ -249,7 +252,6 @@ def mesh_and_export(solid, filename_brep, filename_msh, start_pt, end_pt):
         d_in = get_center_dist(tag, start_pt)
         d_out = get_center_dist(tag, end_pt)
 
-        # Heuristic: Closest face to start/end points
         if d_in < min_dist_in:
             min_dist_in = d_in
             inlet_surf = tag
@@ -258,7 +260,6 @@ def mesh_and_export(solid, filename_brep, filename_msh, start_pt, end_pt):
             min_dist_out = d_out
             outlet_surf = tag
 
-    # Assign Tags
     wall_surfaces = []
     for dim, tag in surfaces:
         if tag == inlet_surf:
@@ -278,7 +279,7 @@ def mesh_and_export(solid, filename_brep, filename_msh, start_pt, end_pt):
         f"[INFO] Tags Assigned: Inlet={inlet_surf}, Outlet={outlet_surf}, Walls={wall_surfaces}"
     )
 
-    # Mesh Generation - curvature-based sizing and smoothing
+    # meshing
     gmsh.option.setNumber("Mesh.Smoothing", 10)
     gmsh.option.setNumber("Mesh.CharacteristicLengthFromCurvature", 1)
     gmsh.option.setNumber("Mesh.MinimumElementsPerTwoPi", 20)
@@ -295,18 +296,22 @@ if __name__ == "__main__":
     args = parse_args()
 
     try:
-        # Calculate min_radius from severity: R_min = (1 - η) * R
+        if args.radius_out > args.radius_in:
+            raise ValueError(f"radius_out ({args.radius_out}) must be <= radius_in ({args.radius_in})")
+        
         if not 0 <= args.severity <= 1:
             raise ValueError(f"Severity must be in [0, 1], got {args.severity}")
-        min_radius = (1 - args.severity) * args.radius
-        print(f"[INFO] Severity η={args.severity} → R_min = {min_radius:.4f}")
+        r_base_mid = (args.radius_in + args.radius_out) / 2
+        min_radius = (1 - args.severity) * r_base_mid
+        print(f"[INFO] radius_in={args.radius_in}, radius_out={args.radius_out}")
+        print(f"[INFO] Severity η={args.severity} → R_min = {min_radius:.4f} (at center)")
 
         solid = generate_stenosis_geometry(
-            args.start, args.end, args.radius, min_radius, args.pendiente
+            args.start, args.end, args.radius_in, args.radius_out, min_radius, args.pendiente
         )
 
-        brep_path = "stenosis.brep"
-        msh_path = "stenosis.msh"
+        brep_path = os.path.join(args.output, "stenosis.brep")
+        msh_path = os.path.join(args.output, "stenosis.msh")
 
         mesh_and_export(solid, brep_path, msh_path, args.start, args.end)
 
