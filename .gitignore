@@ -12,4 +12,5 @@ results/
 .devcontainer/
 .dockerignore
 fenicsx.sif
+vascusynth.sif
 *.gz
