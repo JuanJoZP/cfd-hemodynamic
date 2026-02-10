@@ -3,12 +3,23 @@ import inspect
 import subprocess
 from datetime import datetime
 from importlib import import_module
+from pathlib import Path
+from typing import Union, Type, Optional, Any
 from mpi4py import MPI
 from src.scenario import Scenario
 
 
 class Simulation:
-    def __init__(self, name, simulation, solver, T, dt, output_dir, **kwargs):
+    def __init__(
+        self,
+        name: str,
+        simulation: Union[str, Type[Scenario]],
+        solver: str,
+        T: Union[float, str],
+        dt: Union[float, str],
+        output_dir: Union[str, Path],
+        **kwargs: Any,
+    ):
         """
         Orchestrates the simulation execution.
 
@@ -38,10 +49,15 @@ class Simulation:
             )
 
         self.name = name
-        self.scenario_name = simulation
+        self.scenario_name = simulation if isinstance(simulation, str) else getattr(simulation, "__name__", "custom_scenario")
         self.solver_name = solver
         self.output_dir = output_dir
         self.kwargs = kwargs
+
+        # If simulation is a class (Scenario subclass), store it
+        self._scenario_class_override = None
+        if inspect.isclass(simulation) and issubclass(simulation, Scenario):
+            self._scenario_class_override = simulation
 
         # Validate and convert T and dt
         try:
@@ -70,7 +86,7 @@ class Simulation:
 
         self.scenario_instance = self._load_scenario()
 
-    def _load_scenario(self):
+    def _load_scenario(self) -> Scenario:
         """Load and instantiate the scenario class.
 
         Returns:
@@ -81,36 +97,38 @@ class Simulation:
             ValueError: If no Scenario subclass is found or required parameters are missing
             RuntimeError: If scenario instantiation fails
         """
-        # Import the scenario module
-        try:
-            module = import_module(f"src.scenarios.{self.scenario_name}")
-        except ImportError as e:
-            available = self._list_available_scenarios()
-            raise ImportError(
-                f"Could not import scenario '{self.scenario_name}'. "
-                f"Ensure src/scenarios/{self.scenario_name}.py exists.\n"
-                f"Available scenarios: {available}"
-            ) from e
-        except SyntaxError as e:
-            raise SyntaxError(
-                f"Syntax error in scenario module 'src/scenarios/{self.scenario_name}.py': {e}"
-            ) from e
+        scenario_class = self._scenario_class_override
 
-        # Find the Scenario subclass
-        scenario_class = None
-        for member_name, obj in inspect.getmembers(module):
-            if (
-                inspect.isclass(obj)
-                and issubclass(obj, Scenario)
-                and obj is not Scenario
-            ):
-                scenario_class = obj
-                break
+        if not scenario_class:
+            # Import the scenario module
+            try:
+                module = import_module(f"src.scenarios.{self.scenario_name}")
+            except ImportError as e:
+                available = self._list_available_scenarios()
+                raise ImportError(
+                    f"Could not import scenario '{self.scenario_name}'. "
+                    f"Ensure src/scenarios/{self.scenario_name}.py exists.\n"
+                    f"Available scenarios: {available}"
+                ) from e
+            except SyntaxError as e:
+                raise SyntaxError(
+                    f"Syntax error in scenario module 'src/scenarios/{self.scenario_name}.py': {e}"
+                ) from e
+
+            # Find the Scenario subclass
+            for member_name, obj in inspect.getmembers(module):
+                if (
+                    inspect.isclass(obj)
+                    and issubclass(obj, Scenario)
+                    and obj is not Scenario
+                ):
+                    scenario_class = obj
+                    break
 
         if not scenario_class:
             raise ValueError(
-                f"No Scenario subclass found in src/scenarios/{self.scenario_name}.py. "
-                f"Ensure the file defines a class that inherits from Scenario."
+                f"No Scenario subclass found for '{self.scenario_name}'. "
+                f"Ensure the module exists and defines a class that inherits from Scenario."
             )
 
         # Prepare arguments for the scenario constructor
@@ -167,7 +185,7 @@ class Simulation:
                 f"Error while initializing scenario '{self.scenario_name}': {type(e).__name__}: {e}"
             ) from e
 
-    def _list_available_scenarios(self):
+    def _list_available_scenarios(self) -> list[str]:
         """List available scenario modules."""
         import os
 
@@ -181,17 +199,20 @@ class Simulation:
         except OSError:
             return ["(could not list)"]
 
-    def run(self):
+    def run(self, save_path: Optional[Union[str, Path]] = None) -> str:
         # Create output path structure: <output_dir>/<scenario>/<datetime>_<name>/
         # datetime-without-tz format example: 2023-01-01T12:00:00
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
 
-        timestamp = datetime.now().strftime("%Y-%m-%dT%H.%M.%S")
-        folder_name = f"{timestamp}_{self.name}"
-        save_path = os.path.abspath(
-            os.path.join(self.output_dir, self.scenario_name, folder_name)
-        )
+        if save_path is None:
+            timestamp = datetime.now().strftime("%Y-%m-%dT%H.%M.%S")
+            folder_name = f"{timestamp}_{self.name}"
+            save_path = os.path.abspath(
+                os.path.join(self.output_dir, self.scenario_name, folder_name)
+            )
+        else:
+            save_path = os.path.abspath(save_path)
 
         if rank == 0:
             os.makedirs(save_path, exist_ok=True)
@@ -233,6 +254,7 @@ class Simulation:
 
         comm.barrier()
 
+        self.scenario_instance.setup() 
         result_path = self.scenario_instance.solve(output_folder=save_path)
 
         if rank == 0:

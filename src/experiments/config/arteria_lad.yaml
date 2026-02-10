@@ -1,0 +1,26 @@
+base_params:
+  radius_in: 1.6 
+  length: 80 
+  radius_out: 1.1 
+  q_in: 70 
+  q_in_hyper: 225 
+  tree_volume: 70 
+  n_terminal: 20 
+  p_terminal: 1000 
+  murray_exponent: 3.0 
+  lambda: 2.0
+  closest_neighbours: 5
+
+matrix:
+  hiperemia: [true, false]
+  factor_perdida_vasos: [0.0, 0.5]
+  reduccion_lumen: [0.0, 0.1, 0.2]
+  factor_dilatacion_hiperemia: [1.0]
+
+# Parámetros de simulación constantes para todos los experimentos
+simulation_params:
+  solver: "stabilized_schur"
+  T: 0.1 
+  dt: 0.01 
+  mu: 0.0035 
+  rho: 0.00106 

@@ -1,60 +1,42 @@
 import argparse
 import ast
 import sys
-from src.simulation import Simulation
 
-def main():
-    parser = argparse.ArgumentParser(description="Run CFD Simulations")
-    parser.add_argument("--simulation", required=True, help="Scenario name (e.g., dfg_1)")
-    parser.add_argument("--solver", required=True, help="Solver name (e.g., stabilized_schur)")
-    parser.add_argument("--mu", type=float, default=None, help="Viscosity (optional, uses scenario default if not provided)")
-    parser.add_argument("--rho", type=float, default=None, help="Density (optional, uses scenario default if not provided)")
-    parser.add_argument("--T", type=float, required=True, help="Total time")
-    parser.add_argument("--dt", type=float, required=True, help="Time step")
-    parser.add_argument("--name", required=True, help="Name of the run")
-    parser.add_argument("--output_dir", default="results", help="Output directory")
 
-    # Use parse_known_args to handle arbitrary Scenario arguments
-    args, unknown = parser.parse_known_args()
+def run_simulate(args, unknown):
+    """Run a single CFD simulation."""
+    from src.simulation import Simulation
 
     kwargs = {}
-    
-    # Process unknown arguments
+
     i = 0
     while i < len(unknown):
         arg = unknown[i]
         if arg.startswith("--"):
             key = arg[2:]
             val = None
-            if i + 1 < len(unknown) and not unknown[i+1].startswith("--"):
-                val = unknown[i+1]
+            if i + 1 < len(unknown) and not unknown[i + 1].startswith("--"):
+                val = unknown[i + 1]
                 i += 1
             else:
-                # Flag without value, assume True? or missing value?
                 val = True
-            
-            # Try to convert to proper type
+
             if isinstance(val, str):
                 try:
-                    # try evaluating as literal (int, float, list, tuple)
                     val = ast.literal_eval(val)
-                except:
-                    # keep as string
+                except (ValueError, SyntaxError):
                     pass
-            
+
             kwargs[key] = val
         i += 1
-        
-    # Handle f specifically if it was passed generically or needs generic logic
-    # If passed as --f "(0,0)", ast.literal_eval above handles it.
 
-    # Only include mu/rho if explicitly provided
     if args.mu is not None:
-        kwargs['mu'] = args.mu
+        kwargs["mu"] = args.mu
     if args.rho is not None:
-        kwargs['rho'] = args.rho
+        kwargs["rho"] = args.rho
 
     from mpi4py import MPI
+
     if MPI.COMM_WORLD.Get_rank() == 0:
         print(f"Running simulation with extra args: {kwargs}")
 
@@ -66,7 +48,7 @@ def main():
             T=args.T,
             dt=args.dt,
             output_dir=args.output_dir,
-            **kwargs
+            **kwargs,
         )
     except ValueError as e:
         if MPI.COMM_WORLD.Get_rank() == 0:
@@ -86,17 +68,104 @@ def main():
         return 1
     except Exception as e:
         if MPI.COMM_WORLD.Get_rank() == 0:
-            print(f"\n[ERROR] Unexpected error during setup: {type(e).__name__}: {e}")
+            print(f"\n[ERROR] Unexpected error: {type(e).__name__}: {e}")
         raise
-    
+
     try:
         sim.run()
     except Exception as e:
         if MPI.COMM_WORLD.Get_rank() == 0:
             print(f"\n[ERROR] Simulation failed: {type(e).__name__}: {e}")
         raise
-    
+
     return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="CFD Hemodynamic - Unified CLI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Comando disponible")
+
+    # ── simulate ──────────────────────────────────────────────────────────
+    sim_parser = subparsers.add_parser("simulate", help="Ejecutar una simulación CFD")
+    sim_parser.add_argument(
+        "--simulation", required=True, help="Scenario name (e.g. dfg_1)"
+    )
+    sim_parser.add_argument(
+        "--solver", required=True, help="Solver name (e.g. stabilized_schur)"
+    )
+    sim_parser.add_argument("--mu", type=float, default=None, help="Viscosity")
+    sim_parser.add_argument("--rho", type=float, default=None, help="Density")
+    sim_parser.add_argument("--T", type=float, required=True, help="Total time")
+    sim_parser.add_argument("--dt", type=float, required=True, help="Time step")
+    sim_parser.add_argument("--name", required=True, help="Name of the run")
+    sim_parser.add_argument("--output_dir", default="results", help="Output directory")
+
+    # ── experiment ────────────────────────────────────────────────────────
+    exp_parser = subparsers.add_parser(
+        "experiment", help="Gestor de matriz de experimentos"
+    )
+    exp_parser.add_argument(
+        "--config", type=str, required=True, help="Ruta al YAML de configuración"
+    )
+    exp_parser.add_argument(
+        "--output",
+        type=str,
+        default="results/experiments",
+        dest="exp_output",
+        help="Directorio base para resultados",
+    )
+    exp_subparsers = exp_parser.add_subparsers(
+        dest="exp_command", help="Subcomandos de experiment"
+    )
+    exp_subparsers.add_parser(
+        "mesh", help="Generar mallas para la matriz de experimentos"
+    )
+    exp_subparsers.add_parser(
+        "solve", help="Resolver ecuaciones para la matriz de experimentos"
+    )
+
+    # ── tree ──────────────────────────────────────────────────────────────
+    tree_parser = subparsers.add_parser(
+        "tree", help="Generar árbol vascular con VascuSynth"
+    )
+    tree_parser.add_argument(
+        "--config", type=str, required=True, help="Path al YAML de configuración"
+    )
+    tree_parser.add_argument(
+        "--output", type=str, required=True, help="Path de salida de la malla (.msh)"
+    )
+    tree_parser.add_argument(
+        "--bind",
+        action="store_true",
+        help="Bind al directorio actual para Singularity",
+    )
+    tree_parser.add_argument(
+        "--perf_point",
+        type=float,
+        nargs=3,
+        help="Punto de perfusión en mm (x y z)",
+    )
+
+    # ── Parse & dispatch ──────────────────────────────────────────────────
+    args, unknown = parser.parse_known_args()
+
+    if args.command == "simulate":
+        return run_simulate(args, unknown)
+    elif args.command == "experiment":
+        from src.experiments.main import run
+
+        return run(args)
+    elif args.command == "tree":
+        from src.geom.tree.main import run
+
+        return run(args)
+    else:
+        parser.print_help()
+        return 1
+
 
 if __name__ == "__main__":
     sys.exit(main() or 0)

@@ -1,0 +1,3 @@
+debo documentar bien el tema de los parametros del yaml y como 
+se va a generar la micro respecto a eso, revisar unos params rarosa 
+de vascusynth lambda gamma etc

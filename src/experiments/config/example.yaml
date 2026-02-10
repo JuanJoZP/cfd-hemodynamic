@@ -1,0 +1,32 @@
+# Archivo de ejemplo de configuración para experimentos de hemodinámica (Arteria LAD)
+
+base_params:
+  # Geometría principal
+  radius_in: 1.6        # [mm] Radio proximal
+  length: 80           # [mm] Longitud segmento
+  radius_out: 1.1       # [mm] Radio distal (conexión árbol)
+  
+  # Flujo (Inlet BC)
+  q_in: 70             # [mL/min] Flujo reposo
+  q_in_hyper: 225      # [mL/min] Flujo hiperemia
+  
+  # Árbol vascular (VascuSynth)
+  tree_volume: 70      # [mL] Volumen territorio perfundido
+  n_terminal: 2000     # [#] Nodos terminales
+  p_terminal: 1000     # [Pa] Presión de salida (Outlet BC)
+  murray_exponent: 3.0 # [-] Exponente bifurcaciones
+
+# Matriz paramétrica de experimentos
+matrix:
+  hiperemia: [true, false]          # Estado fisiológico
+  factor_perdida_vasos: [0.0, 0.5]  # Rarefacción microvascular (fracción)
+  reduccion_lumen: [0.0, 0.1, 0.2]  # Severidad estenosis (fracción)
+  factor_dilatacion_hiperemia: [1.0] # Vasodilatación del árbol cuando hiperemia = true
+
+# Constantes físicas y numéricas
+simulation_params:
+  solver: "solver1"    # Solver de la carpeta src/solvers
+  T: 0.1               # [s] Tiempo final
+  dt: 0.01             # [s] Paso temporal
+  mu: 0.0035           # [Pa·s] Viscosidad dinámica
+  rho: 0.00106         # [kg/cm³] Densidad sangre
