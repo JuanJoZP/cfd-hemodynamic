@@ -6,8 +6,23 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "cadquery>=2.6.1",
+    "gmsh>=4.15.0",
     "lxml>=6.0.2",
     "meshio>=5.3.5",
     "numpy>=2.4.2",
     "tqdm>=4.67.2",
+]
+
+[tool.pyright]
+pythonPlatform = "Linux"
+extraPaths = ["."]
+
+[tool.pylint."messages_control"]
+disable = [
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "too-few-public-methods",
+    "broad-exception-caught",
+    "unspecified-encoding",
 ]

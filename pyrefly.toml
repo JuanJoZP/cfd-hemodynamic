@@ -1,0 +1,5 @@
+project-includes = ["."]
+search-path = ["."]
+python-platform = "linux"
+python-version = "3.12"
+python-interpreter-path = "/home/juanjozp/.pyenv/versions/3.12.7/bin/python"
