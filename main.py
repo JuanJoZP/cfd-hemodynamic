@@ -86,10 +86,18 @@ def main():
         description="CFD Hemodynamic - Unified CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
+    # Argumentos globales/comunes
+    hpc_parent = argparse.ArgumentParser(add_help=False)
+    hpc_parent.add_argument(
+        "--hpc", action="store_true", help="Ejecutar en HPC via Slurm/Singularity"
+    )
+
     subparsers = parser.add_subparsers(dest="command", help="Comando disponible")
 
     # ── simulate ──────────────────────────────────────────────────────────
-    sim_parser = subparsers.add_parser("simulate", help="Ejecutar una simulación CFD")
+    sim_parser = subparsers.add_parser(
+        "simulate", parents=[hpc_parent], help="Ejecutar una simulación CFD"
+    )
     sim_parser.add_argument(
         "--simulation", required=True, help="Scenario name (e.g. dfg_1)"
     )
@@ -104,32 +112,49 @@ def main():
     sim_parser.add_argument("--output_dir", default="results", help="Output directory")
 
     # ── experiment ────────────────────────────────────────────────────────
+    # ── experiment ────────────────────────────────────────────────────────
     exp_parser = subparsers.add_parser(
         "experiment", help="Gestor de matriz de experimentos"
     )
-    exp_parser.add_argument(
+
+    # Argumentos comunes para los subcomandos de experiment
+    exp_common = argparse.ArgumentParser(add_help=False)
+    exp_common.add_argument(
         "--config", type=str, required=True, help="Ruta al YAML de configuración"
     )
-    exp_parser.add_argument(
+    exp_common.add_argument(
         "--output",
         type=str,
         default="results/experiments",
         dest="exp_output",
         help="Directorio base para resultados",
     )
+
     exp_subparsers = exp_parser.add_subparsers(
         dest="exp_command", help="Subcomandos de experiment"
     )
-    exp_subparsers.add_parser(
-        "mesh", help="Generar mallas para la matriz de experimentos"
+
+    exp_mesh_parser = exp_subparsers.add_parser(
+        "mesh",
+        parents=[exp_common, hpc_parent],
+        help="Generar mallas para la matriz de experimentos",
     )
+    exp_mesh_parser.add_argument(
+        "--job_idx",
+        type=int,
+        default=None,
+        help="Índice del experimento a ejecutar (para Job Arrays)",
+    )
+
     exp_subparsers.add_parser(
-        "solve", help="Resolver ecuaciones para la matriz de experimentos"
+        "solve",
+        parents=[exp_common, hpc_parent],
+        help="Resolver ecuaciones para la matriz de experimentos",
     )
 
     # ── tree ──────────────────────────────────────────────────────────────
     tree_parser = subparsers.add_parser(
-        "tree", help="Generar árbol vascular con VascuSynth"
+        "tree", parents=[hpc_parent], help="Generar árbol vascular con VascuSynth"
     )
     tree_parser.add_argument(
         "--config", type=str, required=True, help="Path al YAML de configuración"
@@ -151,6 +176,15 @@ def main():
 
     # ── Parse & dispatch ──────────────────────────────────────────────────
     args, unknown = parser.parse_known_args()
+
+    # --hpc flag logic
+    if args.hpc:
+        from src.utils.hpc import dispatch_hpc
+
+        # Remove --hpc from sys.argv so it doesn't get passed downstream
+        sys.argv = [a for a in sys.argv if a != "--hpc"]
+        dispatch_hpc(args, unknown)
+        return 0
 
     if args.command == "simulate":
         return run_simulate(args, unknown)

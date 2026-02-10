@@ -14,4 +14,4 @@ $mpich -n $SLURM_NTASKS singularity exec \
     --bind /home/juanjo.zuluaga/data:/data \
     --pwd /work \
     $image \
-    bash -c "PYTHONPATH=/work:\$PYTHONPATH python3 main.py --output_dir=/data/results $*"
+    bash -c "PYTHONPATH=/work:\$PYTHONPATH python3 main.py simulate --output_dir=/data/results $*"

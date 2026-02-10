@@ -1,9 +1,25 @@
+import cadquery as cq
 import numpy as np
 from lxml import etree  # type: ignore
-import cadquery as cq
+
 
 def magnitude(v: cq.Vector) -> float:
     return (v.x**2 + v.y**2 + v.z**2) ** 0.5
+
+
+def create_safe_plane(origin, normal):
+    if isinstance(normal, tuple):
+        normal = cq.Vector(*normal)
+
+    n = normal.normalized()
+    # If normal is roughly parallel to X, use Y as xDir reference
+    if abs(n.x) > 0.99:
+        x_dir = cq.Vector(0, 1, 0)
+    else:
+        x_dir = cq.Vector(1, 0, 0)
+
+    return cq.Plane(origin=origin, xDir=x_dir, normal=normal)
+
 
 def create_root_bifurcation(root_node, bif_node, r1, end1_node, end2_node, r2, r3):
     offset = 0.2
@@ -17,9 +33,7 @@ def create_root_bifurcation(root_node, bif_node, r1, end1_node, end2_node, r2, r
     end_b2 = cq.Vector(*end2_node)
 
     # root cylinder
-    plane_circle = cq.Plane(
-        origin=start_inlet, xDir=(1, 0, 0), normal=end_inlet - start_inlet
-    )
+    plane_circle = create_safe_plane(origin=start_inlet, normal=end_inlet - start_inlet)
     inlet_line = cq.Workplane("XY").spline([start_inlet, end_inlet])
     inlet_volume = (
         cq.Workplane(plane_circle).workplane(offset=0).circle(r1).sweep(inlet_line)
@@ -39,9 +53,7 @@ def create_root_bifurcation(root_node, bif_node, r1, end1_node, end2_node, r2, r
     end_b = end_b1 if r2 >= r3 else end_b2
     r = r2 if r2 >= r3 else r3
 
-    plane_circle = cq.Plane(
-        origin=start_b, xDir=(1, 0, 0), normal=start_b - start_inlet
-    )
+    plane_circle = create_safe_plane(origin=start_b, normal=start_b - start_inlet)
     bif1_line = cq.Workplane("XY").spline(
         [start_b, end_b], tangents=[start_b - start_inlet, end_b - start_b]
     )
@@ -98,8 +110,8 @@ def create_bifurcation(bif_node, bif_wp, end1_node, end2_node, r0, r1, r2):
     end_b = end_b1 if r1 >= r2 else end_b2
     r = r1 if r1 >= r2 else r2
 
-    plane_circle = cq.Plane(
-        origin=center + offset * height * normal, xDir=(1, 0, 0), normal=normal
+    plane_circle = create_safe_plane(
+        origin=center + offset * height * normal, normal=normal
     )
     bif1_line = cq.Workplane("XY").spline(
         [start_b + offset * height * normal, end_b], tangents=[normal, end_b - start_b]
@@ -113,7 +125,7 @@ def create_bifurcation(bif_node, bif_wp, end1_node, end2_node, r0, r1, r2):
     end_b = end_b1 if r1 < r2 else end_b2
     r = r1 if r1 < r2 else r2
 
-    plane_circle = cq.Plane(origin=center, xDir=(1, 0, 0), normal=normal)
+    plane_circle = create_safe_plane(origin=center, normal=normal)
     # TODO: aca la tangente mejor del mismo branch
     bif2_line = cq.Workplane("XY").spline(
         [start_b, end_b], tangents=[normal, end_b - start_b]
@@ -228,15 +240,26 @@ def tag_and_mesh_with_gmsh(
     create physical groups for inlet, outlets and walls, then mesh and write out_msh.
     """
     import gmsh
+
     gmsh.initialize()
+    import multiprocessing
+    import os
+
+    try:
+        num_threads = int(
+            os.environ.get("SLURM_CPUS_PER_TASK", multiprocessing.cpu_count())
+        )
+    except ValueError:
+        num_threads = 1
+
+    gmsh.option.setNumber("General.NumThreads", num_threads)
+    print(f"[INFO] Using {num_threads} threads for meshing")
     gmsh.option.setNumber("General.Terminal", 1)
     gmsh.merge(brep_path)
 
-    # Ensure OCC internal model is synchronized after importing the BREP
     try:
         gmsh.model.occ.synchronize()
     except Exception:
-        # not all gmsh builds require/allow explicit occ sync after merge
         pass
 
     volumes = gmsh.model.getEntities(dim=3)
@@ -245,10 +268,7 @@ def tag_and_mesh_with_gmsh(
     gmsh.model.setPhysicalName(volumes[0][0], 4, "Fluid")
     print(f"[INFO] Fluid volume assigned to volume {volumes[0][1]}")
 
-    # get all 2D entities (surfaces)
-    surfaces = gmsh.model.getBoundary(volumes, oriented=False)  # list of (2, tag)
-
-    # precompute surface centers (bounding-box centers)
+    surfaces = gmsh.model.getBoundary(volumes, oriented=False)
     surf_centers = {}
     for dim, s in surfaces:
         xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(dim, s)
@@ -259,7 +279,6 @@ def tag_and_mesh_with_gmsh(
 
     assigned = {}  # node_id -> surface tag
 
-    # helper to find nearest surface to a point
     def find_nearest_surface(pt):
         best_s = None
         best_d2 = float("inf")

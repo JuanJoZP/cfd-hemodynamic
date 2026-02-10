@@ -97,19 +97,29 @@ def _merge_msh_files(stenosis_msh, tree_msh, out_msh):
     print(f"[OK] Combined mesh written to {out_msh}")
 
 
-def run_meshing(config_path, output_base):
+def run_meshing(config_path, output_base, job_idx=None):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
     base_params = config["base_params"]
     combinations = generate_experiment_matrix(config)
 
-    print(f"[INFO] Generando mallas para {len(combinations)} experimentos...")
+    print(f"[INFO] Total experimentos posibles: {len(combinations)}")
+
+    if job_idx is not None:
+        if 0 <= job_idx < len(combinations):
+            print(f"[INFO] Ejecutando SOLAMENTE el experimento índice {job_idx}")
+            combinations_with_idx = [(job_idx, combinations[job_idx])]
+        else:
+            print(f"[ERROR] job_idx {job_idx} fuera de rango (0-{len(combinations)-1})")
+            return
+    else:
+        combinations_with_idx = list(enumerate(combinations))
 
     output_base = Path(output_base)
     output_base.mkdir(parents=True, exist_ok=True)
 
-    for i, experiment in enumerate(combinations):
+    for i, experiment in combinations_with_idx:
         exp_name = f"exp_{i:03d}"
         for k, v in experiment.items():
             val_str = str(v).replace(".", "p")
@@ -118,7 +128,7 @@ def run_meshing(config_path, output_base):
         exp_dir = output_base / exp_name
         exp_dir.mkdir(exist_ok=True)
 
-        print(f"\n[STEP] --- Experimento: {exp_name} ---")
+        print(f"\n[STEP] --- Experimento: {exp_name} (ID: {i}) ---")
 
         r_in = base_params["radius_in"]
         r_out = base_params["radius_out"]
@@ -153,9 +163,8 @@ def run_meshing(config_path, output_base):
 
             print("[INFO] Generando árbol vascular con VascuSynth...")
             tree_params = {**base_params, **experiment}
-            tree_params["perf_point_mm"] = list(end_pt)
 
-            tmp_dir = str("tmp_vascusynth")
+            tmp_dir = str(f"tmp_vascusynth_{i}")
             os.makedirs(tmp_dir, exist_ok=True)
 
             try:
@@ -181,6 +190,12 @@ def run_meshing(config_path, output_base):
             stenosis_dir = end_pt - start_pt
             stenosis_dir = stenosis_dir / np.linalg.norm(stenosis_dir)
             _rotate_tree_to_align(vtree, root_id, stenosis_dir)
+
+            # Translation
+            current_root_pos = np.array(vtree.nodes[root_id])
+            translation = end_pt - current_root_pos
+            for nid in vtree.nodes:
+                vtree.nodes[nid] = tuple(np.array(vtree.nodes[nid]) + translation)
 
             solid_tree = vtree.build_solid()
             if not solid_tree:

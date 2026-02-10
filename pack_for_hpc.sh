@@ -33,7 +33,6 @@ tar -czvf "$OUTPUT_FILE" \
     --exclude='*.sif' \
     src/ \
     main.py \
-    job.sh
 
 echo ""
 echo "✅ Archivo creado: $OUTPUT_FILE"

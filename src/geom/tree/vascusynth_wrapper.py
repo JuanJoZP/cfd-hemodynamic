@@ -33,24 +33,17 @@ def generate_vascusynth_tree(params, tmp_dir="src/geom/tree/tmp", bind=False):
     # PERF_FLOW: Usamos el flujo de entrada q_in
     perf_flow = params.get("q_in", 70.0) / 60.0  # mL/min -> mL/s
 
-    # Punto de perfusión: se recibe en mm (relativo al cubo de perfusión)
-    # y se convierte a coordenadas de voxel [0, grid_size-1]
-    perf_point_mm = params.get("perf_point_mm", [0.0, cube_side / 2.0, cube_side / 2.0])
-    px = int(perf_point_mm[0] / voxel_width)
-    py = int(perf_point_mm[1] / voxel_width)
-    pz = int(perf_point_mm[2] / voxel_width)
-
-    # Limitar al rango del grid
-    px = max(0, min(grid_size - 1, px))
-    py = max(0, min(grid_size - 1, py))
-    pz = max(0, min(grid_size - 1, pz))
+    # Point of perfusion: Center of the face X=0
+    px = 0
+    py = grid_size // 2
+    pz = grid_size // 2
 
     vs_params = {
         "SUPPLY_MAP": "supply.txt",
         "OXYGENATION_MAP": "oxygenation.txt",
         "PERF_POINT": f"{px} {py} {pz}",
         "PERF_PRESSURE": int(params.get("perf_pressure", 13332)),  # ~100 mmHg
-        "TERM_PRESSURE": int(params.get("p_terminal", 1000)),
+        "TERM_PRESSURE": int(params.get("term_pressure", 1000)),
         "PERF_FLOW": perf_flow,
         "RHO": params.get("mu", 0.0035),  # En VascuSynth RHO es viscosidad
         "GAMMA": params.get("murray_exponent", 3.0),
