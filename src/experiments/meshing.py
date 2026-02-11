@@ -262,7 +262,7 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                 c_slope = tree_params.get("coupling_slope", 0.5)
                 # Avoid division by zero or negative
                 if c_slope <= 1e-4:
-                    c_slope = 0.5
+                    c_slope = 0.05
 
                 coupling_factor = 1.0 / c_slope
 
