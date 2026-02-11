@@ -253,12 +253,20 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
 
                 # 3. Generate Coupling
                 # Coupling starts at end_pt (end of stenosis)
-                # Length depends on radius difference. Factor can be a param or hardcoded for now.
-                coupling_factor = 2.0
-                # direction is stenosis_dir
+                # Length depends on radius difference.
+                # We control this via 'coupling_slope' (default 0.5).
+                # Slope = delta_radius / length  =>  length = delta_radius / Slope
+                # In generate_coupling_geometry, length = delta_radius * length_ratio
+                # So length_ratio = 1 / coupling_slope
 
-                # We need the solid definition to export mesh
-                # But the function returns a CadQuery object.
+                c_slope = tree_params.get("coupling_slope", 0.5)
+                # Avoid division by zero or negative
+                if c_slope <= 1e-4:
+                    c_slope = 0.5
+
+                coupling_factor = 1.0 / c_slope
+
+                # direction is stenosis_dir
 
                 # IMPORTANT: function signature update in my head:
                 # generate_coupling_geometry(start_pt, direction, r_start, r_end, length_ratio)

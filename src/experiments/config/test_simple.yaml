@@ -2,6 +2,7 @@ base_params:
   slope: 0.3
   radius_in: 1.5 # [mm] Radio proximal
   length: 30 # [mm] Longitud segmento (corto para test)
+  coupling_slope: 0.2 # Pendiente del acople (delta R / L)
   radius_out: 0.65 # [mm] Radio distal
   tree_volume: 10
   n_terminal: 5

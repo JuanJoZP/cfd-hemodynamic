@@ -138,7 +138,11 @@ def mesh_coupling(solid, filename_msh):
 
     for _, tag in surfs:
         # Check type
-        t = gmsh.model.getType(2, tag)
+        try:
+            t = gmsh.model.getType(2, abs(tag))
+        except Exception:
+            pass
+
         # Plane = Cone (usually B-Spline or Surface in OCC).
         # Actually checking curvature or bounding box might be safer?
         # A Cone has curvature. The caps are planes.
