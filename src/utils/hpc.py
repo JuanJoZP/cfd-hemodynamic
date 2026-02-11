@@ -28,7 +28,7 @@ def load_config(config_path):
         # matrix:
         #   key: [v1, v2]
 
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             for line in f:
                 content = line.split("#")[0].rstrip()
                 if not content:
