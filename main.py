@@ -145,6 +145,13 @@ def main():
         default=None,
         help="Índice del experimento a ejecutar (para Job Arrays)",
     )
+    exp_mesh_parser.add_argument(
+        "--mode",
+        choices=["all", "tree", "geometry"],
+        default="all",
+        dest="meshing_mode",
+        help="Modo de ejecución del mallado",
+    )
 
     exp_subparsers.add_parser(
         "solve",

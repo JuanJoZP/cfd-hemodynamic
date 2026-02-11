@@ -164,8 +164,21 @@ def parse_gxl(gxl_path, voxel_width=0.04):
         frm = e.get("from")
         to = e.get("to")
         r_attr = e.xpath(".//attr[contains(@name,'radius')]/float/text()")
-        radius = float(r_attr[0]) * vw
+        # VascuSynth output radii are in cm, so we convert to mm by multiplying by 10.
+        # Coordinates are in voxel units, so they are scaled by voxel_width (vw).
+        radius = float(r_attr[0]) * 10.0
         edges.append((frm, to, radius))
+
+    # Logging validation
+    coords_arr = np.array(list(nodes.values()))
+    min_c = coords_arr.min(axis=0)
+    max_c = coords_arr.max(axis=0)
+    print(f"[DEBUG] Tree Bounding Box (mm): Min={min_c}, Max={max_c}")
+    print(f"[DEBUG] Tree Dimensions (mm): {max_c - min_c}")
+
+    radii = [r for _, _, r in edges]
+    if radii:
+        print(f"[DEBUG] Radii range (mm): Min={min(radii):.4f}, Max={max(radii):.4f}")
 
     return nodes, node_types, edges
 
@@ -214,20 +227,36 @@ def build_mesh(
             continue
 
         end1, end2, r1, r2 = get_edges_from_node(current_node)
-        bif_result, wps = create_bifurcation(
-            nodes[current_node],
-            nodes_wps[current_node],
-            nodes[end1],
-            nodes[end2],
-            current_radius,
-            r1,
-            r2,
-        )
-        result = result.union(bif_result)
-        nodes_wps[end1] = wps[0]
-        nodes_wps[end2] = wps[1]
-        queue.append((end1, r1))
-        queue.append((end2, r2))
+        try:
+            bif_result, wps = create_bifurcation(
+                nodes[current_node],
+                nodes_wps[current_node],
+                nodes[end1],
+                nodes[end2],
+                current_radius,
+                r1,
+                r2,
+            )
+
+            # Check if bifurcation solid is valid
+            if bif_result.val() is None:
+                print(
+                    f"[WARN] Bifurcation at node {current_node} produced no solid. Skipping."
+                )
+                continue
+
+            # Try to union
+            result = result.union(bif_result)
+
+            nodes_wps[end1] = wps[0]
+            nodes_wps[end2] = wps[1]
+            queue.append((end1, r1))
+            queue.append((end2, r2))
+
+        except Exception as e:
+            print(f"[WARN] Failed to process bifurcation at node {current_node}: {e}")
+            # If we fail here, we don't add children to queue, effectively pruning this branch
+            continue
 
     return result
 

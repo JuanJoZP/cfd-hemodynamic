@@ -20,7 +20,9 @@ def run(args, _unknown=None):
     if args.exp_command == "mesh":
         from .meshing import run_meshing
 
-        run_meshing(config_path, output_path, job_idx=args.job_idx)
+        run_meshing(
+            config_path, output_path, job_idx=args.job_idx, mode=args.meshing_mode
+        )
     elif args.exp_command == "solve":
         from .solving import run_solving
 

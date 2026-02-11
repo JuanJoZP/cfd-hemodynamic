@@ -1,8 +1,8 @@
 base_params:
   slope: 0.3
-  radius_in: 1.6 # [mm] Radio proximal
+  radius_in: 1.5 # [mm] Radio proximal
   length: 30 # [mm] Longitud segmento (corto para test)
-  radius_out: 1.1 # [mm] Radio distal
+  radius_out: 0.65 # [mm] Radio distal
   tree_volume: 10
   n_terminal: 5
   q_in: 2
@@ -10,13 +10,11 @@ base_params:
   term_pressure: 80000
   murray_exponent: 3.0
   closest_neighbours: 5
-
-matrix:
-  reduccion_lumen: [0.3]
-
-simulation_params:
   solver: "stabilized_schur"
   T: 0.1
   dt: 0.01
   mu: 0.0035
   rho: 0.00106
+
+matrix:
+  reduccion_lumen: [0.3]

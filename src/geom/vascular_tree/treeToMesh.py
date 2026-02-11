@@ -1,11 +1,11 @@
+import cadquery as cq
+import gmsh
 import numpy as np
 from lxml import etree  # type: ignore
-import gmsh
-import cadquery as cq
 
-GXL_FILE = "src/geom/tree_structure.xml"
+GXL_FILE = "src/geom/vascular_tree/tree_structure.xml"
 VOXEL_WIDTH = 0.04
-OUT_MSH = "src/geom/vessels.msh"
+OUT_MSH = "src/geom/vascular_tree/vessels.msh"
 
 inlet_tag = 1
 outlet_tag = 2
@@ -163,7 +163,7 @@ def parse_gxl(gxl_path):
         frm = e.get("from")
         to = e.get("to")
         r_attr = e.xpath(".//attr[contains(@name,'radius')]/float/text()")
-        radius = float(r_attr[0]) * VOXEL_WIDTH
+        radius = float(r_attr[0]) * 10
         edges.append((frm, to, radius))
 
     return nodes, node_types, edges
