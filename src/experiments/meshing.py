@@ -104,6 +104,11 @@ def _merge_multiple_msh_files(out_msh, *msh_files):
 
 
 def run_meshing(config_path, output_base, job_idx=None, mode="all"):
+    if mode in ["all", "geometry"] and np is None:
+        raise ImportError(
+            "Numpy is required for geometry generation but not installed."
+        )
+
     # with open(config_path, "r") as f:
     #     config = yaml.safe_load(f)
     config = load_config(config_path)
@@ -196,38 +201,30 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                 stenosis_dir = stenosis_dir / np.linalg.norm(stenosis_dir)
 
                 print("[INFO] Generando y malleando estenosis...")
+                current_params = {**base_params, **experiment}
+
                 solid_stenosis = generate_stenosis_geometry(
                     tuple(start_pt),
                     tuple(end_pt),
                     r_in,
                     r_out,
                     min_radius,
-                    slope=base_params.get("slope", 0.5),
+                    slope=current_params.get("slope", 0.5),
+                    position=current_params.get("stenosis_position", 0.5),
                 )
 
-                stenosis_brep = str(exp_dir / "stenosis.brep")
-                stenosis_msh = str(exp_dir / "stenosis.msh")
-                mesh_and_export(
-                    solid_stenosis,
-                    stenosis_brep,
-                    stenosis_msh,
-                    tuple(start_pt),
-                    tuple(end_pt),
-                )
+                # We do NOT mesh stenosis separately anymore.
 
                 print(f"[INFO] Cargando arbol desde {tree_xml_path}...")
                 tree_params = {**base_params, **experiment}
 
-                # Recalcular voxel_width para asegurar escala correcta (mismo logica que wrapper)
+                # Recalcular voxel_width
                 tree_volume = tree_params.get("tree_volume", 70.0)
                 vol_mm3 = tree_volume * 1000.0
                 cube_side = vol_mm3 ** (1.0 / 3.0)
                 grid_size = 100
                 voxel_width = cube_side / grid_size
                 tree_params["voxel_width"] = voxel_width
-                print(
-                    f"[INFO] Using voxel_width: {voxel_width:.4f} mm for tree volume {tree_volume} mL"
-                )
 
                 vtree = VascularTree.from_xml(str(tree_xml_path), tree_params)
 
@@ -237,91 +234,107 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                 )
 
                 # --- Coupling Logic ---
-                # 1. Get root radius from tree (do not overwrite it)
                 root_edge = next((e for e in vtree.edges if e["from"] == root_id), None)
                 if not root_edge:
                     raise ValueError("Root node has no outgoing edge?")
                 root_radius = root_edge["radius"]
                 print(f"[INFO] Tree Root Radius: {root_radius:.4f} mm")
 
-                # 2. Align tree to stenosis direction
-                vtree.apply_modifications()  # modifiers might change radii
-                # re-read radius just in case modifiers changed it (though usually only distal)
-                root_radius = root_edge["radius"]
-
+                # Align tree
+                vtree.apply_modifications()
+                root_radius = root_edge["radius"]  # update
                 _rotate_tree_to_align(vtree, root_id, stenosis_dir)
 
-                # 3. Generate Coupling
-                # Coupling starts at end_pt (end of stenosis)
-                # Length depends on radius difference.
-                # We control this via 'coupling_slope' (default 0.5).
-                # Slope = delta_radius / length  =>  length = delta_radius / Slope
-                # In generate_coupling_geometry, length = delta_radius * length_ratio
-                # So length_ratio = 1 / coupling_slope
-
+                # Generate Coupling
                 c_slope = tree_params.get("coupling_slope", 0.5)
-                # Avoid division by zero or negative
                 if c_slope <= 1e-4:
                     c_slope = 0.05
-
                 coupling_factor = 1.0 / c_slope
 
-                # direction is stenosis_dir
-
-                # IMPORTANT: function signature update in my head:
-                # generate_coupling_geometry(start_pt, direction, r_start, r_end, length_ratio)
+                # FORCE OVERLAP for robust union
+                # Move coupling start slightly inside the stenosis
+                overlap_dist = 0.1
+                coupling_start = end_pt - stenosis_dir * overlap_dist
 
                 coupling_solid, coupling_len = generate_coupling_geometry(
-                    tuple(end_pt),
+                    tuple(coupling_start),
                     tuple(stenosis_dir),
                     r_out,
                     root_radius,
                     length_ratio=coupling_factor,
                 )
-                print(f"[INFO] Coupling generated with length {coupling_len:.4f} mm")
+                print(
+                    f"[INFO] Coupling generated with length {coupling_len:.4f} mm (overlap {overlap_dist}mm)"
+                )
 
-                coupling_msh = str(exp_dir / "coupling.msh")
-                # We need to implement mesh_coupling or similar.
-                # I'll assume we added mesh_coupling to src.geom.coupling
-                # (Wait, I need to check if I added it in the previous step... yes I did)
-
-                # To define the mesh properly we need start/end of coupling?
-                # mesh_coupling in the file I just wrote takes (solid, filename). Generates generic mesh.
-                mesh_coupling(coupling_solid, coupling_msh)
-
-                # 4. Position Tree
-                # Tree starts at end_pt + coupling_len * stenosis_dir
+                # Position Tree
                 coupling_end_pt = end_pt + stenosis_dir * coupling_len
-
                 current_root_pos = np.array(vtree.nodes[root_id])
                 translation = coupling_end_pt - current_root_pos
+
+                # Apply translation to all nodes
                 for nid in vtree.nodes:
                     vtree.nodes[nid] = tuple(np.array(vtree.nodes[nid]) + translation)
 
+                # Build Tree Solid
                 solid_tree = vtree.build_solid()
                 if not solid_tree:
                     raise RuntimeError(
                         "No se pudo generar el solido del arbol vascular"
                     )
 
-                tree_brep = str(exp_dir / "tree.brep")
-                tree_msh = str(exp_dir / "tree.msh")
-                cq.exporters.export(solid_tree, tree_brep)
-                vtree.mesh_and_tag(tree_brep, tree_msh)
+                # Clean individual solids
+                try:
+                    solid_stenosis = solid_stenosis.clean()
+                    coupling_solid = coupling_solid.clean()
+                    if hasattr(solid_tree, "clean"):
+                        solid_tree = solid_tree.clean()
+                except Exception as e:
+                    print(f"[WARN] Failed to clean individual solids: {e}")
 
-                # Save parameters to YAML
-                if yaml:
-                    with open(exp_dir / "params.yaml", "w") as f:
-                        yaml.dump({"experiment": experiment, "base": base_params}, f)
-                else:
-                    print(
-                        f"[WARN] PyYAML not available, skipping params.yaml dump for {exp_name}"
+                # DEBUG: Export components
+                print("[DEBUG] Exporting individual components for inspection...")
+                try:
+                    cq.exporters.export(
+                        solid_stenosis, str(exp_dir / "debug_stenosis.brep")
                     )
+                    cq.exporters.export(
+                        coupling_solid, str(exp_dir / "debug_coupling.brep")
+                    )
+                    cq.exporters.export(solid_tree, str(exp_dir / "debug_tree.brep"))
+                except Exception as e:
+                    print(f"[WARN] Failed to export debug components: {e}")
 
-                print("[INFO] Merging meshes...")
-                combined_msh = str(exp_dir / "mesh.msh")
-                _merge_multiple_msh_files(
-                    combined_msh, stenosis_msh, coupling_msh, tree_msh
+                # --- UNION EVERYTHING ---
+                print("[INFO] Uniendo solidos (Estenosis + Coupling + Arbol)...")
+
+                # Use a combined approach with clean
+                combined_solid = solid_stenosis.union(coupling_solid).union(solid_tree)
+                try:
+                    combined_solid = combined_solid.clean()
+                except Exception as e:
+                    print(f"[WARN] Failed to clean combined solid: {e}")
+
+                merged_brep = str(exp_dir / "merged_geometry.brep")
+                merged_msh = str(exp_dir / "mesh.msh")
+
+                print(f"[INFO] Exportando geometria unificada a {merged_brep}")
+                cq.exporters.export(combined_solid, merged_brep)
+
+                # Mesh the merged geometry
+                print("[INFO] Mallando geometria unificada...")
+
+                # Collect terminals for tagging
+                terminals = []
+                for nid, ntype in vtree.node_types.items():
+                    if "terminal node" in ntype:
+                        terminals.append(vtree.nodes[nid])
+
+                mesh_merged_geometry(
+                    merged_brep,
+                    merged_msh,
+                    tuple(start_pt),  # Inlet (start of stenosis)
+                    terminals,  # Outlets (tree terminals)
                 )
 
                 print(f"[OK] Experimento {exp_name} completado.")
@@ -329,3 +342,114 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
         except Exception as e:
             print(f"[ERROR] Meshing failed for {exp_name}: {e}")
             traceback.print_exc()
+
+
+def mesh_merged_geometry(brep_path, out_msh_path, inlet_pt, outlet_pts):
+    """
+    Meshes the single merged BREP file.
+    Tags:
+      - Inlet: Surface closest to inlet_pt
+      - Outlets: Surfaces closest to outlet_pts
+      - Walls: All other surfaces
+    """
+    import gmsh
+
+    from src.geom.stenosis.stenosis import FLUID_TAG, INLET_TAG, OUTLET_TAG, WALL_TAG
+
+    gmsh.initialize()
+    gmsh.option.setNumber("General.Terminal", 1)
+    gmsh.merge(brep_path)
+
+    try:
+        # Heal shapes to fix potential tolerance issues
+        gmsh.model.occ.healShapes()
+    except Exception as e:
+        print(f"[WARN] Failed to heal shapes: {e}")
+
+    try:
+        gmsh.model.occ.synchronize()
+    except:
+        pass
+
+    # Tag Volume
+    vols = gmsh.model.getEntities(3)
+    if vols:
+        gmsh.model.addPhysicalGroup(3, [vols[0][1]], FLUID_TAG)
+        gmsh.model.setPhysicalName(3, FLUID_TAG, "Fluid")
+
+    surfaces = gmsh.model.getBoundary(vols)
+
+    # Helper for distance
+    def get_surf_center_dist(tag, pt):
+        bb = gmsh.model.getBoundingBox(2, tag)
+        c = [(bb[0] + bb[3]) / 2, (bb[1] + bb[4]) / 2, (bb[2] + bb[5]) / 2]
+        return np.linalg.norm(np.array(c) - np.array(pt))
+
+    # Identify Inlet
+    best_in_dist = float("inf")
+    inlet_tag = None
+
+    # Pre-calculate distances to avoid re-querying
+    surf_centers = []
+    for dim, tag in surfaces:
+        bb = gmsh.model.getBoundingBox(2, tag)
+        c = [(bb[0] + bb[3]) / 2, (bb[1] + bb[4]) / 2, (bb[2] + bb[5]) / 2]
+        surf_centers.append((tag, np.array(c)))
+
+    # Find Inlet
+    inlet_pt_arr = np.array(inlet_pt)
+    for tag, c in surf_centers:
+        d = np.linalg.norm(c - inlet_pt_arr)
+        if d < best_in_dist:
+            best_in_dist = d
+            inlet_tag = tag
+
+    # Find Outlets
+    outlet_tags = []
+    for out_pt in outlet_pts:
+        best_out_dist = float("inf")
+        best_out_tag = None
+        out_pt_arr = np.array(out_pt)
+        for tag, c in surf_centers:
+            if tag == inlet_tag or tag in outlet_tags:
+                continue
+            d = np.linalg.norm(c - out_pt_arr)
+            if d < best_out_dist:
+                best_out_dist = d
+                best_out_tag = tag
+
+        if best_out_tag:
+            outlet_tags.append(best_out_tag)
+
+    # Tagging
+    walls = []
+    for dim, tag in surfaces:
+        if tag == inlet_tag:
+            gmsh.model.addPhysicalGroup(2, [tag], INLET_TAG)
+            gmsh.model.setPhysicalName(2, INLET_TAG, "Inlet")
+        elif tag in outlet_tags:
+            # We can group all outlets or individual
+            # Let's group all as 2 for now, or distinct?
+            # Existing code used 2 for "outlets" group.
+            pass
+        else:
+            walls.append(tag)
+
+    if outlet_tags:
+        gmsh.model.addPhysicalGroup(2, outlet_tags, OUTLET_TAG)
+        gmsh.model.setPhysicalName(2, OUTLET_TAG, "Outlets")
+
+    if walls:
+        gmsh.model.addPhysicalGroup(2, walls, WALL_TAG)
+        gmsh.model.setPhysicalName(2, WALL_TAG, "Walls")
+
+    # Mesh settings
+    gmsh.option.setNumber("Mesh.Smoothing", 30)
+    gmsh.option.setNumber("Mesh.CharacteristicLengthFromCurvature", 1)
+    gmsh.option.setNumber("Mesh.MinimumElementsPerTwoPi", 11)
+    gmsh.model.mesh.generate(3)
+    gmsh.model.mesh.optimize("Netgen")
+
+    gmsh.write(out_msh_path)
+    gmsh.finalize()
+    print(f"[OK] Combined mesh generated at {out_msh_path}")

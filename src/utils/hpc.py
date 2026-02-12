@@ -95,7 +95,18 @@ def dispatch_hpc(args, unknown):
 
             print(f"[INFO] Dispatching meshing for {num_experiments} experiments.")
 
-            array_range = f"0-{num_experiments-1}"
+            # Check if job_idx is specified
+            target_idx = None
+            for i, arg in enumerate(sys.argv):
+                if arg == "--job_idx":
+                    if i + 1 < len(sys.argv):
+                        target_idx = sys.argv[i + 1]
+
+            if target_idx:
+                print(f"[INFO] Dispatching single job for index {target_idx}")
+                array_range = target_idx
+            else:
+                array_range = f"0-{num_experiments-1}"
 
             # Determine steps to run
             steps = []
@@ -116,26 +127,49 @@ def dispatch_hpc(args, unknown):
 
             for step in steps:
                 script_name = "hpc_tree.sh" if step == "tree" else "hpc_mesh.sh"
+                # Correct path relative to where dispatch is called (root)
                 script_path = Path("src/experiments") / script_name
 
                 # Adjust output path for geometry step (running in container with /data bind)
                 step_output = override_output
+
+                # Only remap path for the meshing step which runs inside Singularity
                 if step == "geometry":
+                    container_output = step_output
                     home_data = str(Path.home() / "data")
-                    if override_output.startswith(home_data):
-                        step_output = override_output.replace(home_data, "/data", 1)
+                    # On HPC, home is /home/juanjo.zuluaga.
+                    # We want to replace /home/juanjo.zuluaga/data -> /data
+                    # But ONLY if the path actually starts with that.
+
+                    # Hardcode the HPC home path for robustness if Path.home() is local
+                    hpc_home_data = "/home/juanjo.zuluaga/data"
+
+                    if step_output.startswith(hpc_home_data):
+                        container_output = step_output.replace(
+                            hpc_home_data, "/data", 1
+                        )
+                    elif step_output.startswith(home_data):
+                        container_output = step_output.replace(home_data, "/data", 1)
+                else:
+                    # Tree generation runs on bare metal python (no container bind), so use absolute path
+                    container_output = step_output
 
                 # Reconstruct arguments: pass specific mode to the script
-                step_args = [args.exp_command, "--config", args.config, "--mode", step]
-                step_args.extend(["--output", step_output])
+                # We need to construct the ARGS passed TO THE SCRIPT (python main.py ...)
+                # The script itself (hpc_mesh.sh) takes arguments as $*
+
+                # NOTE: We DO NOT pass --job_idx here because hpc_mesh.sh uses $SLURM_ARRAY_TASK_ID
+                # However, if we use --array=5, then TASK_ID will be 5.
+
+                step_args = ["mesh", "--config", str(config_path), "--mode", step]
+                step_args.extend(["--output", container_output])
 
                 cmd = ["sbatch", f"--array={array_range}"]
-
-                # Dependency chain
                 if last_job_id:
                     cmd.append(f"--dependency=afterok:{last_job_id}")
 
                 cmd.append(str(script_path))
+                # Append python args to the sbatch script arguments
                 cmd.extend(step_args)
 
                 print(f"[INFO] Submitting {step} job via {script_name}...")

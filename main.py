@@ -185,7 +185,7 @@ def main():
     args, unknown = parser.parse_known_args()
 
     # --hpc flag logic
-    if args.hpc:
+    if getattr(args, "hpc", False):
         from src.utils.hpc import dispatch_hpc
 
         # Remove --hpc from sys.argv so it doesn't get passed downstream

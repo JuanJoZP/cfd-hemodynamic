@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 ROOT_PATH = Path(__file__).resolve().parent.parent.parent
@@ -19,6 +20,19 @@ def run(args, _unknown=None):
 
     if args.exp_command == "mesh":
         from .meshing import run_meshing
+
+        # Helper: detect if we are likely on login node but forgot --hpc
+        if args.job_idx is not None:
+            try:
+                import cadquery
+            except ImportError:
+                print(
+                    "\n[WARNING] You specified --job_idx but are running locally without CadQuery."
+                )
+                print(
+                    "[HINT] Did you mean to dispatch this job to the HPC? If so, add the '--hpc' flag:"
+                )
+                print(f"       python main.py {' '.join(sys.argv[1:])} --hpc\n")
 
         run_meshing(
             config_path, output_path, job_idx=args.job_idx, mode=args.meshing_mode
