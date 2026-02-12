@@ -115,6 +115,21 @@ class Scenario(ABC):
     def setup(self):
         self.solver.setup(self.bcu, self.bcp)
 
+        if self.mesh.comm.rank == 0:
+            num_dofs_V = (
+                self.solver.V.dofmap.index_map.size_global
+                * self.solver.V.dofmap.index_map_bs
+            )
+            num_dofs_Q = (
+                self.solver.Q.dofmap.index_map.size_global
+                * self.solver.Q.dofmap.index_map_bs
+            )
+            total_dofs = num_dofs_V + num_dofs_Q
+            print(
+                f"DOFs: {total_dofs} (Velocity: {num_dofs_V}, Pressure: {num_dofs_Q})"
+            )
+            print(f"Suggested cores: {total_dofs / 20000:.1f}")
+
     def solve(
         self, output_folder: str, afterStepCallback: Callable[[float], None] = None
     ) -> str:
