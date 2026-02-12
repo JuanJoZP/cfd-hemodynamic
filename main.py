@@ -129,6 +129,12 @@ def main():
         dest="exp_output",
         help="Directorio base para resultados",
     )
+    exp_common.add_argument(
+        "--job_idx",
+        type=int,
+        default=None,
+        help="Índice del experimento a ejecutar (para Job Arrays)",
+    )
 
     exp_subparsers = exp_parser.add_subparsers(
         dest="exp_command", help="Subcomandos de experiment"
@@ -140,12 +146,6 @@ def main():
         help="Generar mallas para la matriz de experimentos",
     )
     exp_mesh_parser.add_argument(
-        "--job_idx",
-        type=int,
-        default=None,
-        help="Índice del experimento a ejecutar (para Job Arrays)",
-    )
-    exp_mesh_parser.add_argument(
         "--mode",
         choices=["all", "tree", "geometry"],
         default="all",
@@ -153,10 +153,16 @@ def main():
         help="Modo de ejecución del mallado",
     )
 
-    exp_subparsers.add_parser(
+    exp_solve_parser = exp_subparsers.add_parser(
         "solve",
         parents=[exp_common, hpc_parent],
         help="Resolver ecuaciones para la matriz de experimentos",
+    )
+    exp_solve_parser.add_argument(
+        "--cores",
+        type=int,
+        default=1,
+        help="Number of MPI cores per job (for HPC solve)",
     )
 
     # ── tree ──────────────────────────────────────────────────────────────

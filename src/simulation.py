@@ -1,11 +1,13 @@
-import os
 import inspect
+import os
 import subprocess
 from datetime import datetime
 from importlib import import_module
 from pathlib import Path
-from typing import Union, Type, Optional, Any
+from typing import Any, Optional, Type, Union
+
 from mpi4py import MPI
+
 from src.scenario import Scenario
 
 
@@ -39,9 +41,9 @@ class Simulation:
         # Validate required arguments
         if not name or not isinstance(name, str):
             raise ValueError("'name' must be a non-empty string.")
-        if not simulation or not isinstance(simulation, str):
+        if not simulation:
             raise ValueError(
-                "'simulation' must be a non-empty string specifying the scenario module."
+                "'simulation' must be provided (string or Scenario class)."
             )
         if not solver or not isinstance(solver, str):
             raise ValueError(
@@ -49,7 +51,11 @@ class Simulation:
             )
 
         self.name = name
-        self.scenario_name = simulation if isinstance(simulation, str) else getattr(simulation, "__name__", "custom_scenario")
+        self.scenario_name = (
+            simulation
+            if isinstance(simulation, str)
+            else getattr(simulation, "__name__", "custom_scenario")
+        )
         self.solver_name = solver
         self.output_dir = output_dir
         self.kwargs = kwargs
@@ -254,7 +260,7 @@ class Simulation:
 
         comm.barrier()
 
-        self.scenario_instance.setup() 
+        self.scenario_instance.setup()
         result_path = self.scenario_instance.solve(output_folder=save_path)
 
         if rank == 0:
