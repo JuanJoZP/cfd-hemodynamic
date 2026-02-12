@@ -194,7 +194,92 @@ def dispatch_hpc(args, unknown):
                     return
 
         elif args.exp_command == "solve":
-            print("[WARN] HPC dispatch for 'experiment solve' not implemented yet.")
+            config_path = Path(args.config)
+            full_config = load_config(config_path)
+            matrix = full_config.get("matrix", {})
+
+            if not matrix:
+                print(
+                    f"[WARN] usage of yaml is deprecated on HPC login node, and fallback parser found no 'matrix' in {config_path} or it was empty."
+                )
+                if not matrix:
+                    print("[ERROR] Matrix configuration not found.")
+                    return
+
+            keys = matrix.keys()
+            values = [v if isinstance(v, list) else [v] for v in matrix.values()]
+            combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
+            num_experiments = len(combinations)
+
+            print(f"[INFO] Dispatching solving for {num_experiments} experiments.")
+
+            # Check if job_idx is specified
+            target_idx = None
+            for i, arg in enumerate(sys.argv):
+                if arg == "--job_idx":
+                    if i + 1 < len(sys.argv):
+                        target_idx = sys.argv[i + 1]
+
+            if target_idx:
+                print(f"[INFO] Dispatching single job for index {target_idx}")
+                array_range = target_idx
+            else:
+                array_range = f"0-{num_experiments-1}"
+
+            # Output directory logic (must match meshing output location)
+            # User correction: should use 'data/results' not 'data/meshes'
+            config_name = config_path.stem
+            override_output = str(Path.home() / "data/results" / config_name)
+            print(f"[INFO] Using output directory: {override_output}")
+
+            script_name = "hpc_solve.sh"
+            script_path = Path("src/experiments") / script_name
+
+            # Adjust output path for container (running in container with /data bind)
+            container_output = override_output
+            home_data = str(Path.home() / "data")
+            # Hardcode HPC home path for robustness
+            hpc_home_data = "/home/juanjo.zuluaga/data"
+
+            if override_output.startswith(hpc_home_data):
+                container_output = override_output.replace(hpc_home_data, "/data", 1)
+            elif override_output.startswith(home_data):
+                container_output = override_output.replace(home_data, "/data", 1)
+
+            # Reconstruct arguments
+            # We pass args to main.py experiment solve ...
+            # The script (hpc_solve.sh) binds /data so we use container_output
+
+            step_args = ["solve", "--config", str(config_path)]
+            step_args.extend(["--output", container_output])
+
+            # Logic for custom cores (ntasks)
+            num_cores = getattr(args, "cores", 1)
+
+            # Verify array range is valid (single job or range)
+            cmd = ["sbatch", f"--array={array_range}"]
+            # Override ntasks from command line based on user request
+            cmd.append(f"--ntasks={num_cores}")
+
+            # Note: This command-line argument overrides the #SBATCH --array directive in the script.
+            cmd.append(str(script_path))
+            cmd.extend(step_args)
+
+            print(f"[INFO] Submitting solve job via {script_name}...")
+            print(f"       Command: {' '.join(cmd)}")
+
+            try:
+                res = subprocess.run(
+                    cmd,
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    universal_newlines=True,
+                )
+                print(res.stdout)
+            except subprocess.CalledProcessError as e:
+                print(f"[ERROR] Submission failed: {e.stderr}")
+                return
 
     elif command == "simulate":
         script_path = Path("src/simulation_hpc.sh")
