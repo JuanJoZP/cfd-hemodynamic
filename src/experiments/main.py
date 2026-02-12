@@ -38,9 +38,22 @@ def run(args, _unknown=None):
             config_path, output_path, job_idx=args.job_idx, mode=args.meshing_mode
         )
     elif args.exp_command == "solve":
+        # Helper: detect if we are likely on login node but forgot --hpc
+        if args.job_idx is not None:
+            try:
+                import dolfinx
+            except ImportError:
+                print(
+                    "\n[WARNING] You specified --job_idx but are running locally without dolfinx."
+                )
+                print(
+                    "[HINT] Did you mean to dispatch this job to the HPC? If so, add the '--hpc' flag:"
+                )
+                print(f"       python main.py {' '.join(sys.argv[1:])} --hpc\n")
+
         from .solving import run_solving
 
-        run_solving(config_path, output_path)
+        run_solving(config_path, output_path, job_idx=args.job_idx)
     else:
         print("[ERROR] Subcomando de experiment no reconocido. Use 'mesh' o 'solve'.")
         return 1
