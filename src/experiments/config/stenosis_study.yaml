@@ -7,19 +7,16 @@ base_params:
   perf_pressure: 133000 # Bayre
   term_pressure: 80000 # Bayre
   q_in_hyper: 225
-  tree_volume: 70
-  n_terminal: 20
+  tree_volume: 40
+  n_terminal: 10
   murray_exponent: 3.0
   closest_neighbours: 5
-  stenosis_position: 0.5
   slope: 0.3
 
 matrix:
-  # hiperemia: [true, false]
-  # factor_perdida_vasos: [0.0, 0.5]
-  # reduccion_lumen: [0.0, 0.1, 0.2]
-  # factor_dilatacion_hiperemia: [1.0]
-  reduccion_lumen: [0.5]
+  # Variation of stenosis location and severity
+  stenosis_position: [0.25, 0.5, 0.75]
+  reduccion_lumen: [0.25, 0.5, 0.75]
 
 # Parámetros de simulación constantes para todos los experimentos
 simulation_params:
