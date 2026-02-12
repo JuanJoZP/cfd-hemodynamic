@@ -292,19 +292,6 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                 except Exception as e:
                     print(f"[WARN] Failed to clean individual solids: {e}")
 
-                # DEBUG: Export components
-                print("[DEBUG] Exporting individual components for inspection...")
-                try:
-                    cq.exporters.export(
-                        solid_stenosis, str(exp_dir / "debug_stenosis.brep")
-                    )
-                    cq.exporters.export(
-                        coupling_solid, str(exp_dir / "debug_coupling.brep")
-                    )
-                    cq.exporters.export(solid_tree, str(exp_dir / "debug_tree.brep"))
-                except Exception as e:
-                    print(f"[WARN] Failed to export debug components: {e}")
-
                 # --- UNION EVERYTHING ---
                 print("[INFO] Uniendo solidos (Estenosis + Coupling + Arbol)...")
 
