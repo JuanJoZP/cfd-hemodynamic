@@ -1,10 +1,11 @@
 import argparse
-import cadquery as cq
-import gmsh
-import numpy as np
 import os
 import sys
 import traceback
+
+import cadquery as cq
+import gmsh
+import numpy as np
 
 # Tags for physical groups
 INLET_TAG = 1
@@ -69,10 +70,12 @@ def parse_args():
     return parser.parse_args()
 
 
-def generate_stenosis_geometry(start, end, radius_in, radius_out, min_radius, slope):
+def generate_stenosis_geometry(
+    start, end, radius_in, radius_out, min_radius, slope, position=0.5
+):
     """
     Generate a stenosis geometry with progressive tapering.
-    
+
     Args:
         start: Start point coordinates (x, y, z)
         end: End point coordinates (x, y, z)
@@ -80,13 +83,21 @@ def generate_stenosis_geometry(start, end, radius_in, radius_out, min_radius, sl
         radius_out: Radius at the outlet (end), must be <= radius_in
         min_radius: Minimum radius at the stenosis center
         slope: Slope parameter controlling stenosis steepness
+        position: Relative position of stenosis center [0, 1]. 0=proximal (start), 1=distal (end).
     """
     if slope >= 0.85:
-        raise ValueError(f"Valores tan altos de slope generan geometrias dificiles de mallar, si gmsh logra mallarla por lo general es una malla de baja calidad")
+        raise ValueError(
+            f"Valores tan altos de slope generan geometrias dificiles de mallar, si gmsh logra mallarla por lo general es una malla de baja calidad"
+        )
 
     if radius_out > radius_in:
-        raise ValueError(f"radius_out ({radius_out}) must be <= radius_in ({radius_in})")
-    
+        raise ValueError(
+            f"radius_out ({radius_out}) must be <= radius_in ({radius_in})"
+        )
+
+    if not (0.0 <= position <= 1.0):
+        raise ValueError(f"Position must be in [0, 1], got {position}")
+
     start_v = np.array(start)
     end_v = np.array(end)
     vector = end_v - start_v
@@ -103,33 +114,48 @@ def generate_stenosis_geometry(start, end, radius_in, radius_out, min_radius, sl
 
     p_start = (0, r_base_start)
     p_end = (length, r_base_end)
-    p_mid = (length / 2, min_radius)
+
+    # Calculate mid point based on position
+    mid_x = length * position
+    p_mid = (mid_x, min_radius)
 
     # control points follow the line from (0, r_in) to (L, r_out)
     # slope to determine how far the CPs are from center
-    height_at_mid = r_base_mid - min_radius
+    # Radius at mid_x if it were a straight taper
+    r_taper_at_mid = radius_in + (radius_out - radius_in) * position
+
+    height_at_mid = r_taper_at_mid - min_radius
 
     if height_at_mid < 0:
-        raise ValueError(f"El min_radius es muy grande, debe ser menor o igual a {r_base_mid}")
+        raise ValueError(
+            f"El min_radius es muy grande, debe ser menor o igual a {r_taper_at_mid} at position {position}"
+        )
 
     dist_x = height_at_mid / slope if slope != 0 else length / 4
 
-    if dist_x >= length/2:
-        raise ValueError("La pendiente de la estenosis es muy pequeña, se sale de los limites. Pruebe con una pendiente mayor")
+    # Check boundaries
+    if (mid_x - dist_x < 0) or (mid_x + dist_x > length):
+        print(
+            f"[WARN] La pendiente es muy pequeña para la posicion {position}, ajustando dist_x..."
+        )
+        # Clamp dist_x to fit within the segment
+        max_dist = min(mid_x, length - mid_x)
+        if dist_x > max_dist:
+            dist_x = max_dist * 0.95  # Leave a small margin
 
-    cp1_x = length / 2 - dist_x
-    cp2_x = length / 2 + dist_x
-    
+    cp1_x = mid_x - dist_x
+    cp2_x = mid_x + dist_x
+
     cp1_r = radius_in + (radius_out - radius_in) * (cp1_x / length)
     cp2_r = radius_in + (radius_out - radius_in) * (cp2_x / length)
 
     cp1 = (cp1_x, cp1_r)
     cp2 = (cp2_x, cp2_r)
 
-
     points_2d = [(float(p[0]), float(p[1])) for p in [p_start, cp1, p_mid, cp2, p_end]]
     print(f"[INFO] Profile Points (Local 2D): {points_2d}")
     print(f"[INFO] Tapering from radius_in={radius_in} to radius_out={radius_out}")
+    print(f"[INFO] Stenosis position: {position} (x={mid_x:.4f})")
 
     # construct the profile in XY plane, then revolve around X axis
     # straight lines at extremes, spline only for stenosis
@@ -140,18 +166,18 @@ def generate_stenosis_geometry(start, end, radius_in, radius_out, min_radius, sl
     v_cp2 = cq.Vector(float(cp2[0]), float(cp2[1]), 0.0)
     v_end = cq.Vector(float(p_end[0]), float(p_end[1]), 0.0)
 
-    edge_line_start = cq.Edge.makeLine(v_start, v_cp1) 
+    edge_line_start = cq.Edge.makeLine(v_start, v_cp1)
 
-    taper_slope = (radius_out - radius_in) / length  
+    taper_slope = (radius_out - radius_in) / length
     tangent_in = cq.Vector(1.0, taper_slope, 0.0)
     tangent_out = cq.Vector(1.0, taper_slope, 0.0)
-    
+
     stenosis_points = [v_cp1, v_mid, v_cp2]
     edge_spline = cq.Edge.makeSpline(
         stenosis_points, tangents=[tangent_in, tangent_out]
     )
 
-    edge_line_end = cq.Edge.makeLine(v_cp2, v_end) 
+    edge_line_end = cq.Edge.makeLine(v_cp2, v_end)
 
     edge_cap_end = cq.Edge.makeLine(
         cq.Vector(length, r_base_end, 0), cq.Vector(length, 0, 0)
@@ -242,23 +268,30 @@ def mesh_and_export(solid, filename_brep, filename_msh, start_pt, end_pt):
         )
         return np.linalg.norm(center - np.array(point))
 
-    inlet_surf = None
-    outlet_surf = None
-    min_dist_in = float("inf")
-    min_dist_out = float("inf")
-
-    # Identify Inlet and Outlet
+    # Identify Inlet and Outlet robustly
+    surf_data = []  # (tag, dist_start, dist_end)
     for dim, tag in surfaces:
         d_in = get_center_dist(tag, start_pt)
         d_out = get_center_dist(tag, end_pt)
+        surf_data.append((tag, d_in, d_out))
+        print(f"[DEBUG] Surface {tag}: dist_start={d_in:.4f}, dist_end={d_out:.4f}")
 
-        if d_in < min_dist_in:
-            min_dist_in = d_in
-            inlet_surf = tag
+    # Sort by distance to start to find inlet
+    surf_data.sort(key=lambda x: x[1])
+    inlet_surf = surf_data[0][0]
 
-        if d_out < min_dist_out:
-            min_dist_out = d_out
-            outlet_surf = tag
+    # Sort by distance to end to find outlet
+    # Be careful not to pick the same if geometry is very short, but usually distinct.
+    surf_data.sort(key=lambda x: x[2])
+    outlet_surf = surf_data[0][0]
+
+    # Just in case they match (degenerate), usually implies length ~ 0
+    if inlet_surf == outlet_surf and len(surfaces) > 1:
+        print(
+            "[WARN] Inlet and Outlet resolved to same surface. Checking next closest..."
+        )
+        if surf_data[1][0] != inlet_surf:
+            outlet_surf = surf_data[1][0]
 
     wall_surfaces = []
     for dim, tag in surfaces:
@@ -297,17 +330,26 @@ if __name__ == "__main__":
 
     try:
         if args.radius_out > args.radius_in:
-            raise ValueError(f"radius_out ({args.radius_out}) must be <= radius_in ({args.radius_in})")
-        
+            raise ValueError(
+                f"radius_out ({args.radius_out}) must be <= radius_in ({args.radius_in})"
+            )
+
         if not 0 <= args.severity <= 1:
             raise ValueError(f"Severity must be in [0, 1], got {args.severity}")
         r_base_mid = (args.radius_in + args.radius_out) / 2
         min_radius = (1 - args.severity) * r_base_mid
         print(f"[INFO] radius_in={args.radius_in}, radius_out={args.radius_out}")
-        print(f"[INFO] Severity η={args.severity} → R_min = {min_radius:.4f} (at center)")
+        print(
+            f"[INFO] Severity η={args.severity} → R_min = {min_radius:.4f} (at center)"
+        )
 
         solid = generate_stenosis_geometry(
-            args.start, args.end, args.radius_in, args.radius_out, min_radius, args.pendiente
+            args.start,
+            args.end,
+            args.radius_in,
+            args.radius_out,
+            min_radius,
+            args.pendiente,
         )
 
         brep_path = os.path.join(args.output, "stenosis.brep")

@@ -102,71 +102,81 @@ def generate_coupling_geometry(start_pt, direction, r_start, r_end, length_ratio
 def mesh_coupling(solid, filename_msh):
     """
     Mesh the coupling solid.
-    Since this is a simple loft, we just tag everything as 'Wall' except the flat faces
-    which we hope Gmsh will merge with neighbor volumes if nodes match.
-    ACTUALLY, for merging to work best without duplicates, we should generate the mesh
-    and ensuring the boundary nodes match is the hard part usually handled by `coherence` or `removeDuplicateNodes`.
-
-    We will just tag the volume as 'Fluid' and boundaries as Default/Wall.
-    The important part is the volume mesh.
+    Tags the lateral surface (cone) as 'Wall' and the volume as 'Fluid'.
+    Planar surfaces (caps) are left untagged (internal interfaces).
     """
+    import os
+
     import gmsh
 
     # Generate BREP temp
     brep_tmp = filename_msh.replace(".msh", ".brep")
-    cq.exporters.export(solid, brep_tmp)
+
+    # Export using exporters
+    from cadquery import exporters
+
+    exporters.export(solid, brep_tmp)
 
     gmsh.initialize()
+    gmsh.option.setNumber("General.Terminal", 1)
     gmsh.merge(brep_tmp)
 
-    # Basic tagging
+    # Sync to get entities
+    try:
+        gmsh.model.occ.synchronize()
+    except:
+        pass
+
+    # Tag Volume
     vols = gmsh.model.getEntities(3)
     if vols:
         gmsh.model.addPhysicalGroup(3, [vols[0][1]], 4)  # Fluid
+        gmsh.model.setPhysicalName(3, 4, "Fluid")
 
-    # We won't tag surfaces specifically as inlet/outlet because
-    # they are internal interfaces. We tag everything else as Wall.
-    # However, to be safe, maybe we should not tag surfaces at all and let them be internal?
-    # If we tag 'Wall' on the side surface, that's good.
-    # The caps are interfaces.
-
-    # Simple heuristic: Side walls are the conical surface.
-    # Caps are likely planar.
+    # Tag Surfaces
     surfs = gmsh.model.getBoundary(vols)
-    walls = []
-    interfaces = []
+    wall_surfs = []
 
     for _, tag in surfs:
-        # Check type
+        # Check surface type
+        # Plane = curvature is 0. Cone/Cylinder = curvature > 0
+        # Gmsh occ getType: "Plane", "Cylinder", "Cone", "BSplineSurface", etc.
         try:
-            t = gmsh.model.getType(2, abs(tag))
-        except Exception:
+            stype = gmsh.model.getType(2, abs(tag))
+            print(f"[DEBUG] Surface {tag} has type {stype}")
+
+            # If it's a Plane, it's likely a cap (interface) -> Skip tagging
+            if stype == "Plane":
+                continue
+            # If Cone, Cylinder, BSpline -> Wall
+            wall_surfs.append(tag)
+
+        except Exception as e:
+            # Fallback based on bounding box or just assume it's wall if not sure?
+            # Safe bet: if we can't determine, maybe don't tag to avoid blocking flow?
+            # Or tag as wall? A cylinder wall is curved.
+            print(f"[WARN] Could not determine type for surface {tag}: {e}")
             pass
 
-        # Plane = Cone (usually B-Spline or Surface in OCC).
-        # Actually checking curvature or bounding box might be safer?
-        # A Cone has curvature. The caps are planes.
+    if wall_surfs:
+        # Create physical group for Wall
+        # Note: In other parts of code 'walls' might have ID 3. Let's stick to that.
+        p_tag = gmsh.model.addPhysicalGroup(2, wall_surfs, 3)
+        gmsh.model.setPhysicalName(2, 3, "walls")  # consistent with graph_to_mesh
 
-        # Let's just mesh everything. Merging logic in main script handles coherence.
-        pass
-
-    # Actually, proper tagging is useful if we want to exclude interfaces from "Wall" BC.
-    # But usually internal faces (between two fluid volumes) disappear or become internal after Merge+Coherence if properly done.
-    # If they remain "Physical Surfaces", they might be treated as walls by solvers unless specified otherwise.
-    # Ideally, we DONT tag the interface surfaces.
-
-    # How to identify caps in a general way?
-    # They are at the start and end positions.
-    # But we don't have the start/end points passed here easily unless we pass them.
-    # Let's assume the merging process cleans it up.
-    # BUT, if we assign "Wall" to everything, the solver might block flow.
-    # So we should try to identify the lateral surface.
-
+    # Mesh generation
+    gmsh.option.setNumber("Mesh.Algorithm", 6)  # Frontal-Delaunay typically robust
     gmsh.option.setNumber("Mesh.CharacteristicLengthFromCurvature", 1)
     gmsh.option.setNumber("Mesh.Smoothing", 10)
 
+    # Generate 2D then 3D
     gmsh.model.mesh.generate(3)
+
+    # Check if 2D mesh exists? generate(3) implies 2
+
     gmsh.write(filename_msh)
     gmsh.finalize()
+
     if os.path.exists(brep_tmp):
         os.remove(brep_tmp)
+    print(f"[OK] Coupling mesh written to {filename_msh}")
