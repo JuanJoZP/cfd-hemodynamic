@@ -15,9 +15,17 @@ if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
 
-def run_solving(config_path, output_base):
+def run_solving(config_path, output_base, job_idx=None):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
+
+    # MPI Setup for clean output
+    try:
+        from mpi4py import MPI
+
+        rank = MPI.COMM_WORLD.Get_rank()
+    except ImportError:
+        rank = 0
 
     base_params = config["base_params"]
     # Parámetros de simulación por defecto (pueden venir del YAML o ser sobreescritos)
@@ -29,21 +37,55 @@ def run_solving(config_path, output_base):
     combinations = generate_experiment_matrix(config)
     output_base = Path(output_base)
 
-    print(f"[INFO] Iniciando resoluciones para {len(combinations)} experimentos...")
+    if rank == 0:
+        print(f"[INFO] Total experimentos posibles: {len(combinations)}")
 
-    for i, experiment in enumerate(combinations):
+    if job_idx is not None:
+        if 0 <= job_idx < len(combinations):
+            if rank == 0:
+                print(f"[INFO] Ejecutando SOLAMENTE el experimento indice {job_idx}")
+            combinations_with_idx = [(job_idx, combinations[job_idx])]
+        else:
+            if rank == 0:
+                print(
+                    f"[ERROR] job_idx {job_idx} fuera de rango (0-{len(combinations)-1})"
+                )
+            return
+    else:
+        combinations_with_idx = list(enumerate(combinations))
+
+    if rank == 0:
+        print(
+            f"[INFO] Iniciando resoluciones para {len(combinations_with_idx)} experimentos..."
+        )
+
+    for i, experiment in combinations_with_idx:
         exp_name = f"exp_{i:03d}"
         for k, v in experiment.items():
-            exp_name += f"_{k}_{v}"
+            val_str = str(v).replace(".", "p")
+            exp_name += f"_{k}_{val_str}"
 
         exp_dir = output_base / exp_name
         mesh_path = exp_dir / "mesh.msh"
 
         if not mesh_path.exists():
-            print(f"[WARN] No se encontró malla para {exp_name}. Saltando...")
+            # Try to look in parallel 'meshes' dir if we are in 'results'
+            # (User case: data/results vs data/meshes)
+            if "results" in str(output_base):
+                alt_base = Path(str(output_base).replace("results", "meshes"))
+                alt_mesh_path = alt_base / exp_name / "mesh.msh"
+                if alt_mesh_path.exists():
+                    mesh_path = alt_mesh_path
+
+        if not mesh_path.exists():
+            if rank == 0:
+                print(
+                    f"[WARN] No se encontró malla para {exp_name} en {mesh_path} (ni alternativos). Saltando..."
+                )
             continue
 
-        print(f"[SOLVE] {exp_name}")
+        if rank == 0:
+            print(f"[SOLVE] {exp_name}")
 
         try:
             # 1. Obtener la CLASE del escenario con params de experimento 'congelados'
@@ -69,9 +111,10 @@ def run_solving(config_path, output_base):
             results_dir = exp_dir / "solution"
             sim.run(save_path=results_dir)
 
-            print(f"[DONE] {exp_name}")
+            if rank == 0:
+                print(f"[DONE] {exp_name}")
 
         except Exception as e:
-            print(f"[ERROR] Solver failed for {exp_name}: {e}")
-
-            traceback.print_exc()
+            if rank == 0:
+                print(f"[ERROR] Solver failed for {exp_name}: {e}")
+                traceback.print_exc()
