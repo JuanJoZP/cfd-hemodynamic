@@ -1,40 +1,35 @@
 # SUPG, PSPG, and LSIC stabilization, newton linealization, full schur preconditioning
 
 from typing import Callable
-from petsc4py import PETSc
+
 import numpy as np
-from dolfinx.mesh import Mesh
-from dolfinx.fem import (
-    DirichletBC,
-    Constant,
-    Function,
-    functionspace,
-    form,
+from dolfinx.fem import Constant, DirichletBC, Function, form, functionspace
+from dolfinx.fem.petsc import (
+    assemble_matrix_block,
+    assemble_vector_block,
+    create_matrix_block,
+    create_vector_block,
 )
+from dolfinx.mesh import Mesh
+from petsc4py import PETSc
 from ufl import (
     FacetNormal,
     MixedFunctionSpace,
+    TestFunctions,
     TrialFunctions,
+    conditional,
     derivative,
-    dx,
-    ds,
+    div,
     dot,
+    ds,
+    dx,
     extract_blocks,
     ge,
-    inner,
-    nabla_grad,
     grad,
-    div,
-    TestFunctions,
-    sqrt,
-    conditional,
+    inner,
     le,
-)
-from dolfinx.fem.petsc import (
-    create_matrix_block,
-    create_vector_block,
-    assemble_matrix_block,
-    assemble_vector_block,
+    nabla_grad,
+    sqrt,
 )
 
 from src.boundaryCondition import BoundaryCondition
