@@ -21,47 +21,116 @@ def load_config(config_path):
         config = {"matrix": {}, "base_params": {}}
 
         current_section = None
-        # Simple indentation-based parser
-        # Assumes structure:
-        # base_params:
-        #   key: value
-        # matrix:
-        #   key: [v1, v2]
+        buffer = ""
+        in_multiline_value = False
+        bracket_count = 0
+        current_key = None
+        expecting_value = False
 
         with open(config_path, "r", encoding="utf-8") as f:
-            for line in f:
-                content = line.split("#")[0].rstrip()
-                if not content:
-                    continue
+            lines = f.readlines()
 
-                stripped = content.strip()
-                indent = len(content) - len(stripped)
+        for line in lines:
+            # Remove comments and whitespace
+            line_content = line.split("#")[0]
+            stripped = line_content.strip()
 
-                if indent == 0 and stripped.endswith(":"):
-                    # Top-level section
-                    key = stripped[:-1]
-                    if key in ["matrix", "base_params"]:
-                        current_section = key
-                    else:
-                        current_section = None
-                    continue
+            if not stripped:
+                continue
 
-                if current_section and ":" in stripped:
-                    key, val_str = stripped.split(":", 1)
-                    key = key.strip()
-                    val_str = val_str.strip()
+            # Determine indentation
+            indent = len(line_content) - len(line_content.lstrip())
 
-                    if not val_str:
-                        continue
+            # Check for top-level sections
+            if indent == 0 and stripped.endswith(":"):
+                key = stripped[:-1]
+                if key in ["matrix", "base_params", "simulation_params"]:
+                    current_section = key
+                    if current_section not in config:
+                        config[current_section] = {}
+                    current_key = None
+                    buffer = ""
+                    in_multiline_value = False
+                    bracket_count = 0
+                    expecting_value = False
+                else:
+                    current_section = None
+                continue
 
+            if not current_section:
+                continue
+
+            # If we are parsing a multiline value
+            if in_multiline_value:
+                buffer += " " + stripped
+                bracket_count += stripped.count("[") - stripped.count("]")
+                if bracket_count == 0:
+                    # Value finished
                     try:
-                        # Try to evaluate safely (numbers, lists, bools)
-                        val = ast.literal_eval(val_str)
+                        val = ast.literal_eval(buffer)
+                        config[current_section][current_key] = val
                     except (ValueError, SyntaxError):
-                        # Keep as string if eval fails
-                        val = val_str
+                        # Fallback for weird strings, maybe simple list manual parse needed?
+                        # For now assume AST works for lists
+                        print(f"[WARN] Failed to ast.parse: {buffer}")
+                        config[current_section][current_key] = buffer
 
-                    config[current_section][key] = val
+                    in_multiline_value = False
+                    buffer = ""
+                    current_key = None
+                continue
+
+            if expecting_value:
+                if stripped.startswith("["):
+                    buffer = stripped
+                    bracket_count = stripped.count("[") - stripped.count("]")
+                    if bracket_count > 0:
+                        in_multiline_value = True
+                    else:
+                        try:
+                            val = ast.literal_eval(buffer)
+                        except:
+                            val = buffer
+                        config[current_section][current_key] = val
+                        current_key = None
+                else:
+                    try:
+                        val = ast.literal_eval(stripped)
+                    except:
+                        val = stripped
+                    config[current_section][current_key] = val
+                    current_key = None
+                expecting_value = False
+                continue
+
+            # Standard key parsing
+            if ":" in stripped:
+                parts = stripped.split(":", 1)
+                key = parts[0].strip()
+                val_str = parts[1].strip()
+
+                # Check if value starts a list but doesn't end it
+                if val_str.startswith("[") and not val_str.endswith("]"):
+                    current_key = key
+                    buffer = val_str
+                    bracket_count = val_str.count("[") - val_str.count("]")
+                    in_multiline_value = True
+                    continue
+
+                # Check empty value (maybe start of block list, but we only support inline lists properly or need logic)
+                # But previous logic supported '- item', let's just stick to the requested inline fix + multiline robustness
+
+                if not val_str:
+                    current_key = key
+                    expecting_value = True
+                    continue
+
+                try:
+                    val = ast.literal_eval(val_str)
+                except (ValueError, SyntaxError):
+                    val = val_str
+
+                config[current_section][key] = val
 
         return config
 
@@ -112,7 +181,16 @@ def dispatch_hpc(args, unknown):
             steps = []
             if hasattr(args, "meshing_mode"):
                 if args.meshing_mode == "all":
-                    steps = ["tree", "geometry"]
+                    # Check if we assume tree is needed based on config
+                    # If geometry_type is present and ONLY contains 'stenosis', skip tree step
+                    geo_types = matrix.get("geometry_type", [])
+                    if geo_types and all(g == "stenosis" for g in geo_types):
+                        print(
+                            "[INFO] Detected pure stenosis experiment. Skipping tree generation step."
+                        )
+                        steps = ["geometry"]
+                    else:
+                        steps = ["tree", "geometry"]
                 else:
                     steps = [args.meshing_mode]
             else:

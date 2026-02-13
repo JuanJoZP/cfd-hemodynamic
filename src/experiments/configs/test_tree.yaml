@@ -1,0 +1,37 @@
+base_params:
+  radius_in: 0.9
+  radius_out: 0.4
+  length: 100.0
+  q_in: 2
+  q_in_hyper: 7
+  mu: 0.0035
+  rho: 0.00106
+  p_terminal: 0.0
+  n_terminal: 5
+  perf_pressure: 133000
+  term_pressure: 80000
+  murray_exponent: 3.0
+  closest_neighbours: 5
+  tree_volume: 50.0
+
+simulation_params:
+  solver: "stabilized_schur"
+  T: 0.05
+  dt: 0.01
+  mu: 0.0035
+  rho: 0.00106
+
+matrix:
+  bc_type:
+    [
+      "inlet_pressure_outlet_pressure",
+      "inlet_pressure_outlet_none",
+      "inlet_pressure_outlet_velocity_zero",
+      "inlet_velocity_constant_outlet_pressure",
+      "inlet_velocity_constant_outlet_none",
+      "inlet_velocity_constant_outlet_velocity_zero",
+      "inlet_velocity_parabolic_outlet_pressure",
+      "inlet_velocity_parabolic_outlet_none",
+      "inlet_velocity_parabolic_outlet_velocity_zero",
+    ]
+  geometry_type: ["tree"]

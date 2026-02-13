@@ -15,11 +15,10 @@ if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
 
-def run_solving(config_path, output_base, job_idx=None):
+def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
-    # MPI Setup for clean output
     try:
         from mpi4py import MPI
 
@@ -28,7 +27,6 @@ def run_solving(config_path, output_base, job_idx=None):
         rank = 0
 
     base_params = config["base_params"]
-    # Parámetros de simulación por defecto (pueden venir del YAML o ser sobreescritos)
     sim_params = config.get(
         "simulation_params",
         {"solver": "step_p2p1", "T": 1.0, "dt": 0.01, "mu": 3.5e-3, "rho": 1.06e-3},
@@ -66,11 +64,22 @@ def run_solving(config_path, output_base, job_idx=None):
             exp_name += f"_{k}_{val_str}"
 
         exp_dir = output_base / exp_name
-        mesh_path = exp_dir / "mesh.msh"
+        exp_dir.mkdir(parents=True, exist_ok=True)
+
+        # Mesh location logic
+        mesh_path = (
+            exp_dir / "mesh.msh"
+        )  # Default: Look in the experiment folder itself
+
+        if mesh_source_dir:
+            # If explicit mesh source override provided
+            explicit_mesh_base = Path(mesh_source_dir)
+            explicit_mesh_path = explicit_mesh_base / exp_name / "mesh.msh"
+            if explicit_mesh_path.exists():
+                mesh_path = explicit_mesh_path
 
         if not mesh_path.exists():
-            # Try to look in parallel 'meshes' dir if we are in 'results'
-            # (User case: data/results vs data/meshes)
+            # Fallback logic for legacy structures (results vs meshes)
             if "results" in str(output_base):
                 alt_base = Path(str(output_base).replace("results", "meshes"))
                 alt_mesh_path = alt_base / exp_name / "mesh.msh"

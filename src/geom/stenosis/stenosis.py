@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import argparse
 import os
 import sys
@@ -87,16 +88,17 @@ def generate_stenosis_geometry(
     """
     if slope >= 0.85:
         raise ValueError(
-            f"Valores tan altos de slope generan geometrias dificiles de mallar, si gmsh logra mallarla por lo general es una malla de baja calidad"
+            """Valores tan altos de slope generan geometrias dificiles de mallar,
+            si gmsh logra mallarla por lo general es una malla de baja calidad"""
         )
 
     if radius_out > radius_in:
         raise ValueError(
-            f"radius_out ({radius_out}) must be <= radius_in ({radius_in})"
+            "radius_out ({}) must be <= radius_in ({})".format(radius_out, radius_in)
         )
 
     if not (0.0 <= position <= 1.0):
-        raise ValueError(f"Position must be in [0, 1], got {position}")
+        raise ValueError("Position must be in [0, 1], got {}".format(position))
 
     start_v = np.array(start)
     end_v = np.array(end)
@@ -128,34 +130,62 @@ def generate_stenosis_geometry(
 
     if height_at_mid < 0:
         raise ValueError(
-            f"El min_radius es muy grande, debe ser menor o igual a {r_taper_at_mid} at position {position}"
+            "El min_radius es muy grande, debe ser menor o igual a {r_taper_at_mid} at position {position}".format(
+                r_taper_at_mid=r_taper_at_mid, position=position
+            )
         )
 
     dist_x = height_at_mid / slope if slope != 0 else length / 4
 
-    # Check boundaries
-    if (mid_x - dist_x < 0) or (mid_x + dist_x > length):
+    # Force a minimum width for the stenosis region if dist_x is too small
+    # This prevents points from collapsing onto each other
+    min_dist = length * 0.05
+    if dist_x < min_dist:
         print(
-            f"[WARN] La pendiente es muy pequeña para la posicion {position}, ajustando dist_x..."
+            "[WARN] Calculated dist_x ({}) too small. Enforcing min_dist ({})".format(
+                dist_x, min_dist
+            )
         )
-        # Clamp dist_x to fit within the segment
-        max_dist = min(mid_x, length - mid_x)
-        if dist_x > max_dist:
-            dist_x = max_dist * 0.95  # Leave a small margin
+        dist_x = min_dist
+
+    # Check boundaries and clamp
+    max_dist_avail = min(mid_x, length - mid_x)
+
+    if dist_x >= max_dist_avail:
+        print(
+            "[WARN] Stenosis region too wide for position {}. Clamping width.".format(
+                position
+            )
+        )
+        dist_x = max_dist_avail * 0.95
 
     cp1_x = mid_x - dist_x
     cp2_x = mid_x + dist_x
 
+    # Calculate radius at CP x-positions based on linear taper from inlet to outlet
     cp1_r = radius_in + (radius_out - radius_in) * (cp1_x / length)
     cp2_r = radius_in + (radius_out - radius_in) * (cp2_x / length)
 
-    cp1 = (cp1_x, cp1_r)
-    cp2 = (cp2_x, cp2_r)
+    cp1 = (float(cp1_x), float(cp1_r))
+    cp2 = (float(cp2_x), float(cp2_r))
+    p_mid = (float(mid_x), float(min_radius))
+
+    # Validation: Ensure points are strictly ordered in x
+    if not (p_start[0] < cp1[0] < p_mid[0] < cp2[0] < p_end[0]):
+        raise ValueError(
+            "Invalid points order for spline: Start={}, CP1={}, Mid={}, CP2={}, End={}".format(
+                p_start, cp1, p_mid, cp2, p_end
+            )
+        )
 
     points_2d = [(float(p[0]), float(p[1])) for p in [p_start, cp1, p_mid, cp2, p_end]]
-    print(f"[INFO] Profile Points (Local 2D): {points_2d}")
-    print(f"[INFO] Tapering from radius_in={radius_in} to radius_out={radius_out}")
-    print(f"[INFO] Stenosis position: {position} (x={mid_x:.4f})")
+    print("[INFO] Profile Points (Local 2D): {}".format(points_2d))
+    print(
+        "[INFO] Tapering from radius_in={} to radius_out={}".format(
+            radius_in, radius_out
+        )
+    )
+    print("[INFO] Stenosis position: {} (x={:.4f})".format(position, mid_x))
 
     # construct the profile in XY plane, then revolve around X axis
     # straight lines at extremes, spline only for stenosis
@@ -238,7 +268,7 @@ def generate_stenosis_geometry(
 
 def mesh_and_export(solid, filename_brep, filename_msh, start_pt, end_pt):
     cq.exporters.export(solid, filename_brep)
-    print(f"[INFO] BREP exported to {filename_brep}")
+    print("[INFO] BREP exported to {}".format(filename_brep))
 
     gmsh.initialize()
     gmsh.model.add("Stenosis")
@@ -274,7 +304,11 @@ def mesh_and_export(solid, filename_brep, filename_msh, start_pt, end_pt):
         d_in = get_center_dist(tag, start_pt)
         d_out = get_center_dist(tag, end_pt)
         surf_data.append((tag, d_in, d_out))
-        print(f"[DEBUG] Surface {tag}: dist_start={d_in:.4f}, dist_end={d_out:.4f}")
+        print(
+            "[DEBUG] Surface {} (tag {}): dist_start={:.4f}, dist_end={:.4f}".format(
+                tag, tag, d_in, d_out
+            )
+        )
 
     # Sort by distance to start to find inlet
     surf_data.sort(key=lambda x: x[1])
@@ -309,7 +343,9 @@ def mesh_and_export(solid, filename_brep, filename_msh, start_pt, end_pt):
         gmsh.model.setPhysicalName(2, WALL_TAG, "Wall")
 
     print(
-        f"[INFO] Tags Assigned: Inlet={inlet_surf}, Outlet={outlet_surf}, Walls={wall_surfaces}"
+        "[INFO] Tags Assigned: Inlet={}, Outlet={}, Walls={}".format(
+            inlet_surf, outlet_surf, wall_surfaces
+        )
     )
 
     # meshing
@@ -338,9 +374,15 @@ if __name__ == "__main__":
             raise ValueError(f"Severity must be in [0, 1], got {args.severity}")
         r_base_mid = (args.radius_in + args.radius_out) / 2
         min_radius = (1 - args.severity) * r_base_mid
-        print(f"[INFO] radius_in={args.radius_in}, radius_out={args.radius_out}")
         print(
-            f"[INFO] Severity η={args.severity} → R_min = {min_radius:.4f} (at center)"
+            "[INFO] radius_in={:.4f}, radius_out={:.4f}".format(
+                args.radius_in, args.radius_out
+            )
+        )
+        print(
+            "[INFO] Severity η={:.4f} → R_min = {:.4f} (at center)".format(
+                args.severity, min_radius
+            )
         )
 
         solid = generate_stenosis_geometry(

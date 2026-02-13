@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import cadquery as cq
 import gmsh
 import numpy as np
@@ -231,8 +232,17 @@ def build_mesh(
     return result
 
 
+import os
+import sys
+from pathlib import Path
+
+
 def tag_and_mesh_with_gmsh(
-    brep_path: str, nodes: dict, node_types: dict, tol: float = VOXEL_WIDTH * 0.6
+    brep_path: str,
+    nodes: dict,
+    node_types: dict,
+    out_msh_path: str = OUT_MSH,
+    tol: float = VOXEL_WIDTH * 0.6,
 ):
     """
     Import the brep into gmsh, find surfaces nearest the requested node points (inlet + terminals),
@@ -329,13 +339,40 @@ def tag_and_mesh_with_gmsh(
     gmsh.model.mesh.generate(3)
     gmsh.model.mesh.optimize("Netgen")
 
-    gmsh.write(OUT_MSH)
+    gmsh.write(out_msh_path)
     gmsh.finalize()
-    print(f"[OK] Mesh with physical groups written to {OUT_MSH}")
+    print(f"[OK] Mesh with physical groups written to {out_msh_path}")
 
 
 if __name__ == "__main__":
-    nodes, node_types, edges = parse_gxl(GXL_FILE)
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Generate mesh from Vascular Tree GXL/XML"
+    )
+    parser.add_argument(
+        "--input", default=GXL_FILE, help="Path to input tree_structure.xml"
+    )
+    parser.add_argument("--output", default=OUT_MSH, help="Path to output .msh file")
+
+    args = parser.parse_args()
+
+    input_path = args.input
+    output_path = args.output
+    brep_path = str(Path(output_path).with_suffix(".brep"))
+
+    if not os.path.exists(input_path):
+        print(f"[ERROR] Input file not found: {input_path}")
+        sys.exit(1)
+
+    nodes, node_types, edges = parse_gxl(input_path)
     geom = build_mesh(nodes, node_types, edges)
-    cq.exporters.export(geom, "src/geom/vessels.brep")
-    tag_and_mesh_with_gmsh("src/geom/vessels.brep", nodes, node_types)
+
+    print(f"[INFO] Exporting intermediate BREP to {brep_path}")
+    cq.exporters.export(geom, brep_path)
+
+    tag_and_mesh_with_gmsh(brep_path, nodes, node_types, out_msh_path=output_path)
+
+    # Rename/Move the output if tag_and_mesh_with_gmsh doesn't support custom output directly
+    # Wait, tag_and_mesh_with_gmsh uses OUT_MSH global line 332.
+    # I need to modify tag_and_mesh_with_gmsh to accept output path.

@@ -1,0 +1,34 @@
+base_params:
+  radius_in: 1.5 # mm
+  radius_out: 0.65
+  length: 50.0
+  q_in: 3
+  q_in_hyper: 10
+  mu: 0.0035
+  rho: 0.00106
+  p_terminal: 0.0
+  slope: 0.3
+  stenosis_position: 0.5
+  reduccion_lumen: 0.5
+
+simulation_params:
+  solver: "stabilized_schur"
+  T: 0.05
+  dt: 0.01
+  mu: 0.0035
+  rho: 0.00106
+
+matrix:
+  bc_type:
+    [
+      "inlet_pressure_outlet_pressure",
+      "inlet_pressure_outlet_none",
+      "inlet_pressure_outlet_velocity_zero",
+      "inlet_velocity_constant_outlet_pressure",
+      "inlet_velocity_constant_outlet_none",
+      "inlet_velocity_constant_outlet_velocity_zero",
+      "inlet_velocity_parabolic_outlet_pressure",
+      "inlet_velocity_parabolic_outlet_none",
+      "inlet_velocity_parabolic_outlet_velocity_zero",
+    ]
+  geometry_type: ["stenosis"]
