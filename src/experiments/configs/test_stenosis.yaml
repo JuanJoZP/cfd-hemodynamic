@@ -12,8 +12,7 @@ base_params:
   reduccion_lumen: 0.5
 
 simulation_params:
-  solver: "stabilized_schur"
-  T: 0.05
+  T: 0.2
   dt: 0.01
   mu: 0.0035
   rho: 0.00106
@@ -32,3 +31,10 @@ matrix:
       "inlet_velocity_parabolic_outlet_velocity_zero",
     ]
   geometry_type: ["stenosis"]
+  solver: [
+      #"stabilized_schur",
+      #"stabilized_schur_stokes",
+      #"stabilized_schur_ramping",
+      #"stabilized_schur_adaptive",
+      "stabilized_schur_aspin",
+    ]

@@ -1,3 +1,4 @@
+import contextlib
 import sys
 import traceback
 from pathlib import Path
@@ -103,25 +104,46 @@ def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
             )
 
             # 2. Utilizar la clase Simulation para orquestar la ejecución
+            solver_name = experiment.get("solver", sim_params.get("solver"))
+            if not solver_name:
+                raise ValueError(
+                    "Solver not specified in experiment matrix or simulation_params"
+                )
+
             sim = Simulation(
                 name=exp_name,
                 simulation=ScenarioClass,
-                solver=sim_params["solver"],
+                solver=solver_name,
                 T=sim_params["T"],
                 dt=sim_params["dt"],
                 output_dir=output_base,
                 mu=sim_params["mu"],
                 rho=sim_params["rho"],
-                **{k: v for k, v in experiment.items()},
+                **{k: v for k, v in experiment.items() if k != "solver"},
             )
 
             # 3. Ejecutar la simulación en el directorio correspondiente
             # Simulation.run ya se encarga de setup() y de guardar los resultados
             results_dir = exp_dir / "solution"
-            sim.run(save_path=results_dir)
+            log_file = exp_dir / "solver.log"
 
             if rank == 0:
-                print(f"[DONE] {exp_name}")
+                print(f"[RUNNING] {exp_name} -> Log: {log_file}")
+
+            # Use a context manager to redirect output to file
+            with open(log_file, "w") as f:
+                with contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
+                    try:
+                        sim.run(save_path=results_dir)
+                        if rank == 0:
+                            print(f"[DONE] {exp_name}")
+                    except Exception as e:
+                        print(f"[ERROR] Simulation failed: {e}")
+                        traceback.print_exc()
+                        raise e
+
+            if rank == 0:
+                print(f"[FINISHED] {exp_name} (See {log_file} for details)")
 
         except Exception as e:
             if rank == 0:

@@ -5,8 +5,8 @@
 #SBATCH --error=/home/juanjo.zuluaga/data/logs/solve_%A_%a.err
 #SBATCH --ntasks=4
 #SBATCH --cpus-per-task=1
-#SBATCH --time=24:00:00
-#SBATCH --array=0-5
+#SBATCH --time=00:30:00
+#SBATCH --array=0-1
 
 # Definir variables de entorno
 mpich="/opt/ohpc/pub/mpi/mpich-gnu-ohpc/3.2.1/bin/mpirun"
