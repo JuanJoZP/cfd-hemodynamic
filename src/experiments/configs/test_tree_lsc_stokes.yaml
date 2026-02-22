@@ -1,15 +1,18 @@
 base_params:
-  radius_in: 1.5 # mm
-  radius_out: 0.65
-  length: 50.0
-  q_in: 3
-  q_in_hyper: 10
+  radius_in: 0.9
+  radius_out: 0.4
+  length: 100.0
+  q_in: 2
+  q_in_hyper: 7
   mu: 0.0035
   rho: 0.00106
   p_terminal: 0.0
-  slope: 0.3
-  stenosis_position: 0.5
-  reduccion_lumen: 0.5
+  n_terminal: 5
+  perf_pressure: 133000
+  term_pressure: 80000
+  murray_exponent: 3.0
+  closest_neighbours: 5
+  tree_volume: 50.0
 
 simulation_params:
   T: 0.2
@@ -30,11 +33,5 @@ matrix:
       "inlet_velocity_parabolic_outlet_none",
       "inlet_velocity_parabolic_outlet_velocity_zero",
     ]
-  geometry_type: ["stenosis"]
-  solver:
-    [
-      "stabilized_schur",
-      "stabilized_schur_stokes",
-      "stabilized_schur_ramping",
-      "stabilized_schur_lsc",
-    ]
+  geometry_type: ["tree"]
+  solver: ["stabilized_schur_stokes", "stabilized_schur_lsc"]

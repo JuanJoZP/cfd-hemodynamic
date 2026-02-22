@@ -1,0 +1,36 @@
+base_params:
+  radius_in: 1.5
+  radius_out: 0.65
+  length: 80
+  coupling_slope: 0.05
+  q_in: 2
+  q_in_hyper: 7
+  perf_pressure: 133000
+  term_pressure: 80000
+  mu: 0.0035
+  rho: 0.00106
+  p_inlet: 133000
+  p_terminal: 80000
+  tree_volume: 50.0
+  n_terminal: 5
+  murray_exponent: 3.0
+  closest_neighbours: 5
+
+simulation_params:
+  T: 2
+  dt: 0.005
+  mu: 0.0035
+  rho: 0.00106
+
+matrix:
+  bc_type:
+    [
+      "inlet_pressure_outlet_pressure",
+      "inlet_pressure_outlet_none",
+      "inlet_velocity_parabolic_outlet_pressure",
+      "inlet_velocity_constant_outlet_pressure",
+      "inlet_velocity_parabolic_outlet_pressure",
+    ]
+  geometry_type: ["full"]
+  solver: ["stabilized_schur_lsc"]
+  reduccion_lumen: [0]
