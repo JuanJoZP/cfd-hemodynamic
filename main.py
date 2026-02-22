@@ -170,6 +170,18 @@ def main():
         default=None,
         help="Optional directory to look for meshes (override)",
     )
+    exp_solve_parser.add_argument(
+        "--watch",
+        action="store_true",
+        default=False,
+        help="After submitting HPC job, open tmux with sacct watcher and wjob alias",
+    )
+    exp_solve_parser.add_argument(
+        "--time_limit",
+        type=str,
+        default=None,
+        help="Time limit for each SLURM job (e.g. 00:30:00)",
+    )
 
     # ── tree ──────────────────────────────────────────────────────────────
     tree_parser = subparsers.add_parser(

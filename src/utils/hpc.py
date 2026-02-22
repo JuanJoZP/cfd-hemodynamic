@@ -339,6 +339,11 @@ def dispatch_hpc(args, unknown):
             # Override ntasks from command line based on user request
             cmd.append(f"--ntasks={num_cores}")
 
+            # Override time limit if specified
+            time_limit = getattr(args, "time_limit", None)
+            if time_limit:
+                cmd.append(f"--time={time_limit}")
+
             # Note: This command-line argument overrides the #SBATCH --array directive in the script.
             cmd.append(str(script_path))
             cmd.extend(step_args)
@@ -355,6 +360,41 @@ def dispatch_hpc(args, unknown):
                     universal_newlines=True,
                 )
                 print(res.stdout)
+
+                # Extract job ID from sbatch output
+                job_id = None
+                for line in res.stdout.splitlines():
+                    if line.startswith("Submitted batch job"):
+                        job_id = line.split()[-1]
+                        break
+
+                # --watch: open tmux with sacct watcher + wjob alias
+                if job_id and getattr(args, "watch", False):
+                    log_dir = str(Path.home() / "data/logs")
+                    tmux_session = f"watch_{job_id}"
+
+                    # Write a temp bashrc with the wjob function
+                    rc_path = Path.home() / ".wjob_rc"
+                    rc_path.write_text(
+                        f'wjob() {{ tail -f {log_dir}/solve_{job_id}_"$1".out; }}\n'
+                        f'echo "wjob alias ready. Usage: wjob <idx>"\n'
+                        f'echo "Example: wjob 0"\n'
+                    )
+
+                    subprocess.run(
+                        f"tmux new-session -d -s {tmux_session} "
+                        f"'watch -n 5 sacct -j {job_id} --format=JobID,JobName,State,ExitCode,Elapsed'",
+                        shell=True,
+                    )
+                    subprocess.run(
+                        f"tmux split-window -t {tmux_session} -h 'bash --rcfile {rc_path}'",
+                        shell=True,
+                    )
+
+                    print(f"[INFO] Launching tmux watch session '{tmux_session}'...")
+                    print(f"[INFO] Use 'wjob <idx>' in the right pane to tail logs.")
+                    subprocess.run(f"tmux attach -t {tmux_session}", shell=True)
+
             except subprocess.CalledProcessError as e:
                 print(f"[ERROR] Submission failed: {e.stderr}")
                 return
