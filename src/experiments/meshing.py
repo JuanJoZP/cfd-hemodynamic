@@ -243,7 +243,63 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                     print(f"[OK] Stenosis mesh generated at {msh_path}")
                     continue
 
-                # --- CASE 2: Tree + Stenosis (Default) ---
+                # --- CASE 2: Pure Tree (no stenosis/coupling) ---
+                if geometry_type == "tree":
+                    print("[INFO] Generando SOLO arbol vascular (sin estenosis)...")
+
+                    if not tree_xml_path.exists():
+                        print(
+                            f"[ERROR] No se encontro {tree_xml_path}. Ejecute primero en modo 'tree'."
+                        )
+                        continue
+
+                    import cadquery as cq
+
+                    from src.geom.tree.tree_model import VascularTree
+
+                    tree_params = {**base_params, **experiment}
+
+                    # Calcular voxel_width
+                    tree_volume = tree_params.get("tree_volume", 70.0)
+                    vol_mm3 = tree_volume * 1000.0
+                    cube_side = vol_mm3 ** (1.0 / 3.0)
+                    grid_size = 100
+                    voxel_width = cube_side / grid_size
+                    tree_params["voxel_width"] = voxel_width
+
+                    vtree = VascularTree.from_xml(str(tree_xml_path), tree_params)
+                    vtree.apply_modifications()
+
+                    # Alinear arbol con eje X
+                    root_id = next(
+                        (
+                            nid
+                            for nid, nt in vtree.node_types.items()
+                            if "root node" in nt
+                        ),
+                        None,
+                    )
+                    _rotate_tree_to_align(vtree, root_id, [1, 0, 0])
+
+                    # Construir solido del arbol
+                    solid_tree = vtree.build_solid()
+                    if not solid_tree:
+                        raise RuntimeError(
+                            "No se pudo generar el solido del arbol vascular"
+                        )
+
+                    brep_path = str(exp_dir / "tree_geometry.brep")
+                    msh_path = str(exp_dir / "mesh.msh")
+
+                    print(f"[INFO] Exportando BREP del arbol a {brep_path}")
+                    cq.exporters.export(solid_tree, brep_path)
+
+                    print("[INFO] Mallando arbol vascular...")
+                    vtree.mesh_and_tag(brep_path, msh_path)
+                    print(f"[OK] Tree mesh generated at {msh_path}")
+                    continue
+
+                # --- CASE 3: Tree + Stenosis (Default) ---
                 print("[INFO] Generando y malleando estenosis para coupling...")
                 current_params = {**base_params, **experiment}
 
@@ -295,9 +351,8 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                     c_slope = 0.05
                 coupling_factor = 1.0 / c_slope
 
-                # FORCE OVERLAP for robust union
-                # Move coupling start slightly inside the stenosis
-                overlap_dist = 0.1
+                # No overlap needed for union, boundaries touch exactly
+                overlap_dist = 0.0
                 coupling_start = end_pt - stenosis_dir * overlap_dist
 
                 coupling_solid, coupling_len = generate_coupling_geometry(
@@ -312,7 +367,11 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                 )
 
                 # Position Tree
-                coupling_end_pt = end_pt + stenosis_dir * coupling_len
+                # exact match at the tip of the coupling
+                overlap_dist_tree = 0.0
+                coupling_end_pt = coupling_start + stenosis_dir * (
+                    coupling_len - overlap_dist_tree
+                )
                 current_root_pos = np.array(vtree.nodes[root_id])
                 translation = coupling_end_pt - current_root_pos
 
@@ -405,7 +464,8 @@ def mesh_merged_geometry(brep_path, out_msh_path, inlet_pt, outlet_pts):
     # Tag Volume
     vols = gmsh.model.getEntities(3)
     if vols:
-        gmsh.model.addPhysicalGroup(3, [vols[0][1]], FLUID_TAG)
+        vol_tags = [v[1] for v in vols]
+        gmsh.model.addPhysicalGroup(3, vol_tags, FLUID_TAG)
         gmsh.model.setPhysicalName(3, FLUID_TAG, "Fluid")
 
     surfaces = gmsh.model.getBoundary(vols)
