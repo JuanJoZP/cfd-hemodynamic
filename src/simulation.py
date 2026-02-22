@@ -181,7 +181,12 @@ class Simulation:
 
         # Instantiate the scenario
         try:
-            return scenario_class(**init_args)
+            print(
+                f"  [SIM] Instantiating scenario '{self.scenario_name}'...", flush=True
+            )
+            instance = scenario_class(**init_args)
+            print(f"  [SIM] Scenario instantiated OK.", flush=True)
+            return instance
         except TypeError as e:
             raise RuntimeError(
                 f"Failed to instantiate scenario '{self.scenario_name}' with arguments {init_args}: {e}"

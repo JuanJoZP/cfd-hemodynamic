@@ -95,13 +95,17 @@ def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
             continue
 
         if rank == 0:
-            print(f"[SOLVE] {exp_name}")
+            print(f"[SOLVE] {exp_name}", flush=True)
 
         try:
             # 1. Obtener la CLASE del escenario con params de experimento 'congelados'
+            if rank == 0:
+                print(f"  [DEBUG] Creating scenario class...", flush=True)
             ScenarioClass = create_experiment_scenario_class(
                 mesh_path, experiment, base_params
             )
+            if rank == 0:
+                print(f"  [DEBUG] Scenario class created.", flush=True)
 
             # 2. Utilizar la clase Simulation para orquestar la ejecución
             solver_name = experiment.get("solver", sim_params.get("solver"))
@@ -110,6 +114,11 @@ def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
                     "Solver not specified in experiment matrix or simulation_params"
                 )
 
+            if rank == 0:
+                print(
+                    f"  [DEBUG] Creating Simulation object (solver={solver_name})...",
+                    flush=True,
+                )
             sim = Simulation(
                 name=exp_name,
                 simulation=ScenarioClass,
@@ -121,31 +130,26 @@ def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
                 rho=sim_params["rho"],
                 **{k: v for k, v in experiment.items() if k != "solver"},
             )
+            if rank == 0:
+                print(f"  [DEBUG] Simulation object created.", flush=True)
 
-            # 3. Ejecutar la simulación en el directorio correspondiente
-            # Simulation.run ya se encarga de setup() y de guardar los resultados
+            # 3. Ejecutar la simulación
             results_dir = exp_dir / "solution"
-            log_file = exp_dir / "solver.log"
 
             if rank == 0:
-                print(f"[RUNNING] {exp_name} -> Log: {log_file}")
+                print(f"  [DEBUG] Starting sim.run()...", flush=True)
 
-            # Use a context manager to redirect output to file
-            with open(log_file, "w") as f:
-                with contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
-                    try:
-                        sim.run(save_path=results_dir)
-                        if rank == 0:
-                            print(f"[DONE] {exp_name}")
-                    except Exception as e:
-                        print(f"[ERROR] Simulation failed: {e}")
-                        traceback.print_exc()
-                        raise e
-
-            if rank == 0:
-                print(f"[FINISHED] {exp_name} (See {log_file} for details)")
+            try:
+                sim.run(save_path=results_dir)
+                if rank == 0:
+                    print(f"[DONE] {exp_name}", flush=True)
+            except Exception as e:
+                if rank == 0:
+                    print(f"[ERROR] Simulation failed: {e}", flush=True)
+                    traceback.print_exc()
+                raise e
 
         except Exception as e:
             if rank == 0:
-                print(f"[ERROR] Solver failed for {exp_name}: {e}")
+                print(f"[ERROR] Solver failed for {exp_name}: {e}", flush=True)
                 traceback.print_exc()
