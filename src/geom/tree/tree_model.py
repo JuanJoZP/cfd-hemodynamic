@@ -26,13 +26,13 @@ class VascularTree:
     def apply_modifications(self):
         levels = self._calculate_levels()
         max_level = max(levels.values()) if levels else 1
-        factor_p = self.params.get("factor_perdida_vasos", 0.0)
+        factor_p = self.params.get("vessel_loss_factor", 0.0)
         if factor_p > 0:
             self._prune_tree(factor_p, levels, max_level)
 
-        is_hyper = self.params.get("hiperemia", False)
-        hyper_f = self.params.get("factor_dilatacion_hiperemia", 1.0)
-        thick_f = self.params.get("factor_engrosamiento_lumen", 1.0)
+        is_hyper = self.params.get("hyperemia", False)
+        hyper_f = self.params.get("hyperemia_dilation_factor", 1.0)
+        thick_f = self.params.get("lumen_thickening_factor", 1.0)
         thick_threshold = self.params.get("thickening_level_threshold", 0)
 
         for edge in self.edges:

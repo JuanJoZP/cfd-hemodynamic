@@ -27,11 +27,16 @@ def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
     except ImportError:
         rank = 0
 
-    base_params = config["base_params"]
+    base_params = config.get("base_params", {})
     sim_params = config.get(
         "simulation_params",
         {"solver": "step_p2p1", "T": 1.0, "dt": 0.01, "mu": 3.5e-3, "rho": 1.06e-3},
     )
+
+    # Build a unified param dict: sim_params values complement base_params.
+    # This allows q_in, q_in_hyper, p_inlet, p_terminal, bc_type, hyperemia, etc.
+    # to be declared in simulation_params and still be found by scenario_factory.
+    effective_base_params = {**base_params, **sim_params}
 
     combinations = generate_experiment_matrix(config)
     output_base = Path(output_base)
@@ -59,6 +64,9 @@ def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
         )
 
     for i, experiment in combinations_with_idx:
+        # Merge: matrix values override effective_base_params for this run
+        run_params = {**effective_base_params, **experiment}
+
         exp_name = f"exp_{i:03d}"
         for k, v in experiment.items():
             val_str = str(v).replace(".", "p")
@@ -102,13 +110,13 @@ def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
             if rank == 0:
                 print(f"  [DEBUG] Creating scenario class...", flush=True)
             ScenarioClass = create_experiment_scenario_class(
-                mesh_path, experiment, base_params
+                mesh_path, experiment, run_params
             )
             if rank == 0:
                 print(f"  [DEBUG] Scenario class created.", flush=True)
 
             # 2. Utilizar la clase Simulation para orquestar la ejecución
-            solver_name = experiment.get("solver", sim_params.get("solver"))
+            solver_name = run_params.get("solver")
             if not solver_name:
                 raise ValueError(
                     "Solver not specified in experiment matrix or simulation_params"
@@ -123,11 +131,11 @@ def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
                 name=exp_name,
                 simulation=ScenarioClass,
                 solver=solver_name,
-                T=sim_params["T"],
-                dt=sim_params["dt"],
+                T=run_params["T"],
+                dt=run_params["dt"],
                 output_dir=output_base,
-                mu=sim_params["mu"],
-                rho=sim_params["rho"],
+                mu=run_params["mu"],
+                rho=run_params["rho"],
                 **{k: v for k, v in experiment.items() if k != "solver"},
             )
             if rank == 0:

@@ -8,6 +8,20 @@ from src.geom.stenosis.stenosis import INLET_TAG, OUTLET_TAG, WALL_TAG
 from src.scenario import Scenario
 
 
+def _parse_bc_type(bc_type_raw):
+    """
+    Parse bc_type dict into (bc_inlet, bc_outlet) strings.
+
+    Expected YAML format:
+        bc_type:
+          inlet: "velocity_parabolic"  # velocity_parabolic | velocity_constant | pressure
+          outlet: "pressure"           # pressure | none | velocity_zero
+    """
+    bc_inlet = bc_type_raw.get("inlet", "velocity_parabolic")
+    bc_outlet = bc_type_raw.get("outlet", "pressure")
+    return bc_inlet, bc_outlet
+
+
 def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
     """
     Crea dinámicamente una clase de escenario (LADExperimentScenario)
@@ -55,13 +69,17 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
 
         @property
         def bcu(self):
-            # Determinamos el flujo según si es hiperemia o no
-            is_hyper = self.experiment_params.get("hiperemia", False)
+            is_hyper = self.experiment_params.get(
+                "hyperemia", self.base_params.get("hyperemia", False)
+            )
             q_val = (
                 self.base_params["q_in_hyper"] if is_hyper else self.base_params["q_in"]
             )
 
-            bc_type = self.experiment_params.get("bc_type", "default")
+            bc_type_raw = self.experiment_params.get(
+                "bc_type", self.base_params.get("bc_type", {})
+            )
+            bc_inlet, bc_outlet = _parse_bc_type(bc_type_raw)
 
             fdim = self.mesh.topology.dim - 1
 
@@ -77,7 +95,7 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
             # Inlet Configs
             entities_inflow = self.ft.find(self.INLET_TAG)
 
-            if "inlet_velocity_parabolic" in bc_type or bc_type == "default":
+            if bc_inlet in ("velocity_parabolic", "default"):
                 # Parabolic velocity profile
                 r_in = self.base_params["radius_in"]
                 area = np.pi * r_in**2
@@ -96,18 +114,15 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
                 bcu_inflow.initTopological(fdim, entities_inflow)
                 bcs.append(bcu_inflow)
 
-            elif "inlet_velocity_constant" in bc_type:
-                # Constant velocity profile
+            elif bc_inlet == "velocity_constant":
+                # Constant (plug) velocity profile
                 r_in = self.base_params["radius_in"]
                 area = np.pi * r_in**2
                 v_avg = q_val / area
 
                 u_inlet = Function(self.solver.V)
-                u_inlet.x.array[:] = 0.0  # reset
+                u_inlet.x.array[:] = 0.0
 
-                # We need to set x-component to v_avg everywhere (assuming flow is along X)
-                # However, Function.x.array is flat.
-                # Use interpolate with constant value
                 def constant_profile(x):
                     return np.stack(
                         (
@@ -123,30 +138,34 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
                 bcu_inflow.initTopological(fdim, entities_inflow)
                 bcs.append(bcu_inflow)
 
-            elif "inlet_pressure" in bc_type:
+            elif bc_inlet == "pressure":
                 # Inlet Pressure -> No Dirichlet BC for Velocity on Inlet
                 pass
 
-            # Outlet Configs for Velocity
-            if "outlet_velocity_zero" in bc_type:
-                # Zero velocity at outlet (Blocked / Wall-like)
+            # Outlet Velocity BC (only for velocity_zero)
+            if bc_outlet == "velocity_zero":
+                # Zero velocity at outlet (wall-like blockage)
                 u_outlet = Function(self.solver.V)
                 u_outlet.x.array[:] = 0.0
                 entities_outlet = self.ft.find(self.OUTLET_TAG)
                 bcu_outlet = BoundaryCondition(u_outlet)
                 bcu_outlet.initTopological(fdim, entities_outlet)
+
                 bcs.append(bcu_outlet)
 
             return bcs
 
         @property
         def bcp(self):
-            bc_type = self.experiment_params.get("bc_type", "default")
+            bc_type_raw = self.experiment_params.get(
+                "bc_type", self.base_params.get("bc_type", {})
+            )
+            bc_inlet, bc_outlet = _parse_bc_type(bc_type_raw)
             fdim = self.mesh.topology.dim - 1
             bcs = []
 
-            # Outlet Pressure Configs
-            if "outlet_pressure" in bc_type or bc_type == "default":
+            # Outlet Pressure BC
+            if bc_outlet in ("pressure", "default"):
                 p_val = self.base_params.get("p_terminal", 0.0)
                 p_out = Function(self.solver.Q)
                 p_out.x.array[:] = float(p_val)
@@ -155,15 +174,11 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
                 bc_outflow.initTopological(fdim, outflow_entities)
                 bcs.append(bc_outflow)
 
-            # Inlet Pressure Configs
-            if "inlet_pressure" in bc_type:
-                # Set inlet pressure
-                # We assume p_inlet is provided or derived.
-                # For now let's say p_inlet is another param, or repurpose a param.
+            # Inlet Pressure BC
+            if bc_inlet == "pressure":
                 p_in_val = self.experiment_params.get(
-                    "p_inlet", 13332.2
-                )  # ~100 mmHg default? Or just higher than terminal.
-
+                    "p_inlet", self.base_params.get("p_inlet", 13332.2)
+                )
                 p_in = Function(self.solver.Q)
                 p_in.x.array[:] = float(p_in_val)
                 inflow_entities = self.ft.find(self.INLET_TAG)

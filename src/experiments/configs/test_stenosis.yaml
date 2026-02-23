@@ -1,36 +1,45 @@
-base_params:
-  radius_in: 1.5 # mm
-  radius_out: 0.65
-  length: 50.0
-  q_in: 3
-  q_in_hyper: 10
-  mu: 0.0035
-  rho: 0.00106
-  p_terminal: 0.0
-  slope: 0.3
-  stenosis_position: 0.5
-  reduccion_lumen: 0.5
+artery_params:
+  radius_in: 1.5 # [mm] Inlet radius
+  radius_out: 0.65 # [mm] Outlet radius
+  length: 50.0 # [mm] Vessel length
+  stenosis_slope: 0.3 # [-] Stenosis transition sharpness
+  stenosis_position: 0.5 # [-] Stenosis axial position [0,1]
+  stenosis_severity: 0.5 # [-] Stenosis severity [0,1]
 
 simulation_params:
   T: 0.2
   dt: 0.01
-  mu: 0.0035
-  rho: 0.00106
+  mu: 0.0035 # [g/(mm·s)]
+  rho: 0.00106 # [g/mm³]
+  q_in: 3 # [mL/s] Used to prescribe inlet velocity BC
+  q_in_hyper: 10 # [mL/s] Used when hyperemia=true
+  p_terminal: 0.0 # [dyn/cm²] Outlet pressure BC
+  geometry_type: "stenosis"
+  hyperemia: false
+  bc_type:
+    inlet: "velocity_parabolic"
+    outlet: "pressure"
 
 matrix:
   bc_type:
-    [
-      "inlet_pressure_outlet_pressure",
-      "inlet_pressure_outlet_none",
-      "inlet_pressure_outlet_velocity_zero",
-      "inlet_velocity_constant_outlet_pressure",
-      "inlet_velocity_constant_outlet_none",
-      "inlet_velocity_constant_outlet_velocity_zero",
-      "inlet_velocity_parabolic_outlet_pressure",
-      "inlet_velocity_parabolic_outlet_none",
-      "inlet_velocity_parabolic_outlet_velocity_zero",
-    ]
-  geometry_type: ["stenosis"]
+    - inlet: "velocity_parabolic"
+      outlet: "pressure"
+    - inlet: "velocity_parabolic"
+      outlet: "none"
+    - inlet: "velocity_parabolic"
+      outlet: "velocity_zero"
+    - inlet: "velocity_constant"
+      outlet: "pressure"
+    - inlet: "velocity_constant"
+      outlet: "none"
+    - inlet: "velocity_constant"
+      outlet: "velocity_zero"
+    - inlet: "pressure"
+      outlet: "pressure"
+    - inlet: "pressure"
+      outlet: "none"
+    - inlet: "pressure"
+      outlet: "velocity_zero"
   solver:
     [
       "stabilized_schur",

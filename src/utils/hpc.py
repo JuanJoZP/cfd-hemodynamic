@@ -7,15 +7,170 @@ from pathlib import Path
 
 def load_config(config_path):
     """
-    Load the full configuration (including 'matrix' and 'base_params') from the YAML config file.
-    Tries to use PyYAML if available.
-    Falls back to a simple text parser if PyYAML is missing (e.g. on HPC login node or host).
+    Load the full configuration from a YAML config file (strict mode).
+
+    Supports both the legacy flat 'base_params' layout and the new structured
+    layout with 'artery_params', 'tree_params', and 'fluid_params' sections.
+    All named sections are merged into a single 'base_params' dict so the rest
+    of the pipeline works without changes.
+
+    Raises ValueError if any unknown top-level section or any unknown parameter
+    within a known section is found.
+
+    Tries to use PyYAML if available; falls back to a simple text parser.
     """
+    # ------------------------------------------------------------------ #
+    # Schema: which sections and which keys are valid in each section.    #
+    # Add new params here when the pipeline supports them.                #
+    # ------------------------------------------------------------------ #
+
+    KNOWN_SECTIONS = {
+        "matrix",
+        "base_params",
+        "simulation_params",
+        "artery_params",
+        "tree_params",
+        "fluid_params",
+    }
+    MERGE_INTO_BASE = {"artery_params", "tree_params", "fluid_params"}
+
+    # Parameters allowed inside base_params (or its structured equivalents).
+    VALID_BASE_PARAMS = {
+        # --- Artery geometry ---
+        "radius_in",
+        "radius_out",
+        "length",
+        "slope",
+        "stenosis_position",
+        "stenosis_severity",
+        "coupling_slope",
+        # --- Boundary-condition flow values ---
+        "q_in",
+        "q_in_hyper",
+        "p_terminal",
+        "p_inlet",
+        # --- Vascular tree (VascuSynth) ---
+        "tree_volume",
+        "n_terminal",
+        "perf_pressure",
+        "term_pressure",
+        "murray_exponent",
+        "closest_neighbours",
+        # --- Fluid properties ---
+        "mu",
+        "rho",
+        # --- Legacy flat-layout solver params (test_simple / arteria_lad) ---
+        "solver",
+        "T",
+        "dt",
+    }
+
+    # Parameters allowed inside simulation_params.
+    VALID_SIMULATION_PARAMS = {
+        "solver",
+        "T",
+        "dt",
+        "mu",
+        "rho",
+    }
+
+    # Parameters allowed inside the matrix section.
+    # These are the experiment axes that drive the combinatorial sweep.
+    VALID_MATRIX_PARAMS = {
+        "hyperemia",
+        "vessel_loss_factor",
+        "stenosis_severity",
+        "hyperemia_dilation_factor",
+        "bc_type",
+        "geometry_type",
+        "solver",
+        "reduccion_lumen",
+        "p_inlet",
+    }
+
+    # Map each logical section name (after merging) to its allowed-key set.
+    SECTION_SCHEMA = {
+        "base_params": VALID_BASE_PARAMS,
+        "simulation_params": VALID_SIMULATION_PARAMS,
+        "matrix": VALID_MATRIX_PARAMS,
+    }
+
+    # ------------------------------------------------------------------ #
+    # Internal helper: validate the final dict (after merges).            #
+    # ------------------------------------------------------------------ #
+    def _validate(config: dict, source: str) -> None:
+        """Raise ValueError for unknown sections or unknown parameters."""
+        unknown_sections = set(config.keys()) - KNOWN_SECTIONS
+        if unknown_sections:
+            raise ValueError(
+                f"[CONFIG ERROR] {source}: unknown top-level section(s): "
+                f"{sorted(unknown_sections)}.\n"
+                f"  Allowed sections: {sorted(KNOWN_SECTIONS)}"
+            )
+
+        for section, schema in SECTION_SCHEMA.items():
+            if section not in config:
+                continue
+            section_data = config[section]
+            if not isinstance(section_data, dict):
+                continue
+            unknown_keys = set(section_data.keys()) - schema
+            if unknown_keys:
+                raise ValueError(
+                    f"[CONFIG ERROR] {source}: unknown parameter(s) in "
+                    f"'{section}': {sorted(unknown_keys)}.\n"
+                    f"  Allowed parameters: {sorted(schema)}"
+                )
+
     try:
         import yaml
 
         with open(config_path, "r") as f:
-            return yaml.safe_load(f)
+            raw = yaml.safe_load(f)
+
+        if raw is None:
+            raise ValueError(
+                f"[CONFIG ERROR] {config_path}: file is empty or could not be parsed."
+            )
+
+        # Validate top-level sections *before* merging so structured names
+        # like 'artery_params' are still visible.
+        unknown_sections = set(raw.keys()) - KNOWN_SECTIONS
+        if unknown_sections:
+            raise ValueError(
+                f"[CONFIG ERROR] {config_path}: unknown top-level section(s): "
+                f"{sorted(unknown_sections)}.\n"
+                f"  Allowed sections: {sorted(KNOWN_SECTIONS)}"
+            )
+
+        # Validate each structured section against VALID_BASE_PARAMS before
+        # merging (they share the same allowed set).
+        for section in MERGE_INTO_BASE:
+            if section in raw and isinstance(raw[section], dict):
+                unknown_keys = set(raw[section].keys()) - VALID_BASE_PARAMS
+                if unknown_keys:
+                    raise ValueError(
+                        f"[CONFIG ERROR] {config_path}: unknown parameter(s) in "
+                        f"'{section}': {sorted(unknown_keys)}.\n"
+                        f"  Allowed parameters: {sorted(VALID_BASE_PARAMS)}"
+                    )
+
+        # Merge structured sections into base_params for pipeline compatibility.
+        if any(k in raw for k in MERGE_INTO_BASE):
+            merged = dict(raw.get("base_params", {}))
+            for section in MERGE_INTO_BASE:
+                merged.update(raw.get(section, {}))
+            # Remove the now-merged structured keys so the final dict only
+            # contains canonical sections.
+            for section in MERGE_INTO_BASE:
+                raw.pop(section, None)
+            raw["base_params"] = merged
+
+        # Final validation on the merged config.
+        _validate(raw, str(config_path))
+
+        return raw
+
     except ImportError:
         print("[INFO] PyYAML not found. Using fallback parser for config.")
         config = {"matrix": {}, "base_params": {}}
@@ -30,7 +185,7 @@ def load_config(config_path):
         with open(config_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
-        for line in lines:
+        for line_no, line in enumerate(lines, start=1):
             # Remove comments and whitespace
             line_content = line.split("#")[0]
             stripped = line_content.strip()
@@ -44,17 +199,21 @@ def load_config(config_path):
             # Check for top-level sections
             if indent == 0 and stripped.endswith(":"):
                 key = stripped[:-1]
-                if key in ["matrix", "base_params", "simulation_params"]:
-                    current_section = key
-                    if current_section not in config:
-                        config[current_section] = {}
-                    current_key = None
-                    buffer = ""
-                    in_multiline_value = False
-                    bracket_count = 0
-                    expecting_value = False
-                else:
-                    current_section = None
+                if key not in KNOWN_SECTIONS:
+                    raise ValueError(
+                        f"[CONFIG ERROR] {config_path} line {line_no}: "
+                        f"unknown top-level section '{key}'.\n"
+                        f"  Allowed sections: {sorted(KNOWN_SECTIONS)}"
+                    )
+                # Map structured sections into base_params
+                current_section = "base_params" if key in MERGE_INTO_BASE else key
+                if current_section not in config:
+                    config[current_section] = {}
+                current_key = None
+                buffer = ""
+                in_multiline_value = False
+                bracket_count = 0
+                expecting_value = False
                 continue
 
             if not current_section:
@@ -65,13 +224,10 @@ def load_config(config_path):
                 buffer += " " + stripped
                 bracket_count += stripped.count("[") - stripped.count("]")
                 if bracket_count == 0:
-                    # Value finished
                     try:
                         val = ast.literal_eval(buffer)
                         config[current_section][current_key] = val
                     except (ValueError, SyntaxError):
-                        # Fallback for weird strings, maybe simple list manual parse needed?
-                        # For now assume AST works for lists
                         print(f"[WARN] Failed to ast.parse: {buffer}")
                         config[current_section][current_key] = buffer
 
@@ -89,14 +245,14 @@ def load_config(config_path):
                     else:
                         try:
                             val = ast.literal_eval(buffer)
-                        except:
+                        except Exception:
                             val = buffer
                         config[current_section][current_key] = val
                         current_key = None
                 else:
                     try:
                         val = ast.literal_eval(stripped)
-                    except:
+                    except Exception:
                         val = stripped
                     config[current_section][current_key] = val
                     current_key = None
@@ -117,9 +273,6 @@ def load_config(config_path):
                     in_multiline_value = True
                     continue
 
-                # Check empty value (maybe start of block list, but we only support inline lists properly or need logic)
-                # But previous logic supported '- item', let's just stick to the requested inline fix + multiline robustness
-
                 if not val_str:
                     current_key = key
                     expecting_value = True
@@ -132,6 +285,8 @@ def load_config(config_path):
 
                 config[current_section][key] = val
 
+        # Validate after full parse
+        _validate(config, str(config_path))
         return config
 
 

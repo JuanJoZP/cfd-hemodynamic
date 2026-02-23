@@ -1,30 +1,33 @@
-base_params:
+artery_params:
   radius_in: 1.5
   radius_out: 0.65
   length: 80
   coupling_slope: 0.05
-  q_in: 2 #cm3/s
-  perf_pressure: 133000 # Bayre
-  term_pressure: 80000 # Bayre
-  q_in_hyper: 225
+  stenosis_position: 0.5
+  stenosis_slope: 0.3
+
+tree_params:
+  perf_pressure: 133000
+  term_pressure: 80000
   tree_volume: 70
   n_terminal: 20
   murray_exponent: 3.0
-  closest_neighbours: 5
-  stenosis_position: 0.5
-  slope: 0.3
+  mu: 0.0035
+  rho: 0.00106
 
-matrix:
-  # hiperemia: [true, false]
-  # factor_perdida_vasos: [0.0, 0.5]
-  # reduccion_lumen: [0.0, 0.1, 0.2]
-  # factor_dilatacion_hiperemia: [1.0]
-  reduccion_lumen: [0.5]
-
-# Parámetros de simulación constantes para todos los experimentos
 simulation_params:
   solver: "stabilized_schur"
   T: 0.1
   dt: 0.01
   mu: 0.0035
   rho: 0.00106
+  q_in: 2
+  q_in_hyper: 225
+  geometry_type: "full"
+  hyperemia: false
+  bc_type:
+    inlet: "velocity_parabolic"
+    outlet: "pressure"
+
+matrix:
+  stenosis_severity: [0.5]

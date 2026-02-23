@@ -1,36 +1,48 @@
-base_params:
-  radius_in: 1.5
-  radius_out: 0.65
-  length: 80
-  coupling_slope: 0.05
-  q_in: 2
-  q_in_hyper: 7
-  perf_pressure: 133000
-  term_pressure: 80000
-  mu: 0.0035
-  rho: 0.00106
-  p_inlet: 133000
-  p_terminal: 80000
-  tree_volume: 50.0
-  n_terminal: 5
-  murray_exponent: 3.0
-  closest_neighbours: 5
+artery_params:
+  radius_in: 1.5 # [mm] Inlet radius
+  radius_out: 0.65 # [mm] Outlet radius
+  length: 80 # [mm] Vessel length
+  coupling_slope: 0.05 # [-]
+  stenosis_slope: 0.3 # [-]
+  stenosis_position: 0.5 # [-]
+
+tree_params:
+  perf_pressure: 133000 # [dyn/cm²]
+  term_pressure: 80000 # [dyn/cm²]
+  tree_volume: 50.0 # [mL]
+  n_terminal: 5 # [-]
+  murray_exponent: 3.0 # [-]
+  mu: 0.0035 # [g/(mm·s)] Used by VascuSynth
+  rho: 0.00106 # [g/mm³]   Used by VascuSynth
+  lumen_thickening_factor: 1.0
+  vessel_loss_factor: 0.0
+  hyperemia_dilation_factor: 1.0
 
 simulation_params:
   T: 2
   dt: 0.005
-  mu: 0.0035
-  rho: 0.00106
+  solver: "stabilized_schur_lsc"
+  mu: 0.0035 # [g/(mm·s)]
+  rho: 0.00106 # [g/mm³]
+  q_in: 2 # [mL/s] Used to prescribe inlet velocity BC
+  q_in_hyper: 7 # [mL/s] Used when hyperemia=true
+  p_inlet: 133000 # [dyn/cm²] Inlet pressure BC
+  p_terminal: 80000 # [dyn/cm²] Outlet pressure BC
+  geometry_type: "full"
+  hyperemia: false
+  bc_type:
+    inlet: "velocity_parabolic"
+    outlet: "pressure"
 
 matrix:
   bc_type:
-    [
-      "inlet_pressure_outlet_pressure",
-      "inlet_pressure_outlet_none",
-      "inlet_velocity_parabolic_outlet_pressure",
-      "inlet_velocity_constant_outlet_pressure",
-      "inlet_velocity_parabolic_outlet_pressure",
-    ]
+    - inlet: "pressure"
+      outlet: "pressure"
+    - inlet: "pressure"
+      outlet: "none"
+    - inlet: "velocity_parabolic"
+      outlet: "pressure"
+    - inlet: "velocity_constant"
+      outlet: "pressure"
   geometry_type: ["full"]
-  solver: ["stabilized_schur_lsc"]
-  reduccion_lumen: [0]
+  hyperemia: [false]

@@ -1,37 +1,47 @@
-base_params:
+tree_params:
   radius_in: 0.9
   radius_out: 0.4
   length: 100.0
-  q_in: 2
-  q_in_hyper: 7
-  mu: 0.0035
-  rho: 0.00106
-  p_terminal: 0.0
   n_terminal: 5
   perf_pressure: 133000
   term_pressure: 80000
   murray_exponent: 3.0
-  closest_neighbours: 5
   tree_volume: 50.0
+  mu: 0.0035
+  rho: 0.00106
 
 simulation_params:
   T: 0.2
   dt: 0.01
   mu: 0.0035
   rho: 0.00106
+  q_in: 2
+  q_in_hyper: 7
+  p_terminal: 0.0
+  geometry_type: "tree"
+  hyperemia: false
+  bc_type:
+    inlet: "velocity_parabolic"
+    outlet: "pressure"
 
 matrix:
   bc_type:
-    [
-      "inlet_pressure_outlet_pressure",
-      "inlet_pressure_outlet_none",
-      "inlet_pressure_outlet_velocity_zero",
-      "inlet_velocity_constant_outlet_pressure",
-      "inlet_velocity_constant_outlet_none",
-      "inlet_velocity_constant_outlet_velocity_zero",
-      "inlet_velocity_parabolic_outlet_pressure",
-      "inlet_velocity_parabolic_outlet_none",
-      "inlet_velocity_parabolic_outlet_velocity_zero",
-    ]
-  geometry_type: ["tree"]
+    - inlet: "pressure"
+      outlet: "pressure"
+    - inlet: "pressure"
+      outlet: "none"
+    - inlet: "pressure"
+      outlet: "velocity_zero"
+    - inlet: "velocity_constant"
+      outlet: "pressure"
+    - inlet: "velocity_constant"
+      outlet: "none"
+    - inlet: "velocity_constant"
+      outlet: "velocity_zero"
+    - inlet: "velocity_parabolic"
+      outlet: "pressure"
+    - inlet: "velocity_parabolic"
+      outlet: "none"
+    - inlet: "velocity_parabolic"
+      outlet: "velocity_zero"
   solver: ["stabilized_schur_stokes", "stabilized_schur_lsc"]

@@ -146,7 +146,7 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
         r_in = base_params["radius_in"]
         r_out = base_params["radius_out"]
         length = base_params["length"]
-        severity = experiment.get("reduccion_lumen", 0.0)
+        severity = experiment.get("stenosis_severity", 0.0)
 
         r_base_mid = (r_in + r_out) / 2
         min_radius = (1 - severity) * r_base_mid
@@ -213,7 +213,7 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                     # Generate logic similar to stenosis.py main
 
                     # Check slope
-                    slope = current_params.get("slope", 0.5)
+                    slope = current_params.get("stenosis_slope", 0.5)
                     pos = current_params.get("stenosis_position", 0.5)
 
                     solid_stenosis = generate_stenosis_geometry(
@@ -309,7 +309,7 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                     r_in,
                     r_out,
                     min_radius,
-                    slope=current_params.get("slope", 0.5),
+                    slope=current_params.get("stenosis_slope", 0.5),
                     position=current_params.get("stenosis_position", 0.5),
                 )
 
