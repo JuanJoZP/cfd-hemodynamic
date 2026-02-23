@@ -1,0 +1,753 @@
+\documentclass[12pt, letterpaper]{article}
+
+% --- Paquetes Básicos ---
+\usepackage[utf8]{inputenc}
+\usepackage[spanish, english]{babel} % Soporte para ambos idiomas [cite: 6]
+\usepackage{times} % Fuente Times New Roman
+\usepackage[margin=2.5cm]{geometry} % Márgenes de 2.5cm
+\usepackage{setspace} \setstretch{1.5} % Interlineado 1.5
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{cite} % Para formato IEEE
+\renewcommand{\refname}{Referencias}
+\usepackage{amsmath,amscd}
+\usepackage{amssymb} %Mathematics
+\usepackage{hyperref}
+\usepackage{cleveref}
+\usepackage{parskip}
+
+% --- Configuración de Leyendas (Tablas arriba, Figuras abajo)  ---
+\captionsetup[table]{position=top, justification=raggedright, singlelinecheck=false}
+\captionsetup[figure]{position=bottom, justification=raggedright, singlelinecheck=false}
+
+% --- Numeración de páginas (Inferior central)  ---
+\usepackage{fancyhdr}
+\pagestyle{plain}
+
+\begin{document}
+
+% --- 1, 2, 3. Portada Sencilla ---
+\begin{titlepage}
+  \centering
+  \vspace*{1cm}
+  \begin{figure}
+    \centering
+    \includegraphics[width=0.25\linewidth]{figures/logo_vertical_ur_rojo.png}
+  \end{figure}
+  {\Large \textbf{Simulaciones computacionales de dinámica de fluidos para el análisis hemodinámico de la enfermedad coronaria}} \\
+
+  \vfill
+  \textbf{Autor:} Juan José Zuluaga Patiño \\
+  \textbf{Director:} José Alejandro Guerrero Vargas, PhD \\
+
+  \vfill
+  Programa de pregrado en Matemáticas Aplicadas y Ciencias de la Computación \\
+  Escuela de Ciencias e Ingeniería \\
+  Universidad del Rosario \\
+  2026
+\end{titlepage}
+
+% --- 4. Resumen / Abstract [cite: 11] ---
+\selectlanguage{spanish}
+\section*{Resumen}
+(Máximo 250 palabras, tercera persona. Incluye objetivos, alcance, metodología, resultados y conclusiones).
+
+\section*{Palabras clave}
+Palabra1, Palabra2, Palabra3 (3 a 5 palabras).
+
+\newpage
+
+% --- 6. Introducción ---
+\section{Introducción}
+La enfermedad arterial coronaria (EAC) constituye uno de los desafíos de salud pública más importantes a nivel global y es una de las principales causas de mortalidad \cite{world_health_organization_cardiovascular_2021}. Esta patología se caracteriza por la estenosis progresiva o el estrechamiento de las arterias coronarias, un proceso fundamentalmente impulsado por la aterosclerosis \cite{knuuti_2019_2020}. A nivel hemodinámico, este estrechamiento altera drásticamente el flujo sanguíneo, provocando un aumento de la velocidad a través de las regiones restringidas y la formación de zonas de recirculación; además, genera bajo estrés de corte en las paredes, lo que activa las células endoteliales y promueve la acumulación de placa \cite{malek_hemodynamic_1999,ku_blood_1997}.
+
+Tradicionalmente, el diagnóstico se ha apoyado en técnicas anatómicas como la Angiografía Coronaria Invasiva (ICA) y la Angiografía Coronaria por Tomografía Computarizada (CTCA) \cite{knuuti_2019_2020}. Si bien estas ofrecen un detalle anatómico sin igual, han revelado una brecha fundamental: la severidad anatómica de una lesión no siempre se correlaciona con su impacto fisiológico real en el flujo sanguíneo \cite{tonino_fractional_2009,knuuti_2019_2020}. Esta limitación cobra aún más relevancia ante la Isquemia con Arterias Coronarias no Obstructivas (INOCA), una condición donde los pacientes presentan síntomas de angina/isquemia pero sin estenosis obstructivas significativas en las arterias epicárdicas, un fenómeno estrechamente ligado a la Disfunción Microvascular Coronaria (DMV) \cite{kunadian_eapci_2021}.
+
+Para superar el enfoque puramente anatómico, se introdujo la evaluación funcional mediante la Reserva Fraccional de Flujo (FFR), que mide la relación de presiones distal y proximal a una estenosis bajo condiciones de hiperemia (flujo máximo) \cite{tonino_fractional_2009,knuuti_2019_2020}. Aunque la FFR ha transformado el manejo clínico al guiar la intervención coronaria percutánea (PCI) de forma más precisa, sigue siendo un procedimiento invasivo y, al igual que sus predecesores, no ofrece una visión directa ni detallada de la microvasculatura \cite{kunadian_eapci_2021}.
+
+En este contexto, la Dinámica de Fluidos Computacional (CFD) y el Método de los Elementos Finitos (FEM) emergen como un paradigma innovador y no invasivo para el análisis hemodinámico. La CFD permite simular el flujo sanguíneo en geometrías arteriales reconstruidas a partir de imágenes médicas, posibilitando el cálculo detallado de campos de presión, velocidad y parámetros biomecánicos cruciales como el estrés de corte de pared (WSS) \cite{taylor_computational_2013}. Esta aproximación ha llevado al desarrollo de índices como la FFR virtual (vFFR), que busca estimar la FFR a partir de modelos computacionales basados en imágenes médicas \cite{taylor_computational_2013,morris_virtual_2013,nannini_automated_2024}. Este enfoque permite una evaluación de la estenosis de forma no invasiva o mínimamente invasiva, a partir de datos de tomografía computarizada (TC) o angiografía \cite{taylor_computational_2013,morris_virtual_2013}. Además, el modelado multi-escala acopla simulaciones 3D de alta fidelidad de las arterias principales con modelos de parámetros agrupados (0D) que representan la fisiología de la microcirculación distal \cite{duanmu_patient-specific_2018,nannini_automated_2024}. Este enfoque integrado es esencial para abordar las limitaciones diagnósticas actuales y comprender la compleja interacción entre la enfermedad macrovascular (EAC) y la disfunción microvascular (DMV) \cite{kunadian_eapci_2021}.
+
+Estudios pioneros como DeFACTO y HeartFlow NXT validaron la viabilidad de la vFFR/FFR-CT, demostrando niveles de precisión diagnóstica significativos en comparación con la FFR invasiva \cite{min_diagnostic_2012,norgaard_diagnostic_2014}. Sin embargo, los enfoques actuales de vFFR no están exentos de limitaciones. Una de las críticas más importantes es su dependencia de las condiciones de contorno, que son modelos matemáticos simplificados para representar la microcirculación distal. Además, las simulaciones transitorias completas, que capturan la naturaleza pulsátil del flujo sanguíneo a lo largo de todo el ciclo cardíaco, tienen un costo computacional muy elevado. Esto ha impulsado el desarrollo de métodos alternativos basados en estado estacionario (steady-state), que son mucho más rápidos pero sacrifican parte de la fidelidad fisiológica \cite{nannini_automated_2024}.
+
+La necesidad de refinar estos modelos, especialmente en la representación de la microvasculatura, es crucial para mejorar su precisión y extender su aplicabilidad a patologías complejas como la DMV \cite{kunadian_eapci_2021}.
+
+Para obtener simulaciones coronarias precisas y para empezar a desentrañar patologías como la DMV, es crucial modelar adecuadamente la microcirculación. El enfoque más común ha sido el uso de modelos de parámetros concentrados (lumped-parameter models), como modelos tipo Windkessel, para representar la resistencia y la compliancia del lecho distal y acoplarlos a una simulación 3D \cite{duanmu_patient-specific_2018,nannini_automated_2024}. Enfoques más avanzados han evolucionado hacia el acoplamiento multi-escala 3D-0D/1D, buscando condiciones de contorno más fisiológicas y específicas del paciente \cite{duanmu_patient-specific_2018,nannini_automated_2024}.
+
+En paralelo, se han propuesto estrategias de generación de redes microvasculares sintéticas como una vía para representar de forma más explícita la microcirculación distal; este tipo de modelos puede ser útil para explorar sensibilidad a la microvasculatura y reducir incertidumbre en las condiciones de contorno \cite{nannini_automated_2024}.
+
+En cuanto a las herramientas, este campo se ha beneficiado enormemente del movimiento de software de código abierto, como FEniCSx y SimVascular \cite{BarattaEtal2023,updegrove_simvascular_2017}. A diferencia del software propietario (p. ej., ANSYS Fluent), que presenta altos costos de licencia y limitaciones en la personalización, las plataformas de código abierto promueven la transparencia, la reproducibilidad y la colaboración, democratizando el acceso a tecnologías de diagnóstico avanzadas.
+
+Si bien la FFR virtual (vFFR) es una herramienta no invasiva prometedora para la evaluación funcional de la EAC, su precisión y aplicabilidad clínica están limitadas por simplificaciones en el modelado de la microcirculación. Los modelos actuales a menudo utilizan condiciones de contorno genéricas que no capturan adecuadamente la fisiología específica del paciente \cite{nannini_automated_2024}. Esta brecha de conocimiento es particularmente crítica en pacientes con sospecha de Disfunción Microvascular Coronaria (DMV), donde la patología reside precisamente en el compartimento que los modelos actuales simplifican \cite{kunadian_eapci_2021}.
+Para abordar esta limitación, la presente investigación plantea si la integración de un modelo multiescala, que acople la arteria principal con redes microvasculares sintéticas, permite capturar de manera más precisa la interacción hemodinámica entre la EAC y la DMV en comparación con los modelos de resistencia fija o de parámetros agrupados. Al explorar esta relación, surge la hipótesis de que la representación explícita de la arquitectura microvascular reduciria la incertidumbre en el cálculo de índices funcionales, proporcionando una base más robusta para el desarrollo de herramientas diagnósticas que consideren la fisiología integral del paciente.
+
+Con esto en cuenta, el trabajo se centra inicialmente en la implementación y validación de un solver de CFD en 3 dimensiones, que garantice la estabilidad numérica en el régimen de flujo coronario. Sobre esta base, se procede a la generación de las geometrias microvasculares sintéticas cuya morfología se corresponda con la demanda de oxígeno miocárdico, permitiendo un acoplamiento multiescala anatómicamente coherente. Esta infraestructura computacional posibilita la evaluación de diversos escenarios mediante la parametrización sistemática de la severidad de la estenosis macrovascular y el grado de disfunción de la microvasculatura. Finalmente, a través del análisis de estos escenarios, se busca caracterizar la interacción entre ambas patologías, identificando patrones en las variables hemodinámicas que permitan mejorar los criterios del diagnóstico funcional no invasivo.
+
+% --- 7. Metodología ---
+\section{Metodología}
+La simulación precisa de la hemodinámica coronaria exige una metodología robusta que combine el modelado físico de las ecuaciones gobernantes con estrategias de solución numérica eficientes y estables. Esta sección describe el marco computacional utilizado.
+
+\subsection{Ecuaciones gobernantes y formulación débil}
+
+En el contexto coronario, el CFD posibilita una resolución espacial y temporal de variables hemodinámicas difícil de obtener in vivo. Específicamente, permite cuantificar el impacto funcional de una estenosis y analizar fenómenos locales clave para la aterosclerosis, como las zonas de recirculación y las zonas de WSS bajo \cite{malek_hemodynamic_1999}.
+
+El flujo sanguíneo en las arterias coronarias presenta una naturaleza compleja debido a su composición celular. No obstante, en arterias de gran y mediano calibre, la velocidad de corte es lo suficientemente elevada como para que la viscosidad se mantenga prácticamente constante. En este sentido, estudios previos \cite{modelnonnewtonian} han demostrado que un modelo de sangre newtoniano constituye una aproximación válida para el cálculo de variables hemodinámicas en estos vasos.
+
+Bajo esta premisa, se adoptan dos supuestos fundamentales para el desarrollo del modelo:
+\begin{itemize}
+  \item \textbf{Incompresibilidad:} La sangre se considera un fluido de densidad constante, una aproximación estándar en el estudio de grandes vasos donde las variaciones de presión no afectan el volumen del fluido \cite{ku_blood_1997}.
+  \item \textbf{Comportamiento Newtoniano:} Se asume una relación lineal entre el esfuerzo y la deformación con una viscosidad dinámica constante ($\mu \approx 0.0035 \, \text{Pa} \cdot \text{s}$).
+\end{itemize}
+
+Teniendo en cuenta estos supuestos, la velocidad y presión del fluido se describen mediante las ecuaciones de Navier-Stokes para flujo incompresible, las cuales representan la conservación del momento lineal y de la masa:
+
+\begin{center}
+  \begin{subequations}
+    \begin{align}
+      \label{momentum}
+      \rho\left(\frac{\partial u}{\partial t}+ u \cdot \nabla u\right) = \nabla \cdot \sigma(u,p) + f. \\
+      \label{continuity}
+      \nabla \cdot u = 0. \\
+      \sigma(u,p) = \mu(\nabla u + (\nabla u)^T) - pI.
+    \end{align}
+  \end{subequations}
+\end{center}
+
+Donde $u: \mathbb{R}^d \times \mathbb{R}_+ \rightarrow \mathbb{R}^d$, $p: \mathbb{R}^d \times \mathbb{R}_+ \rightarrow \mathbb{R}$ corresponden a velocidad y presión, respectivamente, como funciones de espacio y tiempo, $d \in \{2,3\}$ es la dimension espacial, $\rho = 1055 \, \text{kg}/\text{m}^3$ es la densidad de la sangre, $\mu = 0.0035\, \text{Pa} \cdot \text{s}$ es la viscosidad dinámica y $f: \mathbb{R}^d \rightarrow \mathbb{R}^d$ es una fuerza externa aplicada al sistema.
+
+Las ecuaciones (\ref{momentum}) y (\ref{continuity}), junto con unas condiciones de frontera Dirichlet $g(t)$, una condición inicial $u_0$, y un dominio geométrico $\Omega \in \mathbb{R}^d$ conforman la formulación del problema en su versión fuerte.
+
+\begin{center}
+  \begin{subequations}
+    \begin{align}
+      u(x,0) &= u_0(x) \\
+      u(x,t) &= g(t) \quad \forall x \in \Gamma_D
+    \end{align}
+  \end{subequations}
+\end{center}
+
+Donde $\Gamma_D \subset \Omega$ es la parte de la frontera del dominio en la que se está prescribiendo la condición de frontera.
+
+Para resolver este problema usando CFD, debemos transformarlo a su forma variacional, también conocida como la formulación débil. Este procedimiento transforma una ecuación diferencial en un problema algebraico definido sobre espacios funcionales de dimensión posiblemente infinita. Lo que esto hace es posibilitar el uso de métodos del álgebra lineal para resolver un sistema del cual no se conoce una solución analítica.
+
+En términos prácticos, esto se consigue al multiplicar las ecuaciones por funciones de prueba pertenecientes a espacios funcionales adecuados e integrando sobre el dominio $\Omega$. Para el campo de velocidades, se emplean funciones del espacio de Sobolev $V = [H^1(\Omega)]^d$, que garantiza la integrabilidad de las derivadas primeras, mientras que para la presión se utiliza el espacio $Q = L^2(\Omega)$, correspondiente a funciones cuadrado integrables. Al aplicar integración por partes sobre el término del tensor de esfuerzos, obtenemos un sistema de ecuaciones donde las derivadas son de un orden menor que en la formulación fuerte.
+
+Primero, multiplicamos \cref{momentum} por una función de prueba $v$,
+
+\begin{center}
+  \begin{equation*}
+    \int_{\Omega}\rho(\frac{\partial u}{\partial t} + u \cdot \nabla u) \cdot v \; dx = \int_{\Omega}\nabla \cdot \sigma(u,p) \cdot v \; dx + \int_{\Omega}f \cdot v \; dx.
+  \end{equation*}
+\end{center}
+\vspace{6pt}
+
+Integramos por partes el tensor de estrés,
+
+\begin{center}
+  \begin{equation}
+    \label{momentum_weak}
+    \int_{\Omega}\rho\frac{\partial u}{\partial t}\cdot v \; dx + \int_{\Omega} \rho u \cdot \nabla u \cdot v \; dx = -\int_{\Omega}\sigma(u,p) \cdot \nabla v \; dx + \int_{\Omega}(\sigma(u,p) \cdot n) \cdot v \; ds + \int_{\Omega}f \cdot v \; dx.
+  \end{equation}
+\end{center}
+\vspace{6pt}
+
+Ahora multiplicamos \cref{continuity} por una función de prueba $q$,
+
+\begin{center}
+  \begin{equation}
+    \label{continuity_weak}
+    \int_{\Omega}\nabla \cdot u \cdot q \; dx = 0.
+  \end{equation}
+\end{center}
+\vspace{6pt}
+
+Reorganizamos \cref{momentum_weak} y \cref{continuity_weak} para definir las formas $a$ y $b$ que corresponden a las ecuaciones de momento y continuidad, respectivamente:
+
+\begin{center}
+  \begin{align}
+    \label{bilinear_mom}
+    a(u, p, v) &= \int_{\Omega}\rho\frac{\partial u}{\partial t}\cdot v \; dx + \int_{\Omega} \rho u \cdot \nabla u \cdot v \; dx + \int_{\Omega}\sigma(u,p) \cdot \nabla v \; dx - \int_{\Omega}(\sigma(u,p) \cdot n) \cdot v \; ds - \int_{\Omega}f \cdot v \; dx,\\
+    \label{bilinear_con}
+    b(u, q) &= \int_{\Omega}\nabla \cdot u \cdot q \; dx.
+  \end{align}
+\end{center}
+\vspace{6pt}
+
+Finalmente, para que el problema sea computable, el dominio se discretiza en una malla de elementos finitos. Esta etapa permite aproximar los espacios funcionales de dimensión infinita mediante espacios de dimensión finita compuestos por polinomios por partes.
+
+Entonces, la formulación débil del problema es: encontrar $u \in V$ y $p \in Q$ tales que $a(u,p,v)=0$ y $b(u,q) = 0$ para todo $v \in V$ y $q \in Q$. Donde $V = [H^1(\Omega)]^d$ y $Q = L^2(\Omega)$.
+
+\subsection{Esquema numérico}
+
+La resolución de las ecuaciones de Navier-Stokes en geometrías complejas, como las arterias coronarias, presenta varios retos numéricos que deben abordarse en la formulación del esquema:
+
+El término convectivo $\mathbf{u} \cdot \nabla \mathbf{u}$ introduce una no linealidad inherente a las ecuaciones de Navier-Stokes, lo que impide la resolución directa del problema en un solo paso algebraico. En consecuencia, la solución numérica requiere un esquema que trate adecuadamente esta no linealidad.
+
+Por otra parte, la integración temporal impone restricciones adicionales de estabilidad y costo computacional. En una etapa inicial se exploraron estrategias explícitas y semi-implícitas (por ejemplo, Adams-Bashforth) para aproximar el término convectivo con valores de pasos de tiempo anteriores y así evitar resolver un sistema no lineal en cada paso. Sin embargo, estos métodos quedan fuertemente restringidos por la condición de Courant–Friedrichs–Lewy (CFL), lo que obliga a utilizar pasos de tiempo muy pequeños para mantener la estabilidad y evitar la divergencia numérica.
+
+Dada la rigidez del problema hemodinámico y la necesidad de utilizar pasos de tiempo mayores, en este trabajo se adopta finalmente el método del punto medio implícito. En particular, la derivada temporal se aproxima como
+
+\begin{equation*}
+  \label{eq:midpoint_time_derivative}
+  \left.\frac{\partial u}{\partial t}\right|_{t^{n+1/2}} \approx \frac{u^{n+1}-u^n}{\Delta t}
+\end{equation*}
+
+y los términos espaciales (convectivo, viscoso y de presión) se evalúan en el estado de punto medio $u^{n+1/2}$.
+
+\begin{equation*}
+  u^{n+1/2} := \frac{u^{n+1}+u^n}{2},
+\end{equation*}
+
+La discretización resultante conduce a un sistema no lineal en cada paso de tiempo, el cual se resuelve mediante el algoritmo iterativo de Newton-Raphson.
+
+Para garantizar estabilidad numérica con pares de interpolación de igual orden ($P_1/P_1$) y en regímenes con advección dominante, se añaden términos de estabilización a la formulación variacional \cite{pspg, supg, lsic, leborgne_inf-sup_2023}. En todos los casos, se construyen a partir del \,\textit{residuo fuerte} de la ecuación de momento \cref{momentum}
+
+\begin{equation}
+  \label{eq:strong_residual}
+  R(u, p)
+  = \rho\left(\frac{\partial u}{\partial t} + u \cdot \nabla u - f\right) - \nabla \cdot \sigma(u,p).
+\end{equation}
+
+\noindent A partir de $R(u,p)$ se incorporan, de manera separada, los siguientes términos:
+
+\paragraph{(i) SUPG (Streamline-Upwind Petrov--Galerkin).}
+Este término introduce difusión numérica \,\textit{en la dirección de las líneas de corriente} para suprimir oscilaciones no físicas en el campo de velocidad cuando el transporte convectivo domina \cite{supg}.
+
+\begin{equation}
+  \label{eq:supg_term}
+  f_{\mathrm{SUPG}}(u,p,v)
+  = \tau_{\mathrm{SUPG}}\, (u \cdot \nabla v) \cdot R(u, p),
+\end{equation}
+
+\noindent con parámetro de estabilización
+\begin{equation}
+  \label{eq:tau_supg}
+  \tau_{\mathrm{SUPG}}
+  = \left[ \left( \frac{2\|u\|}{h} \right)^2 + \left( \frac{2}{\Delta t} \right)^2 + \left( \frac{4\nu}{h^2} \right)^2 \right]^{-1/2}.
+\end{equation}
+
+Antes de introducir el término de estabilización para la presión, es importante notar que la discretización mixta de Navier--Stokes exige que los espacios discretos de velocidad y presión satisfagan la condición de Ladyzhenskaya--Babuška--Brezzi (LBB), también conocida como condición \textit{inf-sup} \cite{leborgne_inf-sup_2023}. En este trabajo se utiliza interpolación de igual orden (en particular, $P_1/P_1$) para reducir el costo computacional; sin embargo, este par viola la condición LBB, lo que se manifiesta como oscilaciones espurias (\textit{ruido}) en el campo de presión y, en casos extremos, como sistemas lineales mal condicionados.
+
+\paragraph{(ii) PSPG (Pressure-Stabilizing Petrov--Galerkin).}
+Este término estabiliza el campo de presión y permite el uso de pares de igual orden evitando el “ruido” espurio asociado a la violación de la condición LBB \cite{pspg}.
+
+\begin{equation}
+  \label{eq:pspg_term}
+  f_{\mathrm{PSPG}}(u,p,q)
+  = \tau_{\mathrm{PSPG}}\, \nabla q \cdot R(u,p),
+  \qquad \tau_{\mathrm{PSPG}} := \tau_{\mathrm{SUPG}}.
+\end{equation}
+
+\paragraph{(iii) LSIC (Least-Squares Incompressibility Constraint).}
+Este término penaliza de forma suave desviaciones de la condición de incompresibilidad en el problema discreto, mejorando la robustez del esquema en mallas complejas \cite{lsic}.
+
+\begin{equation}
+  \label{eq:lsic_term}
+  f_{\mathrm{LSIC}}(u,v)
+  = \nu_{\mathrm{LSIC}}\, (\nabla \cdot v)\, \rho\,(\nabla \cdot u),
+  \qquad \nu_{\mathrm{LSIC}} := \frac{h}{2}\,\|u\|\,z.
+\end{equation}
+
+\noindent En las expresiones anteriores, $h$ es una longitud característica de la celda, $\Delta t$ el paso de tiempo y $\nu = \mu/\rho$ la viscosidad cinemática. El factor $z$ depende del número de Reynolds local $Re$ y se define como:
+
+\begin{center}
+  \begin{equation}
+    z =
+    \begin{cases}
+      \left( \dfrac{Re}{3} \right), & \text{si } Re \leq 3, \\
+      1, &  \text{si } Re > 3.
+    \end{cases}
+  \end{equation}
+\end{center}
+
+El sistema no lineal que resulta de la discretización de la formulación débil puede representarse como $F(u,p)=0$, donde
+
+\begin{center}
+  \begin{equation*}
+    F(u, p) =
+    \begin{bmatrix}
+      A(u) \\
+      B(p)
+    \end{bmatrix},
+    \quad \text{con }
+    \quad
+    \begin{aligned}
+      A_i(u) &:= a(u,p, v_i) + f_{\mathrm{SUPG}}(u,p,v_i) + f_{\mathrm{LSIC}}(u, v_i),\\
+      B_i(p) &:= b(p, q_i) + f_{\mathrm{PSPG}}(u, p, q_i).
+    \end{aligned}
+  \end{equation*}
+\end{center}
+
+\noindent siendo $\{v_i\}_{i=1}^n$ y $\{q_i\}_{i=1}^n$ bases de los espacios discretos de prueba de velocidad y presión, $V_h$ y $Q_h$, respectivamente. El sistema se resuelve entonces mediante el método de Newton:
+
+\begin{center}
+  \begin{equation}
+    x_{k+1} = x_k - J(x_k)^{-1}F(x_k), \quad k = 0, 1, 2, \dots
+  \end{equation}
+\end{center}
+
+\noindent donde $J(x) = F'(x)$ es el Jacobiano del residuo, $x_k = [u_k \;\; p_k]^T$ es el vector que contiene los coeficientes de expansión de la solución en la iteración $k$, y $x_0$ es la aproximación inicial (en este trabajo, se toma $x_0=0$).
+
+El sistema lineal para la actualización de Newton $J(x_k)\,\Delta x_k = -F(x_k)$ presenta la estructura de punto de silla típica de Stokes/Navier-Stokes. En particular, la restricción de incompresibilidad hace que el bloque asociado a la presión sea nulo o muy pequeño (en el caso estabilizado), lo que vuelve a la matriz global indefinida y con autovalores tanto positivos como negativos. Esta propiedad descarta el uso de solucionadores para matrices definidas positivas (por ejemplo, Gradiente Conjugado) y puede deteriorar la convergencia de métodos de Krylov si no se emplea un precondicionamiento adecuado; por ello, se recurre a estrategias basadas en el complemento de Schur para desacoplar los campos de velocidad y presión dentro del solver iterativo.
+
+En forma de bloques, el sistema linealizado puede escribirse como
+
+\begin{equation}
+  \label{eq:saddle_point}
+  \begin{bmatrix}
+    A & B^T \\
+    B & -C
+  \end{bmatrix}
+  \begin{bmatrix}
+    \Delta u \\
+    \Delta p
+  \end{bmatrix}
+  =
+  \begin{bmatrix}
+    R_u \\
+    R_p
+  \end{bmatrix},
+\end{equation}
+
+\noindent donde $A$ corresponde al bloque de momento (incluyendo la contribución viscosa y convectiva linealizada), $B$ es el operador discreto de divergencia y $B^T$ el de gradiente. El bloque $C$ proviene de la estabilización de la presión (PSPG) y, en general, es nulo o pequeño en comparación con $A$.
+
+Para resolver \eqref{eq:saddle_point} de forma eficiente, se emplea un precondicionador basado en el complemento de Schur. El complemento de Schur asociado al bloque de presión se define como
+
+\begin{equation}
+  \label{eq:schur_exact}
+  S \;:=\; -C - B\,A^{-1}B^T.
+\end{equation}
+
+Una manera equivalente de ver el desacoplamiento es mediante la eliminación de $\Delta u$:
+
+\begin{align}
+  \label{eq:schur_reduction_u}
+  \Delta u &= A^{-1}\left(R_u - B^T\Delta p\right),\\
+  \label{eq:schur_reduction_p}
+  S\,\Delta p &= R_p - B\,A^{-1}R_u.
+\end{align}
+
+En la implementación, el sistema se resuelve con un método de Krylov global (FGMRES) y una descomposición por campos (FieldSplit) con factorización de tipo Schur. En particular, se utiliza una factorización triangular inferior (\textit{LOWER}) y una aproximación interna de Schur de PETSc de tipo \textit{selfp}.
+
+Cada aplicación del precondicionador requiere resolver aproximadamente el bloque de velocidad $A$ y el bloque de presión (aproximación de $S$). Para ello, se emplean métodos iterativos con precondicionamiento aditivo de Schwarz (ASM): GMRES+ASM para el bloque de velocidad y un solver tipo ASM para el bloque de presión.
+
+Finalmente, cuando no se prescribe presión mediante condiciones de Dirichlet, el sistema presenta un espacio nulo asociado a presiones constantes. Para garantizar la convergencia del método de Krylov, este espacio nulo se construye y se incorpora explícitamente en el solver.
+
+% Nota: Los parámetros de LSIC (incluyendo la definición de $\tau_{\mathrm{LSIC}}$ y $z$) y la forma exacta de $\tau_{\mathrm{SUPG}}$ se documentarán con sus referencias correspondientes.
+% Nota: En el cálculo de $\tau$ se utiliza $\|u^n\|$ (velocidad del paso previo) para simplificar la derivación automática.
+
+\subsection{Benchmarks para validación}
+
+Antes de proceder con las simulaciones orientadas al estudio de la hemodinámica coronaria, es necesario asegurar que la implementación del solver sea robusta y capaz de resolver con precisión las ecuaciones de Navier-Stokes. En este sentido, se realizaron tres pruebas de validación utilizando escenarios estándar de la literatura.
+
+\subsubsection{Flujo 2D en Cavidad Inducida por Tapa (Lid-Driven Cavity)}
+
+Este benchmark se define sobre la cavidad cuadrada unitaria
+\begin{equation}
+  \Omega = (0,1)\times(0,1),
+  \qquad \partial\Omega = \Gamma_{\mathrm{lid}}\cup \Gamma_{\mathrm{walls}},
+\end{equation}
+\noindent donde $\Gamma_{\mathrm{lid}}=\{(x,y)\in\partial\Omega:\; y=1\}$ es la tapa móvil y $\Gamma_{\mathrm{walls}}=\partial\Omega\setminus\Gamma_{\mathrm{lid}}$ corresponde a las otras tres paredes.
+
+Se consideran las ecuaciones de Navier--Stokes incompresibles en $\Omega$ con condición de no deslizamiento en toda la frontera y velocidad prescrita en la tapa:
+\begin{equation}
+  \label{eq:ldc_bc}
+  \begin{aligned}
+    (u,v) &= (U,0) && \text{en } \Gamma_{\mathrm{lid}},\\
+    (u,v) &= (0,0) && \text{en } \Gamma_{\mathrm{walls}},
+  \end{aligned}
+\end{equation}
+\noindent y una condición inicial en reposo,
+\begin{equation}
+  \label{eq:ldc_ic}
+  (u,v)(x,y,0) = (0,0) \qquad \forall (x,y)\in\Omega.
+\end{equation}
+
+El número de Reynolds del problema se define (en variables adimensionales) como
+\begin{equation}
+  \label{eq:ldc_re}
+  Re = \frac{U\,L}{\nu}, \qquad L=1,
+\end{equation}
+\noindent donde $U$ es la velocidad de la tapa y $\nu$ la viscosidad cinemática.
+
+Para $Re=10000$, los resultados numéricos obtenidos con el solver desarrollado se presentan en las \cref{fig:ldc_streamlines_re10000,fig:ldc_lineplot_re10000}. En la \cref{fig:ldc_streamlines_re10000} se comparan los mapas de líneas de corriente del flujo en la cavidad: a la izquierda se muestra el campo computado con el solver presente y a la derecha el correspondiente resultado de referencia reportado por Ghia et al. \cite{ghia_high-re_1982}. La \cref{fig:ldc_lineplot_re10000} muestra la comparación del perfil de la componente $x$ de la velocidad a lo largo de la recta $x=0.5$ frente a los datos de Ghia et al. \cite{ghia_high-re_1982}.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/lid_driven_streamlines.png}
+  \caption{Comparación con el benchmark de cavidad inducida por tapa ($Re=10000$): mapas de líneas de corriente (izquierda: solver presente; derecha: Ghia et al. \cite{ghia_high-re_1982}).}
+  \label{fig:ldc_streamlines_re10000}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.55\textwidth]{figures/lidriven_lineplot.png}
+  \caption{Benchmark de cavidad inducida por tapa ($Re=10000$): comparación de la componente $x$ de la velocidad a lo largo de la recta $x=0.5$ frente a los datos de Ghia et al. \cite{ghia_high-re_1982}.}
+  \label{fig:ldc_lineplot_re10000}
+\end{figure}
+
+\subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1, $Re=100$)}
+
+Este benchmark corresponde al caso 2D-1 del proyecto de benchmarking de la DFG/FeatFlow \cite{Schfer1996BenchmarkCO}. La geometría consiste en un canal bidimensional con un obstáculo circular, definido por
+\begin{equation}
+  \label{eq:dfg23_domain}
+  \Omega = [0,2.2]\times[0,0.41]\,\setminus\, B_r(c),
+  \qquad c=(0.2,0.2),\quad r=0.05,
+\end{equation}
+\noindent donde $B_r(c)$ es el disco de radio $r$ centrado en $c$.
+
+% Template: sustituir el path por la imagen del dominio cuando esté disponible
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{figures/dfg_geometry.png}
+  \caption{Geometría del benchmark DFG 2D-1 ($Re=100$): canal $[0,2.2]\times[0,0.41]$ con cilindro centrado en $(0.2,0.2)$ y radio $0.05$.}
+  \label{fig:dfg2d1_geometry}
+\end{figure}
+
+Se consideran las ecuaciones de Navier--Stokes incompresibles (adimensionalizadas con $\rho=1$) en $\Omega$,
+\begin{equation}
+  \label{eq:dfg23_ns}
+  \partial_t u - \nu\,\Delta u + (u\cdot\nabla)u + \nabla p = 0,
+  \qquad \nabla\cdot u = 0,
+\end{equation}
+\noindent con viscosidad cinemática
+\begin{equation}
+  \label{eq:dfg23_nu}
+  \nu = 0.001.
+\end{equation}
+
+Las condiciones de frontera se imponen como sigue. En las paredes superior e inferior del canal y sobre la frontera del cilindro se prescribe no-deslizamiento:
+\begin{equation}
+  \label{eq:dfg23_noslip}
+  u=0\quad \text{en } \Gamma_{\mathrm{walls}}\cup \Gamma_{\mathrm{cyl}},
+\end{equation}
+\noindent donde $\Gamma_{\mathrm{walls}} = ([0,2.2]\times\{0\})\cup([0,2.2]\times\{0.41\})$ y $\Gamma_{\mathrm{cyl}}=\partial B_r(c)$.
+
+En la entrada $\Gamma_{\mathrm{in}}=\{0\}\times[0,0.41]$ se prescribe un perfil parabólico dependiente del tiempo,
+\begin{equation}
+  \label{eq:dfg23_inflow}
+  u(0,y,t)=\left(\frac{4\,U(t)\,y\,(0.41-y)}{0.41^2},\;0\right),
+  \qquad U(t)=1.5\,\sin\left(\frac{\pi t}{8}\right),
+\end{equation}
+\noindent mientras que en la salida $\Gamma_{\mathrm{out}}=\{2.2\}\times[0,0.41]$ se emplea una condición de tipo \textit{do-nothing},
+\begin{equation}
+  \label{eq:dfg23_outflow}
+  \nu\,\partial_{\eta}u - p\,\eta = 0.
+\end{equation}
+
+El número de Reynolds se define usando la velocidad media asociada al perfil de entrada. Para el máximo $U(4)=1.5$ se tiene $U_{\mathrm{mean}}=\tfrac{2}{3}\,1.5=1.0$, y tomando como longitud característica el diámetro del cilindro $L=2r=0.1$ se obtiene
+\begin{equation}
+  \label{eq:dfg23_re}
+  Re = \frac{U_{\mathrm{mean}}\,L}{\nu} = \frac{1.0\cdot 0.1}{0.001}=100.
+\end{equation}
+
+Para la comparación de resultados se miden las fuerzas de arrastre y sustentación sobre el cilindro. Definiendo el tensor de esfuerzos (en esta formulación) como
+\begin{equation}
+  \label{eq:dfg23_stress}
+  \sigma := \nu\,\nabla u - pI,
+\end{equation}
+\noindent las fuerzas se obtienen mediante
+\begin{equation}
+  \label{eq:dfg23_forces}
+  \begin{pmatrix}F_D\\F_L
+  \end{pmatrix}
+  =\int_{\Gamma_{\mathrm{cyl}}}\sigma\,\eta\,ds,
+\end{equation}
+\noindent y los coeficientes adimensionales correspondientes se definen como
+\begin{equation}
+  \label{eq:dfg23_coeffs}
+  C_D = \frac{2}{U_{\mathrm{mean}}^2\,L}\,F_D,
+  \qquad
+  C_L = \frac{2}{U_{\mathrm{mean}}^2\,L}\,F_L.
+\end{equation}
+
+La simulación se realiza en el intervalo de tiempo $t\in[0,8]$ con condición inicial en reposo $u(\cdot,0)=0$.
+
+\subsubsection{Flujo de Taylor-Green 3D}
+
+Este escenario se define en un dominio periódico donde se establece una condición inicial de velocidades y presiones basada en funciones trigonométricas que satisfacen analíticamente las ecuaciones de Navier-Stokes. A medida que el tiempo progresa, el flujo decae debido a los efectos viscosos sin la influencia de fronteras sólidas. La métrica de comparación es la evolución temporal de la energía cinética total del sistema y la tasa de disipación de energía, comparando los valores obtenidos por el solver frente a la solución analítica exacta del problema.
+
+poner las ecuaciones parametros y visual simple, resultados luego
+
+\subsection{Geometría arterial, EAC parametrizable} \label{sec:geom_arterial}
+
+%medidas 10.7759/cureus.46606
+Para estudiar de forma controlada el efecto de la Enfermedad Arterial Coronaria (EAC) en las variables hemodinámicas, se construyen geometrías arteriales con una estenosis axisimétrica parametrizada. En vez de trabajar con unos pocos casos fijos, se usa un parámetro continuo que permite recorrer desde un vaso sano hasta estenosis severas.
+
+Se considera un segmento vascular idealizado definido por dos puntos extremos $\mathbf{P}_0$ y $\mathbf{P}_1$ en $\mathbb{R}^3$. El eje central se define como
+\begin{equation}
+  \label{eq:eac_axis}
+  \mathbf{e} = \frac{\mathbf{P}_1-\mathbf{P}_0}{\|\mathbf{P}_1-\mathbf{P}_0\|},
+  \qquad L = \|\mathbf{P}_1-\mathbf{P}_0\|.
+\end{equation}
+
+Para cualquier punto $\mathbf{x}\in\mathbb{R}^3$, se introduce un sistema de coordenadas locales $(s,r)$ dado por
+\begin{equation}
+  \label{eq:eac_local_coords}
+  s(\mathbf{x}) = \mathbf{e}\cdot(\mathbf{x}-\mathbf{P}_0)
+  \qquad
+  r(\mathbf{x}) = \left\|\left(I-\mathbf{e}\mathbf{e}^T\right)(\mathbf{x}-\mathbf{P}_0)\right\|.
+\end{equation}
+
+El radio del vaso se describe mediante una función $r(s)$ (en el plano $(s,r)$). Para permitir vasos con radio distinto en la entrada y la salida, se fijan dos radios base $R_{\mathrm{in}}$ y $R_{\mathrm{out}}$, y se define el radio de una transición lineal (sin estenosis) como
+\begin{equation}
+  \label{eq:eac_linear_taper}
+  R_{\mathrm{taper}}(s)
+  := R_{\mathrm{in}} + \left(R_{\mathrm{out}}-R_{\mathrm{in}}\right)\frac{s}{L},
+  \qquad s\in[0,L].
+\end{equation}
+Sobre este perfil base, se parametriza el grado de estenosis con un parámetro adimensional
+\begin{equation}
+  \label{eq:eac_severity}
+  \eta \in [0,1],
+  \qquad
+  R_{\min}(\eta)= (1-\eta)\,R_{\mathrm{taper}}(s_m),
+\end{equation}
+\noindent donde $s_m\in(0,L)$ es la posición axial de la estenosis
+y $R_{\min}$ es el radio en ese punto. De este modo, $\eta=0$ representa un vaso sin estenosis y $\eta\to 1$ una constricción extrema.
+
+El perfil axial se construye por tramos. Fuera de la región de estenosis, el radio sigue el perfil lineal:
+\begin{equation}
+  \label{eq:eac_healthy_segments}
+  r(s)=R_{\mathrm{taper}}(s),
+  \qquad s\in[0,\,s_m-d]\cup[s_m+d,\,L].
+\end{equation}
+
+En la región de estenosis $s\in[s_m-d,\,s_m+d]$ se define una spline cúbica $\mathcal{S}(s)$ que interpola los tres puntos clave
+\begin{equation}
+  \label{eq:eac_spline_points}
+  \mathcal{S}(s_m-d)=R_{\mathrm{taper}}(s_m-d),
+  \qquad
+  \mathcal{S}(s_m)=R_{\min},
+  \qquad
+  \mathcal{S}(s_m+d)=R_{\mathrm{taper}}(s_m+d),
+\end{equation}
+\noindent y se imponen condiciones de tangencia en los puntos de empalme con el resto del perfil:
+\begin{equation}
+  \label{eq:eac_end_tangency}
+  \mathcal{S}'(s_m-d)=R_{\mathrm{taper}}'(s_m-d),
+  \qquad
+  \mathcal{S}'(s_m+d)=R_{\mathrm{taper}}'(s_m+d).
+\end{equation}
+
+La distancia $d$ controla qué tan pronunciada es la transición y se define a partir de un parámetro de pendiente $\alpha>0$ como
+\begin{equation}
+  \label{eq:eac_d_alpha}
+  d = \frac{R_{\mathrm{taper}}(s_m)-R_{\min}}{\alpha}.
+\end{equation}
+
+Finalmente, el radio del vaso se define como
+\begin{equation}
+  \label{eq:eac_radius_profile}
+  r(s) := \mathcal{S}(s), \qquad s\in[0,L].
+\end{equation}
+
+El dominio tridimensional se obtiene al revolver el perfil $r(s)$ alrededor del eje central definido por $\mathbf{e}$, generando una geometría axisimétrica. En todo punto la sección transversal se mantiene circular, y el radio local depende únicamente de la coordenada axial $s$.
+
+La discretización espacial se realiza con una malla tetraédrica. El tamaño local de elemento se adapta según la curvatura de la geometría, refinando alrededor de la estenosis y usando elementos más grandes en las zonas anchas.
+\vspace{10pt}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\textwidth]{figures/geometria_arteria.png}
+  \caption{Ejemplo de geometría arterial mallada generada con $\eta=0.75$ y  $\alpha = 0.4$.}
+  \label{fig:eac_geometria_arteria}
+\end{figure}
+
+\subsection{Geometría microvascular, DMV parametrizable} \label{sec:geom_microvascular}
+
+Para representar explícitamente la microcirculación distal, se genera un árbol microvascular sintético utilizando VascuSynth. En particular, VascuSynth construye un grafo dirigido del árbol vascular a partir de un mapa de demanda de oxígeno y lo exporta en formato GXL. Esta salida se utiliza como entrada para un pipeline propio de reconstrucción geométrica y mallado.
+
+Para este trabajo se usó un mapa de damanda de oxigeno uniforme, y como paso previo de preprocesamiento, se ajustan las dimensiones de este mapa de tal forma que represente un cubo de volumen parametrizable.
+
+Además, también se deben especificar valores para estos parámetros que afectan la generación del árbol:
+\begin{itemize}
+  \item Número de terminales ($N$): controla la granularidad del árbol. AL escoger un número mayor de terminales, el radio de estos vasos es necesariamente menor, de esta forma podemos controlar hasta que nivel de la microvasculatura simular.
+  \item Presión de perfusión y presión terminal ($P_{\mathrm{perf}}$, $P_{\mathrm{term}}$): fijan el gradiente de presión del árbol, escencial al escoger los radios de cada vaso para que sean fisiologicamente consistentes.
+  \item Exponente de bifurcación ($\gamma$): La ley de Murray \cite{<cita_murray>} define la relación del radio de la rama padre con los de las dos hijas en una bifurcación. Está dada por
+    \begin{equation}
+      r_{\mathrm{parent}}^{\gamma} = r_{\mathrm{left}}^{\gamma} + r_{\mathrm{right}}^{\gamma}.
+    \end{equation}
+\end{itemize}
+
+A partir del archivo \texttt{GXL}, se parsea el grafo, se escalan posiciones y radios mediante un factor de conversión interno. Posteriormente, cada segmento vascular se reconstruye como un sólido 3D mediante el barrido de secciones circulares sobre splines que conectan nodos consecutivos. En las bifurcaciones, se emplean derivadas/tangentes consistentes y transiciones geométricas suaves (lofts) para asegurar una geometría suave en la unión de ramas.
+
+La geometría resultante se exporta en formato \texttt{BREP} y se discretiza en una malla volumétrica 3D usando \textit{gmsh}. En esta etapa se asignan etiquetas físicas para el volumen del fluido, la entrada, las salidas  y la pared; el etiquetado se realiza identificando de manera automatizada las superficies más cercanas a los puntos asociados a los nodos de interés. El refinamiento de la malla se controla imponiendo un número mínimo de elementos sobre la circunferencia local de cada sección transversal.
+
+\begin{figure}[!ht]
+  \centering
+  % Reemplazar por el archivo real (subir a la carpeta figures/).
+  \includegraphics[width=0.65\linewidth]{figures/arbol.png}
+  \caption{Árbol microvascular sintético generado con $N=5$, $\gamma=3$, $P_{\mathrm{perf}}=133000$, $P_{\mathrm{term}}=80000$, $Q_{\mathrm{in}}=2$ y volumen $=50\,\mathrm{ml}$.}
+  \label{fig:arbol-microvascular-N5-gamma3}
+\end{figure}
+
+Además de los parámetros globales de generación, se incorporan dos mecanismos simplificados para parametrizar la DMV sobre el árbol microvascular sintético: (i) la \emph{rarefacción capilar}, entendida como una reducción efectiva de la densidad microvascular distal por pérdida/eliminación de vasos, y (ii) el \emph{engrosamiento del lumen} en la microvasculatura, modelado como un cambio multiplicativo del radio en ciertos niveles del árbol. Estos mecanismos se introducen de forma controlada para explorar su impacto hemodinámico.~\cite{<cita_rarefaccion>,<cita_engrosamiento>}
+
+El engrosamiento se implementa aplicando un factor multiplicativo $f_{\mathrm{thick}}$ al radio de los vasos a partir de un umbral de nivel $L_{\mathrm{th}}$ en el árbol. En la práctica, para cada segmento se consulta el nivel asociado al nodo proximal y, si dicho nivel es mayor o igual que $L_{\mathrm{th}}$, se actualiza su radio multiplicándolo por $f_{\mathrm{thick}}$. Este esquema permite concentrar el remodelado en la microvasculatura distal y dejar sin cambios los segmentos proximales.
+
+\begin{figure}[!ht]
+  \centering
+  % Reemplazar por los archivos reales (subir a la carpeta figures/).
+  \includegraphics[width=0.49\linewidth]{figures/arbol_sin_engrosamiento.png}\hfill
+  \includegraphics[width=0.49\linewidth]{figures/arbol_con_engrosamiento.png}
+  \caption{Comparación del mismo árbol microvascular sin engrosamiento (izquierda) y con engrosamiento (derecha). Parámetro usado: $f_{\mathrm{thick}}=\,$\textit{[por definir]} y $L_{\mathrm{th}}=\,$\textit{[por definir]}.}
+  \label{fig:arbol-contra-engrosamiento}
+\end{figure}
+
+
+La rarefacción se modela como una poda aleatoria del árbol, se asigna a cada nodo una probabilidad de eliminación que aumenta con su nivel, escalada por un factor global de severidad. Cuando un nodo es marcado para eliminación, se elimina también todos los vasos que derivan de él, de modo que la estructura final siga siendo un árbol válido. Tras la poda, se reconstruye el conjunto de nodos y aristas activos eliminando los elementos que quedaron desconectados o pertenecen a subárboles removidos. Este procedimiento reduce la densidad de vasos terminales de forma controlada y reproducible.
+
+\begin{figure}[!ht]
+  \centering
+  % Reemplazar por los archivos reales (subir a la carpeta figures/).
+  \includegraphics[width=0.49\linewidth]{figures/arbol_sin_rarefaccion.png}\hfill
+  \includegraphics[width=0.49\linewidth]{figures/arbol_con_rarefaccion.png}
+  \caption{Comparación del mismo árbol microvascular sin rarefacción (izquierda) y con rarefacción (derecha). Parámetro usado: factor de rarefacción $=\,$\textit{[por definir]}.}
+  \label{fig:arbol-contra-rarefaccion}
+\end{figure}
+
+
+\subsection{Acoplamiento}
+
+Para acoplar la geometría de la estenosis con el árbol microvascular, se introduce una sección de transición con forma de cono truncado, cuyo radio varía suavemente desde el radio de salida de la estenosis hasta el radio de entrada del árbol. De esta forma se conserva una geometría suave en el empalme y se evitan discontinuidades geométricas. La transición se controla mediante un parámetro de pendiente.
+
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=0.65\linewidth]{figures/acoplamiento_estenosis_arbol.png}
+  \caption{Ejemplo de acoplamiento con pendiente = 0.05.}
+  \label{fig:acoplamiento-estenosis-arbol}
+\end{figure}
+
+\subsection{Plataforma para la implementación}
+
+La implementación del modelo numérico se construye sobre un ecosistema de código abierto, priorizando la transparencia y la reproducibilidad de los resultados. Para ello, el desarrollo se basa en la integración de dos librerías principales que permiten abordar la complejidad del problema:
+
+\begin{itemize}
+  \item \textbf{FEniCSx:} Se utiliza para la definición de las formas variacionales y su asociación con la geometría del dominio \cite{BarattaEtal2023}. Esta librería permite realizar la discretización y el ensamblaje del sistema de ecuaciones, integrando las condiciones de frontera previamente definidas.
+
+  \item \textbf{PETSc:} Se encarga de resolver los sistemas de ecuaciones resultantes de forma paralela y eficiente \cite{dalcin_parallel_2011}. En este sentido, se emplea el método de Newton para la no linealidad y los métodos de Krylov para la resolución iterativa de los sistemas lineales, garantizando un alto rendimiento computacional.
+\end{itemize}
+
+El sistema ha sido diseñado bajo una arquitectura modular de tres capas que separa la física del problema, el método numérico y la orquestación del experimento:
+
+\begin{itemize}
+  \item \textbf{Scenario:} Define la física del problema: geometría del dominio, propiedades del fluido ($\mu$, $\rho$), condiciones iniciales y condiciones de frontera (velocidad y presión). Toda nueva geometría o escenario físico se implementa heredando de esta clase abstracta, sobrescribiendo únicamente los métodos \texttt{mesh}, \texttt{bcu}, \texttt{bcp} e \texttt{initial\_velocity}.
+
+  \item \textbf{Solver:} Contiene el esquema numérico para las ecuaciones de Navier--Stokes incompresibles: definición de las formas variacionales, integración temporal y aplicación de condiciones de contorno. Distintos solvers (\textit{estabilizado por bloques}, \textit{Schur}, \textit{LSC}, entre otros) heredan de esta clase y pueden intercambiarse sin modificar el escenario.
+
+  \item \textbf{Simulation:} Actúa como orquestador del experimento: recibe una instancia de \texttt{Scenario} y un \texttt{Solver}, gestiona el bucle temporal, el guardado de resultados y la trazabilidad de los parámetros. Desacopla completamente la lógica de ejecución de la física y del esquema numérico, permitiendo combinar cualquier escenario con cualquier solver y repetir o extender experimentos sin reescribir código.
+\end{itemize}
+
+Esta separación en capas permite, por ejemplo, evaluar distintos esquemas numéricos sobre una misma geometría, o probar diferentes condiciones de frontera sin modificar el solver. Para incorporar un nuevo escenario basta con implementar una subclase de \texttt{Scenario}; para añadir un nuevo esquema numérico, una subclase de \texttt{Solver}.
+
+
+Específicamente para el escenario de la enfermedad coronaria, se combinan las geometrías de la arteria \ref{sec:geom_arterial} y de la microvasculatura \ref{sec:geom_microvascular}. Este escenario se instancia a partir de archivos de configuración en formato YAML, en donde se especifican todos los parámetros necesarios, que comprenden la elección del escenario, generación de la geometría, parámetros físicos del flujo, parámetros del esquema numérico y elección de condiciones de frontera.
+
+A continuación se detallan todos los parámetros disponibles en el sistema de configuración:
+
+\begin{description}
+
+  \item[\texttt{artery\_params}.] Parámetros de la arteria y la estenosis:\leavevmode
+  \begin{itemize}
+    \item \texttt{radius\_in} [mm]: Radio de la arteria en la sección de entrada.
+    \item \texttt{radius\_out} [mm]: Radio de la arteria en la sección de salida, en el punto de conexión con el árbol microvascular.
+    \item \texttt{length} [mm]: Longitud del segmento arterial principal.
+    \item \texttt{coupling\_slope} [adimensional]: Pendiente del cono de transición que empalma la arteria con el árbol. Un valor menor produce una transición más gradual.
+    \item \texttt{stenosis\_severity} [adimensional]: Severidad de la estenosis ($\eta \in [0, 1]$); $\eta = 0$ representa un vaso sano y $\eta \to 1$ una oclusión extrema.
+    \item \texttt{stenosis\_position} [adimensional $\in [0,1]$]: Posición relativa de la estenosis a lo largo del eje axial ($s_m / L$); $0$ es el extremo proximal y $1$ el distal.
+    \item \texttt{stenosis\_slope} [adimensional]: Parámetro de pendiente $\alpha$ que controla cuán abrupta es la transición en la zona de estenosis.
+  \end{itemize}
+
+  \item[\texttt{tree\_params}.] Parámetros de la microvasculatura:\leavevmode
+  \begin{itemize}
+    \item \texttt{perf\_pressure} [dyn/cm$^2$]: Presión de perfusión objetivo empleada por \textit{VascuSynth} para dimensionar los radios del árbol ($\approx 133\,322$ dyn/cm$^2$ $\approx$ 100 mmHg).
+    \item \texttt{term\_pressure} [dyn/cm$^2$]: Presión objetivo en los nodos terminales empleada por \textit{VascuSynth}.
+    \item \texttt{tree\_volume} [ml]: Volumen del dominio cúbico que contiene el árbol microvascular. Determina la escala física de la red.
+    \item \texttt{n\_terminal} [entero]: Número de vasos terminales; controla la densidad y la resolución de la red distal.
+    \item \texttt{murray\_exponent} [adimensional]: Exponente $\gamma$ de la ley de Murray, que rige la relación de radios en cada bifurcación: $r_\text{parent}^\gamma = r_\text{left}^\gamma + r_\text{right}^\gamma$.
+    \item \texttt{mu} [g/(mm$\cdot$s)]: Viscosidad dinámica de la sangre ($\mu \approx 0.0035\,\text{Pa}\cdot\text{s}$). Utilizada por \textit{VascuSynth} para el dimensionamiento hidráulico del árbol.
+    \item \texttt{rho} [g/mm$^3$]: Densidad de la sangre ($\rho \approx 0.00106\,\text{g/mm}^3$). Utilizada por \textit{VascuSynth} durante la generación del árbol.
+    \item \texttt{lumen\_thickening\_factor} [adimensional]: Factor multiplicativo aplicado al radio de los vasos distales para simular el engrosamiento de la pared microvascular en la DMV. Valor $= 1$ implica sin engrosamiento.
+    \item \texttt{vessel\_loss\_factor} [adimensional $\in [0,1]$]: Factor de severidad de rarefacción capilar; controla la probabilidad de eliminación de ramas distales del árbol sintético.
+    \item \texttt{hyperemia\_dilation\_factor} [adimensional]: Factor multiplicativo de vasodilatación aplicado a los radios del árbol cuando \texttt{hyperemia = true}.
+  \end{itemize}
+
+  \item[\texttt{simulation\_params}.] Parámetros del esquema numérico y condiciones de frontera:\leavevmode
+  \begin{itemize}
+    \item \texttt{T} [s]: Tiempo físico total a simular.
+    \item \texttt{dt} [s]: Paso de tiempo $\Delta t$ para la integración temporal.
+    \item \texttt{solver}: Esquema numérico empleado. Opciones disponibles: \texttt{stabilized\_staggered}, \texttt{stabilized\_schur}, \texttt{stabilized\_schur\_lsc}, \texttt{solver1}, \texttt{solver2}.
+    \item \texttt{mu} [g/(mm$\cdot$s)]: Viscosidad dinámica de la sangre usada en el esquema numérico.
+    \item \texttt{rho} [g/mm$^3$]: Densidad de la sangre usada en el esquema numérico.
+    \item \texttt{q\_in} [ml/s]: Caudal volumétrico de entrada en condiciones basales. Cuando se prescribe una condición de frontera de velocidad en la entrada, este valor se divide por el área de la sección transversal para obtener la velocidad media $\bar{u} = q_{\mathrm{in}} / A_{\mathrm{in}}$ con la cual se prescribe el perfil de velocidad, ya sea uniforme o parabólico.
+    \item \texttt{q\_in\_hyper} [ml/s]: Caudal volumétrico de entrada en hiperemia, utilizado de forma análoga a \texttt{q\_in} cuando \texttt{hyperemia = true}.
+    \item \texttt{p\_inlet} [dyn/cm$^2$]: Presión estática prescrita en la entrada, utilizada cuando la condición de frontera de entrada es de tipo presión.
+    \item \texttt{p\_terminal} [dyn/cm$^2$]: Presión estática prescrita en las salidas del dominio (arteria o árbol), utilizada cuando la condición de frontera de salida es de tipo presión.
+    \item \texttt{bc\_type}: Especifica las condiciones de frontera de entrada y salida:
+    \begin{itemize}
+      \item \texttt{bc\_type.inlet}: Condición en la entrada. Valores posibles:
+        \texttt{velocity\_parabolic} perfil de Poiseuille
+        \texttt{velocity\_constant} perfil uniforme,
+        \texttt{pressure} presión constante.
+      \item \texttt{bc\_type.outlet}: Condición en la salida. Valores posibles:
+        \texttt{pressure} presión constante,
+        \texttt{none} salida libre,
+        \texttt{velocity\_zero} velocidad nula, como una pared.
+    \end{itemize}
+    \item \texttt{geometry\_type}: Topología de la malla sobre la que se ejecuta la simulación: \texttt{stenosis} (solo arteria), \texttt{tree} (solo árbol microvascular) o \texttt{full} (geometría acoplada completa).
+    \item \texttt{hyperemia} [booleano]: Si es \texttt{true}, el escenario usa \texttt{q\_in\_hyper} en lugar de \texttt{q\_in} y activa la vasodilatación del árbol según \texttt{hyperemia\_dilation\_factor}.
+  \end{itemize}
+
+  \item[\texttt{matrix}.] Matriz de experimentos:
+  Esta sección es opcional y se usa cuando se desea ejecutar un experimento de múltiples escenarios. Cada clave acepta una lista de valores; se calcula el producto cartesiano de todas las listas y se genera un escenario para cada combinación. Los valores de \texttt{matrix} tienen precedencia sobre los declarados en las secciones anteriores para ese escenario concreto.
+
+  Cualquier parámetro de las secciones anteriores puede incluirse en la matriz.
+\end{description}
+
+
+Finalmente, con el objetivo de garantizar la trazabilidad, cada resultado se almacena junto con sus metadatos correspondientes. La información se organiza automáticamente en subcarpetas con una jerarquía que identifica claramente el tipo de simulación, el solver empleado y los parámetros específicos de la ejecución, facilitando el post-procesamiento y los análisis posteriores.
+
+
+\subsection{Condiciones de frontera}
+
+\subsection{Simulación}
+
+Todas las simulaciones numéricas reportadas en este trabajo se ejecutaron en la infraestructura de Cómputo de Alto Desempeño (HPC) de la Universidad del Rosario, a través del Laboratorio de Computación Avanzada -- CALDAS.
+
+\paragraph{(Template) Recursos computacionales y entorno.}
+\textit{[Especificar: nombre del clúster/partición (si aplica), número de nodos y núcleos usados por corrida, tipo de CPU/GPU, RAM por nodo, sistema operativo, y gestor de colas (p. ej., Slurm/PBS).]}
+
+\paragraph{(Template) Software y versiones.}
+\textit{[Especificar: solver (p. ej., FEniCSx/SimVascular u otro), versiones, compiladores, bibliotecas (PETSc/MPI), y configuración relevante (p. ej., flags de compilación, precisión, etc.).]}
+
+\paragraph{(Template) Configuración numérica.}
+\textit{[Especificar: régimen (estacionario/transitorio), esquema temporal, paso de tiempo $\Delta t$, tiempo total simulado, criterios de convergencia, tolerancias absolutas/relativas, precondicionador/solucionador lineal, y número máximo de iteraciones.]}
+
+\paragraph{(Template) Malla y estudio de convergencia.}
+\textit{[Especificar: número de elementos/grados de libertad por caso, estrategia de refinamiento (garganta/bifurcaciones), métricas de calidad, y si se realizó estudio de independencia de malla (qué magnitud se monitoreó y umbral de cambio).]}
+
+\paragraph{(Template) Postproceso y variables reportadas.}
+\textit{[Especificar: cómo se computan $\Delta p$, WSS, caudales, vFFR/índices funcionales, promedios temporales, y software de visualización (p. ej., ParaView) si aplica.]}
+
+\section{Resultados}
+Reporte de hallazgos sin interpretaciones.
+
+\begin{itemize}
+  \item resultados de la validacion?
+  \item experimentos de esquemas numericos? compararlos entre ellos
+  \item analisis parametros hemodinamicos en CAD (lo de cilamce)
+  \item de aca en adelante, lo de arboles microvasculares? lo de el acoplamiento y los analisis de las simulaciones.
+\end{itemize}
+
+\section{Discusión}
+Análisis en relación con hipótesis y otros trabajos.
+
+\section*{Agradecimientos}
+Agradecemos a los docentes Diana Consuelo Rodríguez Burbano y Sebastián Jaramillo Isaza de la Facultad de Ciencias de la Salud por su disposición en las reuniones iniciales en las que se compartió el contexto y la problemática que dieron origen a este trabajo.
+
+Agradecemos a la Universidad del Rosario por proporcionar acceso a la infraestructura HPC a través del Laboratorio de Computación Avanzada – CALDAS.
+
+\bibliographystyle{ieeetr} % Formato IEEE solicitado
+\bibliography{bibliography} % Nombre de tu archivo .bib
+
+\end{document}

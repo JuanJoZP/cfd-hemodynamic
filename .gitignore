@@ -14,3 +14,14 @@ results/
 fenicsx.sif
 vascusynth.sif
 *.gz
+
+#latex
+*.aux
+*.log
+*.out
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.pdf
