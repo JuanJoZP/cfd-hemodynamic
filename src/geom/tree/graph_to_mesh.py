@@ -292,10 +292,39 @@ def tag_and_mesh_with_gmsh(
         pass
 
     volumes = gmsh.model.getEntities(dim=3)
-    assert len(volumes) == 1
-    gmsh.model.addPhysicalGroup(volumes[0][0], [volumes[0][1]], 4)
-    gmsh.model.setPhysicalName(volumes[0][0], 4, "Fluid")
-    print(f"[INFO] Fluid volume assigned to volume {volumes[0][1]}")
+
+    if len(volumes) == 0:
+        print("[WARN] No solid found; building volume from shell surfaces...")
+        surfaces = gmsh.model.getEntities(dim=2)
+        if not surfaces:
+            raise RuntimeError("No volumes and no surfaces found in BREP.")
+        surf_tags = [s[1] for s in surfaces]
+        try:
+            loop = gmsh.model.occ.addSurfaceLoop(surf_tags)
+            gmsh.model.occ.addVolume([loop])
+            gmsh.model.occ.synchronize()
+            volumes = gmsh.model.getEntities(dim=3)
+            print(f"[INFO] Volume created from shell ({len(surf_tags)} surfaces).")
+        except Exception as e:
+            raise RuntimeError(f"Could not create volume from shell: {e}")
+
+    if len(volumes) == 0:
+        raise RuntimeError("No volumes found in BREP — geometry likely failed.")
+
+    if len(volumes) > 1:
+        print(f"[WARN] {len(volumes)} volumes; attempting union...")
+        try:
+            gmsh.model.occ.fuse([volumes[0]], volumes[1:])
+            gmsh.model.occ.synchronize()
+            volumes = gmsh.model.getEntities(dim=3)
+            print(f"[INFO] After union: {len(volumes)} volume(s).")
+        except Exception as e:
+            print(f"[WARN] Union failed ({e}); tagging all volumes as Fluid.")
+
+    vol_tags = [v[1] for v in volumes]
+    gmsh.model.addPhysicalGroup(3, vol_tags, 4)
+    gmsh.model.setPhysicalName(3, 4, "Fluid")
+    print(f"[INFO] Fluid volume(s) assigned: {vol_tags}")
 
     surfaces = gmsh.model.getBoundary(volumes, oriented=False)
     surf_centers = {}
