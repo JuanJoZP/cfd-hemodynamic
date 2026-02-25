@@ -32,7 +32,7 @@ tar -czvf "$OUTPUT_FILE" \
     --exclude='results' \
     --exclude='*.sif' \
     src/ \
-    main.py \
+    *.py \
 
 echo ""
 echo "✅ Archivo creado: $OUTPUT_FILE"
