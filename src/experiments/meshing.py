@@ -143,14 +143,7 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
 
         print(f"\n[STEP] --- Experimento: {exp_name} (ID: {i}) ---")
 
-        r_in = base_params["radius_in"]
-        r_out = base_params["radius_out"]
-        length = base_params["length"]
-        severity = experiment.get("stenosis_severity", 0.0)
-
-        r_base_mid = (r_in + r_out) / 2
-        min_radius = (1 - severity) * r_base_mid
-
+        current_params = {**base_params, **experiment}
         tree_xml_path = exp_dir / "tree_structure.xml"
 
         try:
@@ -199,20 +192,18 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                 )
                 from src.geom.tree.tree_model import VascularTree
 
-                # Setup Common Params
-                start_pt = np.array([0, 0, 0])
-                end_pt = np.array([length, 0, 0])
-                stenosis_dir = end_pt - start_pt
-                stenosis_dir = stenosis_dir / np.linalg.norm(stenosis_dir)
-
                 # --- CASE 1: Pure Stenosis ---
                 if geometry_type == "stenosis":
                     print("[INFO] Generando SOLO estenosis (sin arbol)...")
-                    current_params = {**base_params, **experiment}
 
-                    # Generate logic similar to stenosis.py main
+                    r_in = current_params["radius_in"]
+                    r_out = current_params["radius_out"]
+                    length = current_params["length"]
+                    severity = current_params.get("stenosis_severity", 0.0)
+                    min_radius = (1 - severity) * ((r_in + r_out) / 2)
+                    start_pt = np.array([0, 0, 0])
+                    end_pt = np.array([length, 0, 0])
 
-                    # Check slope
                     slope = current_params.get("stenosis_slope", 0.5)
                     pos = current_params.get("stenosis_position", 0.5)
 
@@ -301,7 +292,15 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
 
                 # --- CASE 3: Tree + Stenosis (Default) ---
                 print("[INFO] Generando y malleando estenosis para coupling...")
-                current_params = {**base_params, **experiment}
+
+                r_in = current_params["radius_in"]
+                r_out = current_params["radius_out"]
+                length = current_params["length"]
+                severity = current_params.get("stenosis_severity", 0.0)
+                min_radius = (1 - severity) * ((r_in + r_out) / 2)
+                start_pt = np.array([0, 0, 0])
+                end_pt = np.array([length, 0, 0])
+                stenosis_dir = (end_pt - start_pt) / np.linalg.norm(end_pt - start_pt)
 
                 solid_stenosis = generate_stenosis_geometry(
                     tuple(start_pt),
@@ -316,7 +315,7 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                 # We do NOT mesh stenosis separately anymore.
 
                 print(f"[INFO] Cargando arbol desde {tree_xml_path}...")
-                tree_params = {**base_params, **experiment}
+                tree_params = current_params.copy()
 
                 # Recalcular voxel_width
                 tree_volume = tree_params.get("tree_volume", 70.0)
