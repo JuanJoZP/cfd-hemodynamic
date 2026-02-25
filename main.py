@@ -165,12 +165,6 @@ def main():
         help="Number of MPI cores per job (for HPC solve)",
     )
     exp_solve_parser.add_argument(
-        "--mesh_source_dir",
-        type=str,
-        default=None,
-        help="Optional directory to look for meshes (override)",
-    )
-    exp_solve_parser.add_argument(
         "--watch",
         action="store_true",
         default=False,

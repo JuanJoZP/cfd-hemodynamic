@@ -53,13 +53,10 @@ def run(args, _unknown=None):
 
         from .solving import run_solving
 
-        # Extract mesh_source_dir if present
-        mesh_source_dir = getattr(args, "mesh_source_dir", None)
         run_solving(
             config_path,
             output_path,
             job_idx=args.job_idx,
-            mesh_source_dir=mesh_source_dir,
         )
     else:
         print("[ERROR] Subcomando de experiment no reconocido. Use 'mesh' o 'solve'.")

@@ -16,7 +16,7 @@ if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
 
-def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
+def run_solving(config_path, output_base, job_idx=None):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
@@ -79,13 +79,6 @@ def run_solving(config_path, output_base, job_idx=None, mesh_source_dir=None):
         mesh_path = (
             exp_dir / "mesh.msh"
         )  # Default: Look in the experiment folder itself
-
-        if mesh_source_dir:
-            # If explicit mesh source override provided
-            explicit_mesh_base = Path(mesh_source_dir)
-            explicit_mesh_path = explicit_mesh_base / exp_name / "mesh.msh"
-            if explicit_mesh_path.exists():
-                mesh_path = explicit_mesh_path
 
         if not mesh_path.exists():
             # Fallback logic for legacy structures (results vs meshes)
