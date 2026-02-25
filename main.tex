@@ -369,21 +369,7 @@ El número de Reynolds del problema se define (en variables adimensionales) como
 \end{equation}
 \noindent donde $U$ es la velocidad de la tapa y $\nu$ la viscosidad cinemática.
 
-Para $Re=10000$, los resultados numéricos obtenidos con el solver desarrollado se presentan en las \cref{fig:ldc_streamlines_re10000,fig:ldc_lineplot_re10000}. En la \cref{fig:ldc_streamlines_re10000} se comparan los mapas de líneas de corriente del flujo en la cavidad: a la izquierda se muestra el campo computado con el solver presente y a la derecha el correspondiente resultado de referencia reportado por Ghia et al. \cite{ghia_high-re_1982}. La \cref{fig:ldc_lineplot_re10000} muestra la comparación del perfil de la componente $x$ de la velocidad a lo largo de la recta $x=0.5$ frente a los datos de Ghia et al. \cite{ghia_high-re_1982}.
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=0.75\textwidth]{figures/lid_driven_streamlines.png}
-  \caption{Comparación con el benchmark de cavidad inducida por tapa ($Re=10000$): mapas de líneas de corriente (izquierda: solver presente; derecha: Ghia et al. \cite{ghia_high-re_1982}).}
-  \label{fig:ldc_streamlines_re10000}
-\end{figure}
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=0.55\textwidth]{figures/lidriven_lineplot.png}
-  \caption{Benchmark de cavidad inducida por tapa ($Re=10000$): comparación de la componente $x$ de la velocidad a lo largo de la recta $x=0.5$ frente a los datos de Ghia et al. \cite{ghia_high-re_1982}.}
-  \label{fig:ldc_lineplot_re10000}
-\end{figure}
+% Los resultados obtenidos para este escenario se presentan detalladamente en la Sección \ref{sec:resultados_validacion}.
 
 \subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1, $Re=100$)}
 
@@ -590,7 +576,7 @@ El engrosamiento se implementa aplicando un factor multiplicativo $f_{\mathrm{th
   % Reemplazar por los archivos reales (subir a la carpeta figures/).
   \includegraphics[width=0.49\linewidth]{figures/arbol_sin_engrosamiento.png}\hfill
   \includegraphics[width=0.49\linewidth]{figures/arbol_con_engrosamiento.png}
-  \caption{Comparación del mismo árbol microvascular sin engrosamiento (izquierda) y con engrosamiento (derecha). Parámetro usado: $f_{\mathrm{thick}}=\,$\textit{[por definir]} y $L_{\mathrm{th}}=\,$\textit{[por definir]}.}
+  \caption{Comparación del mismo árbol microvascular sin engrosamiento (izquierda) y con engrosamiento (derecha). Parámetro usado: $f_{\mathrm{thick}}=\,$\textit{0.4} y $L_{\mathrm{th}}=\,$\textit{2}.}
   \label{fig:arbol-contra-engrosamiento}
 \end{figure}
 
@@ -602,7 +588,7 @@ La rarefacción se modela como una poda aleatoria del árbol, se asigna a cada n
   % Reemplazar por los archivos reales (subir a la carpeta figures/).
   \includegraphics[width=0.49\linewidth]{figures/arbol_sin_rarefaccion.png}\hfill
   \includegraphics[width=0.49\linewidth]{figures/arbol_con_rarefaccion.png}
-  \caption{Comparación del mismo árbol microvascular sin rarefacción (izquierda) y con rarefacción (derecha). Parámetro usado: factor de rarefacción $=\,$\textit{[por definir]}.}
+  \caption{Comparación del mismo árbol microvascular sin rarefacción (izquierda) y con rarefacción (derecha). Parámetro usado: factor de rarefacción $=\,$\textit{0.5}.}
   \label{fig:arbol-contra-rarefaccion}
 \end{figure}
 
@@ -667,7 +653,8 @@ A continuación se detallan todos los parámetros disponibles en el sistema de c
     \item \texttt{murray\_exponent} [adimensional]: Exponente $\gamma$ de la ley de Murray, que rige la relación de radios en cada bifurcación: $r_\text{parent}^\gamma = r_\text{left}^\gamma + r_\text{right}^\gamma$.
     \item \texttt{mu} [g/(mm$\cdot$s)]: Viscosidad dinámica de la sangre ($\mu \approx 0.0035\,\text{Pa}\cdot\text{s}$). Utilizada por \textit{VascuSynth} para el dimensionamiento hidráulico del árbol.
     \item \texttt{rho} [g/mm$^3$]: Densidad de la sangre ($\rho \approx 0.00106\,\text{g/mm}^3$). Utilizada por \textit{VascuSynth} durante la generación del árbol.
-    \item \texttt{lumen\_thickening\_factor} [adimensional]: Factor multiplicativo aplicado al radio de los vasos distales para simular el engrosamiento de la pared microvascular en la DMV. Valor $= 1$ implica sin engrosamiento.
+    \item \texttt{wall\_thickening\_severity} [adimensional $\in [0,1]$]: Severidad de la microangiopatía, modelada como engrosamiento de la pared arteriolar y capilar que estrecha el lumen. El factor reduce el radio efectivo de los vasos distales: $r_\text{eff} = r \cdot (1 - \eta_w)$, donde $\eta_w = 0$ representa vasculatura sana y $\eta_w \to 1$ una oclusión completa del lumen. Este parámetro se aplica a los vasos a partir del nivel de árbol definido por \texttt{thickening\_level\_threshold}.
+    \item \texttt{thickening\_level\_threshold} [entero]: Nivel del árbol a partir del cual se aplica el engrosamiento de pared. Los vasos en niveles inferiores al umbral (más proximales) no se ven afectados, concentrando la patología en la microvasculatura distal.
     \item \texttt{vessel\_loss\_factor} [adimensional $\in [0,1]$]: Factor de severidad de rarefacción capilar; controla la probabilidad de eliminación de ramas distales del árbol sintético.
     \item \texttt{hyperemia\_dilation\_factor} [adimensional]: Factor multiplicativo de vasodilatación aplicado a los radios del árbol cuando \texttt{hyperemia = true}.
   \end{itemize}
@@ -730,10 +717,42 @@ Todas las simulaciones numéricas reportadas en este trabajo se ejecutaron en la
 \textit{[Especificar: cómo se computan $\Delta p$, WSS, caudales, vFFR/índices funcionales, promedios temporales, y software de visualización (p. ej., ParaView) si aplica.]}
 
 \section{Resultados}
-Reporte de hallazgos sin interpretaciones.
+
+\subsection{Validación de esquemas numéricos} \label{sec:resultados_validacion}
+
+Para evaluar el desempeño y la precisión del solver implementado, se presentan a continuación los resultados obtenidos correspondientes a los diferentes benchmarks de validación introducidos en la sección anterior.
+
+\subsubsection{Flujo en cavidad inducida por tapa (Lid-Driven Cavity)}
+
+La \cref{fig:ldc_lineplot_re1000} muestra la comparación del perfil de la componente $x$ de la velocidad a lo largo de la recta $x=0.5$ utilizando diferentes esquemas numéricos, frente a los datos de referencia reportados por Ghia et al. \cite{ghia_high-re_1982} para $Re=1000$.
+
+% \begin{figure}[htbp]
+%   \centering
+%   \includegraphics[width=0.6\textwidth]{figures/template_lidriven_lineplot_solvers.png}
+%   \caption{Benchmark de cavidad inducida por tapa ($Re=1000$): comparación de la componente $x$ de la velocidad en la recta $x=0.5$ para los distintos solvers configurados, frente a los datos de Ghia et al. \cite{ghia_high-re_1982}.}
+%   \label{fig:ldc_lineplot_re1000}
+% \end{figure}
+
+% Adicionalmente, en la \cref{fig:ldc_streamlines_re1000} se contrastan cualitativamente los mapas de líneas de corriente desarrollados en la cavidad.
+
+% \begin{figure}[htbp]
+%   \centering
+%   \includegraphics[width=0.8\textwidth]{figures/template_lid_driven_streamlines.png}
+%   \caption{Mapas de líneas de corriente en la cavidad inducida por tapa ($Re=10000$): (Izquierda) Resultados del solver implementado; (Derecha) Referencia de Ghia et al. \cite{ghia_high-re_1982}.}
+%   \label{fig:ldc_streamlines_re10000}
+% \end{figure}
+
+\subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1)}
+
+% Template: Presentar los resultados obtenidos frente a los valores de referencia (fuerzas de arrastre y sustentación, etc.).
+
+\subsubsection{Flujo de Taylor-Green 3D}
+
+% Template: Presentar curvas de decaimiento de energía cinética y la tasa de disipación frente a la solución analítica.
+
+\subsection{Resultados principales de simulación}
 
 \begin{itemize}
-  \item resultados de la validacion?
   \item experimentos de esquemas numericos? compararlos entre ellos
   \item analisis parametros hemodinamicos en CAD (lo de cilamce)
   \item de aca en adelante, lo de arboles microvasculares? lo de el acoplamiento y los analisis de las simulaciones.
