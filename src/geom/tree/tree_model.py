@@ -60,36 +60,123 @@ class VascularTree:
         return levels
 
     def _prune_tree(self, factor, levels, max_level):
-        to_remove = set()
-        for nid, lvl in levels.items():
-            if lvl > 1 and random.random() < factor * (lvl / max_level):
-                to_remove.add(nid)
+        """Remove edges until count ≤ original * (1 - factor).
 
+        The geometry mesher requires every internal node to have exactly 2
+        outgoing edges.  To honour this invariant, pruning always removes
+        **both** children of a bifurcation (turning the parent into a terminal
+        leaf).  Bifurcations are pruned deepest-first so that the most distal
+        vessels are lost first, which is biologically plausible for vessel loss.
+
+        Parameters
+        ----------
+        factor : float ∈ (0, 1]
+            Fraction of edges to remove.  The algorithm stops as soon as the
+            remaining edge count is at or below ``original_edges * (1 - factor)``.
+        """
+        original_count = len(self.edges)
+        target_count = original_count * (1.0 - factor)
+
+        # Build adjacency (parent -> children).
         adj = {}
         for e in self.edges:
             adj.setdefault(e["from"], []).append(e["to"])
 
-        final_remove = set()
+        removed = set()
 
-        def collect(nid):
-            if nid not in final_remove:
-                final_remove.add(nid)
-                for c in adj.get(nid, []):
-                    collect(c)
+        def count_subtree(nid):
+            """Count nid + all descendants not yet removed."""
+            if nid in removed:
+                return 0
+            total = 1
+            for c in adj.get(nid, []):
+                total += count_subtree(c)
+            return total
 
-        for r in to_remove:
-            collect(r)
+        def collect_subtree(nid):
+            """Recursively add nid and all its descendants to removed."""
+            if nid in removed:
+                return
+            removed.add(nid)
+            for c in adj.get(nid, []):
+                collect_subtree(c)
 
+        current_count = original_count
+
+        # Identify "leaf bifurcations": nodes whose both children are leaves
+        # (i.e. have no children themselves).  These are the safest to prune
+        # because removing both children only affects the parent.
+        # We iterate deepest-first until we hit the target edge count.
+        while current_count > target_count:
+            # Rebuild leaf-bifurcation candidates each iteration (some parents
+            # may become new leaf-bifurcations after their children were pruned).
+            candidates = []
+            for p, children in adj.items():
+                if p in removed:
+                    continue
+                live = [c for c in children if c not in removed]
+                if len(live) != 2:
+                    continue
+                # Both live children must themselves be leaves (0 live children)
+                both_leaves = all(
+                    (
+                        all(gc in removed for gc in adj.get(c, [])) and True
+                        if adj.get(c)
+                        else True
+                    )
+                    for c in live
+                )
+                if both_leaves:
+                    # Use max level of the two children for ordering
+                    lvl = max(levels.get(c, 0) for c in live)
+                    candidates.append((lvl, p, live))
+
+            if not candidates:
+                # No more leaf-bifurcations available; stop.
+                break
+
+            # Sort deepest first, randomise within same level.
+            random.shuffle(candidates)
+            candidates.sort(key=lambda x: x[0], reverse=True)
+
+            # Prune one bifurcation at a time, re-check target after each.
+            lvl, p, live = candidates[0]
+            # Count how many edges will be removed (edges whose from or to
+            # is in the subtrees of both children).
+            edges_lost = 0
+            for c in live:
+                edges_lost += count_subtree(c)
+            for c in live:
+                collect_subtree(c)
+            current_count -= edges_lost
+
+        # Rebuild edges, nodes, node_types from survivors.
         self.edges = [
-            e
-            for e in self.edges
-            if e["from"] not in final_remove and e["to"] not in final_remove
+            e for e in self.edges if e["from"] not in removed and e["to"] not in removed
         ]
         active = {e["from"] for e in self.edges} | {e["to"] for e in self.edges}
+        # Always keep root nodes, even if they have no edges after pruning
+        # (build_mesh requires the root/inlet to always be present).
+        for nid, t in self.node_types.items():
+            if "root node" in t:
+                active.add(nid)
         self.nodes = {nid: pos for nid, pos in self.nodes.items() if nid in active}
         self.node_types = {
             nid: t for nid, t in self.node_types.items() if nid in active
         }
+
+        # Reclassify nodes that lost all children as terminal nodes.
+        # build_mesh expects every non-terminal, non-root node to have
+        # exactly 2 outgoing edges; a former bifurcation with 0 children
+        # must become a terminal (outlet) so the mesher skips it.
+        outgoing = {}
+        for e in self.edges:
+            outgoing.setdefault(e["from"], []).append(e["to"])
+        for nid in list(self.node_types):
+            if "root node" in self.node_types[nid]:
+                continue
+            if nid not in outgoing or len(outgoing[nid]) == 0:
+                self.node_types[nid] = " terminal node "
 
     def build_solid(self):
         # Convertir dicts a tuplas para build_mesh
