@@ -56,6 +56,12 @@ def load_config(config_path):
         "term_pressure",
         "murray_exponent",
         "closest_neighbours",
+        "random_seed",
+        # --- DMV pathology modifiers ---
+        "wall_thickening_severity",
+        "thickening_level_threshold",
+        "vessel_loss_factor",
+        "hyperemia_dilation_factor",
         # --- Fluid properties ---
         "mu",
         "rho",
@@ -72,6 +78,13 @@ def load_config(config_path):
         "dt",
         "mu",
         "rho",
+        "q_in",
+        "q_in_hyper",
+        "p_inlet",
+        "p_terminal",
+        "bc_type",
+        "geometry_type",
+        "hyperemia",
     }
 
     # Parameters allowed inside the matrix section.
@@ -79,13 +92,20 @@ def load_config(config_path):
     VALID_MATRIX_PARAMS = {
         "hyperemia",
         "vessel_loss_factor",
+        "wall_thickening_severity",
+        "thickening_level_threshold",
         "stenosis_severity",
+        "stenosis_position",
+        "lumen_thickening_factor",
         "hyperemia_dilation_factor",
         "bc_type",
         "geometry_type",
         "solver",
-        "reduccion_lumen",
+        "stenosis_slope",
         "p_inlet",
+        "p_terminal",
+        "q_in",
+        "q_in_hyper",
     }
 
     # Map each logical section name (after merging) to its allowed-key set.
