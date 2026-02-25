@@ -53,6 +53,7 @@ def generate_vascusynth_tree(params, tmp_dir="src/geom/tree/tmp", bind=False):
         "NUM_NODES": int(params.get("n_terminal", 200)),
         "VOXEL_WIDTH": voxel_width,
         "CLOSEST_NEIGHBOURS": int(params.get("closest_neighbours", 5)),
+        "RANDOM_SEED": int(params.get("random_seed", 0)),
     }
 
     with open(config1_file, "w") as f:
