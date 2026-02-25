@@ -14,7 +14,7 @@ tree_params:
   murray_exponent: 3.0 # [-]
   mu: 0.0035 # [g/(mm·s)] Used by VascuSynth
   rho: 0.00106 # [g/mm³]   Used by VascuSynth
-  lumen_thickening_factor: 1.0
+  wall_thickening_severity: 0.0 # [0,1] 0 = sin microangiopatía
   vessel_loss_factor: 0.0
   hyperemia_dilation_factor: 1.0
 

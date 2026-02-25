@@ -1,0 +1,16 @@
+tree_params:
+  n_terminal: 7
+  perf_pressure: 133000
+  term_pressure: 80000
+  murray_exponent: 3.0
+  tree_volume: 50.0
+  mu: 0.0035
+  rho: 0.00106
+  random_seed: 1
+  thickening_level_threshold: 2
+
+simulation_params:
+  geometry_type: "tree"
+
+matrix:
+  wall_thickening_severity: [0.0, 0.4]
