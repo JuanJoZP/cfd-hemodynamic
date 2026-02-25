@@ -32,14 +32,14 @@ class VascularTree:
 
         is_hyper = self.params.get("hyperemia", False)
         hyper_f = self.params.get("hyperemia_dilation_factor", 1.0)
-        thick_f = self.params.get("lumen_thickening_factor", 1.0)
+        thick_severity = self.params.get("wall_thickening_severity", 0.0)
         thick_threshold = self.params.get("thickening_level_threshold", 0)
 
         for edge in self.edges:
             if is_hyper and "root node" not in self.node_types[edge["from"]]:
                 edge["radius"] *= hyper_f
-            if levels.get(edge["from"], 0) >= thick_threshold:
-                edge["radius"] *= thick_f
+            if thick_severity > 0 and levels.get(edge["from"], 0) >= thick_threshold:
+                edge["radius"] *= 1.0 - thick_severity
 
     def _calculate_levels(self):
         levels = {}
