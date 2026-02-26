@@ -5,11 +5,21 @@ From: dolfinx/dolfinx:v0.9.0
     pyproject.toml /opt/project/pyproject.toml
 
 %post
+    apt-get update && apt-get install -y wget tar
     pip install uv
 
     cd /opt/project
     uv export --format requirements-txt --output-file requirements.txt
     pip install --ignore-installed -r requirements.txt
+
+    mkdir -p /opt/deps
+    cd /opt/deps
+
+    wget https://gitlab.com/rafinex-external-rifle/fenicsx-pctools/-/archive/v0.9.1/fenicsx-pctools-v0.9.1.tar
+    tar -xf fenicsx-pctools-v0.9.1.tar
+    
+    cd fenicsx-pctools-v0.9.1
+    python3 -m pip install .
 
 %labels
     Author cfd-hemodynamic
