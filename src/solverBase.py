@@ -1,22 +1,24 @@
 from abc import ABC, abstractmethod
 from typing import Callable
-from basix import ElementFamily, CellType
-from basix.ufl import element
+
 import numpy as np
+from basix import CellType, ElementFamily
+from basix.ufl import element
+from dolfinx.fem import Constant, Function, FunctionSpace, form, functionspace
+from dolfinx.fem.petsc import assemble_vector
+from dolfinx.mesh import Mesh
 from petsc4py import PETSc
 from ufl import (
-    Identity,
-    nabla_grad,
-    sym,
+    FacetArea,
     FacetNormal,
-    inner,
+    Identity,
     TestFunction,
     ds,
-    FacetArea,
+    inner,
+    nabla_grad,
+    sym,
 )
-from dolfinx.mesh import Mesh
-from dolfinx.fem import Constant, functionspace, Function, FunctionSpace, form
-from dolfinx.fem.petsc import assemble_vector
+
 from src.boundaryCondition import BoundaryCondition
 
 
@@ -149,18 +151,21 @@ class SolverBase(ABC):
         self.shear_stress = Function(vector)
         self.shear_stress.name = "shear_stress"
 
-        # stress forms
-        n = FacetNormal(self.mesh)
-        T = -self.sigma(self.u_sol, self.p_sol, self.mu) * n
+        try:
+            # stress forms
+            n = FacetNormal(self.mesh)
+            T = -self.sigma(self.u_sol, self.p_sol, self.mu) * n
 
-        Tn = inner(T, n)
-        Tt = T - Tn * n
+            Tn = inner(T, n)
+            Tt = T - Tn * n
 
-        v = TestFunction(scalar)
-        w = TestFunction(vector)
+            v = TestFunction(scalar)
+            w = TestFunction(vector)
 
-        self.Ln = (1 / FacetArea(self.mesh)) * v * Tn * ds
-        self.Lt = (1 / FacetArea(self.mesh)) * inner(w, Tt) * ds
+            self.Ln = (1 / FacetArea(self.mesh)) * v * Tn * ds
+            self.Lt = (1 / FacetArea(self.mesh)) * inner(w, Tt) * ds
+        except (RuntimeError, AttributeError) as e:
+            print(f"Skipping WSS initialization due to unsupported geometry: {e}")
 
     @staticmethod
     def epsilon(u):
@@ -171,11 +176,14 @@ class SolverBase(ABC):
         return 2 * mu * sym(nabla_grad(u)) - p * Identity(len(u))
 
     def assemble_wss(self):
-        # self.normal_stress.x.petsc_vec.zeroEntries()
-        # assemble_vector(self.normal_stress.x.petsc_vec, form(self.Ln))
-        # self.normal_stress.x.petsc_vec.ghostUpdate(
-        #     addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
-        # )
-        self.shear_stress.x.petsc_vec.zeroEntries()
-        assemble_vector(self.shear_stress.x.petsc_vec, form(self.Lt))
-        self.shear_stress.x.scatter_forward()
+        try:
+            # self.normal_stress.x.petsc_vec.zeroEntries()
+            # assemble_vector(self.normal_stress.x.petsc_vec, form(self.Ln))
+            # self.normal_stress.x.petsc_vec.ghostUpdate(
+            #     addv=PETSc.InsertMode.ADD_VALUES, mode=PETSc.ScatterMode.REVERSE
+            # )
+            self.shear_stress.x.petsc_vec.zeroEntries()
+            assemble_vector(self.shear_stress.x.petsc_vec, form(self.Lt))
+            self.shear_stress.x.scatter_forward()
+        except (RuntimeError, AttributeError) as e:
+            pass

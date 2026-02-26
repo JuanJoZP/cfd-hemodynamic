@@ -1,11 +1,12 @@
-from src.scenario import Scenario
+import numpy as np
+from dolfinx.fem import Function
+from dolfinx.mesh import CellType, Mesh, create_unit_square, locate_entities_boundary
 from mpi4py import MPI
 from petsc4py import PETSc
-import numpy as np
-from dolfinx.mesh import create_unit_square, locate_entities_boundary, Mesh
-from dolfinx.fem import Function
 
 from src.boundaryCondition import BoundaryCondition
+from src.scenario import Scenario
+
 
 class UnitSquareSimulation(Scenario):
     def __init__(
@@ -21,7 +22,9 @@ class UnitSquareSimulation(Scenario):
     @property
     def mesh(self):
         if not self._mesh:
-            self._mesh = create_unit_square(MPI.COMM_WORLD, 32, 32)
+            self._mesh = create_unit_square(
+                MPI.COMM_WORLD, 32, 32, cell_type=CellType.quadrilateral
+            )
 
         return self._mesh
 

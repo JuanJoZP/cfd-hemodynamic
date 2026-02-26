@@ -114,6 +114,7 @@ class Simulation:
                 raise ImportError(
                     f"Could not import scenario '{self.scenario_name}'. "
                     f"Ensure src/scenarios/{self.scenario_name}.py exists.\n"
+                    f"Underlying error: {type(e).__name__}: {e}\n"
                     f"Available scenarios: {available}"
                 ) from e
             except SyntaxError as e:

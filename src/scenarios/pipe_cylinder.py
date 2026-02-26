@@ -1,14 +1,15 @@
-from src.scenario import Scenario
-import gmsh
-from mpi4py import MPI
-from petsc4py import PETSc
-import numpy as np
-from dolfinx.io import gmshio, XDMFFile
-from dolfinx.mesh import Mesh
-from dolfinx.fem import Function
 import os
 
+import gmsh
+import numpy as np
+from dolfinx.fem import Function
+from dolfinx.io import XDMFFile, gmshio
+from dolfinx.mesh import Mesh
+from mpi4py import MPI
+from petsc4py import PETSc
+
 from src.boundaryCondition import BoundaryCondition
+from src.scenario import Scenario
 
 
 class PipeCylinderSimulation(Scenario):
@@ -154,6 +155,9 @@ class PipeCylinderSimulation(Scenario):
 
         if mesh_comm.rank == model_rank:
             gmsh.option.setNumber("Mesh.Algorithm", 8)
+            gmsh.option.setNumber("Mesh.RecombinationAlgorithm", 2)
+            gmsh.option.setNumber("Mesh.RecombineAll", 1)
+            gmsh.option.setNumber("Mesh.SubdivisionAlgorithm", 1)
             gmsh.model.mesh.generate(gdim)
             gmsh.model.mesh.setOrder(1)
             gmsh.model.mesh.optimize("Netgen")
