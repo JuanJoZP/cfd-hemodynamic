@@ -1,6 +1,3 @@
-# SUPG, PSPG, and LSIC stabilization, newton linealization, full schur preconditioning
-# Modified to use SELF + LSC for better Navier-Stokes convergence
-
 from typing import Callable
 
 import numpy as np
