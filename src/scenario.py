@@ -240,6 +240,18 @@ class Scenario(ABC):
         u_file.close()
         p_file.close()
         wss_file.close()
+
+        norm_v_form = form(inner(solver.u_sol, solver.u_sol) * dx)
+        norm_v = np.sqrt(mesh.comm.allreduce(assemble_scalar(norm_v_form), op=MPI.SUM))
+
+        norm_p_form = form(inner(solver.p_sol, solver.p_sol) * dx)
+        norm_p = np.sqrt(mesh.comm.allreduce(assemble_scalar(norm_p_form), op=MPI.SUM))
+
+        if mesh.comm.rank == 0:
+            with open(os.path.join(output_folder, "norms.txt"), "w") as f:
+                f.write(f"L2 norm of velocity: {norm_v}\n")
+                f.write(f"L2 norm of pressure: {norm_p}\n")
+
         if error_log:
             error_log.close()
         if progress is not None:
