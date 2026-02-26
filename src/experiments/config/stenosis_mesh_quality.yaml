@@ -1,0 +1,11 @@
+artery_params:
+  radius_in: 1.5
+  radius_out: 0.65
+  length: 80
+
+simulation_params:
+  geometry_type: "stenosis"
+
+matrix:
+  stenosis_severity: [0.0]
+  artery_mesh_size_from_curvature: [20, 40, 60, 80]
