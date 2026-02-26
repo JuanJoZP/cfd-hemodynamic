@@ -173,7 +173,10 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
             # ---------------------------
             if mode in ["all", "geometry"]:
 
-                geometry_type = experiment.get("geometry_type", "tree")
+                geometry_type = experiment.get(
+                    "geometry_type",
+                    config.get("simulation_params", {}).get("geometry_type", "all"),
+                )
 
                 if geometry_type == "tree":
                     if not tree_xml_path.exists():
@@ -230,6 +233,10 @@ def run_meshing(config_path, output_base, job_idx=None, mode="all"):
                         msh_path,
                         tuple(start_pt),
                         tuple(end_pt),
+                        artery_mesh_size_from_curvature=current_params.get(
+                            "artery_mesh_size_from_curvature", 20
+                        ),
+                        radius_out=r_out,
                     )
                     print(f"[OK] Stenosis mesh generated at {msh_path}")
                     continue

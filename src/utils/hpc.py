@@ -43,12 +43,14 @@ def load_config(config_path):
         "slope",
         "stenosis_position",
         "stenosis_severity",
+        "stenosis_slope",
         "coupling_slope",
         # --- Boundary-condition flow values ---
         "q_in",
         "q_in_hyper",
         "p_terminal",
         "p_inlet",
+        "p_outlet",
         # --- Vascular tree (VascuSynth) ---
         "tree_volume",
         "n_terminal",
@@ -65,6 +67,7 @@ def load_config(config_path):
         # --- Fluid properties ---
         "mu",
         "rho",
+        "artery_mesh_size_from_curvature",
         # --- Legacy flat-layout solver params (test_simple / arteria_lad) ---
         "solver",
         "T",
@@ -82,6 +85,7 @@ def load_config(config_path):
         "q_in",
         "q_in_hyper",
         "p_inlet",
+        "p_outlet",
         "p_terminal",
         "bc_type",
         "geometry_type",
