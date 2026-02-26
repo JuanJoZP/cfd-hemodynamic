@@ -13,6 +13,7 @@ from dolfinx.fem.petsc import (
 from dolfinx.mesh import Mesh
 from petsc4py import PETSc
 from ufl import (
+    CellDiameter,
     FacetNormal,
     MixedFunctionSpace,
     TestFunctions,
@@ -79,11 +80,12 @@ class Solver(SolverBase):
 
         # stabilization terms
         V_dg0 = functionspace(mesh, ("DG", 0))
-        h = Function(V_dg0)
-        h.x.array[:] = mesh.h(
-            mesh.topology.dim,
-            np.arange(h.x.index_map.size_local + h.x.index_map.num_ghosts),
-        )
+        # h = Function(V_dg0)
+        # h.x.array[:] = mesh.h(
+        #    mesh.topology.dim,
+        #    np.arange(h.x.index_map.size_local + h.x.index_map.num_ghosts),
+        # )
+        h = CellDiameter(self.mesh)
 
         vnorm = sqrt(
             inner(u_prev, u_prev)
