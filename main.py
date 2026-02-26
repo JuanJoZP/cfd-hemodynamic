@@ -48,6 +48,7 @@ def run_simulate(args, unknown):
             T=args.T,
             dt=args.dt,
             output_dir=args.output_dir,
+            early_stop_tolerance=args.early_stop_tolerance,
             **kwargs,
         )
     except ValueError as e:
@@ -110,6 +111,18 @@ def main():
     sim_parser.add_argument("--dt", type=float, required=True, help="Time step")
     sim_parser.add_argument("--name", required=True, help="Name of the run")
     sim_parser.add_argument("--output_dir", default="results", help="Output directory")
+    sim_parser.add_argument(
+        "--early_stop_tolerance",
+        type=float,
+        default=1e-5,
+        help="Tolerance for early stopping the simulation",
+    )
+    sim_parser.add_argument(
+        "--cores",
+        type=int,
+        default=1,
+        help="Number of MPI cores per job (for HPC solve)",
+    )
 
     # ── experiment ────────────────────────────────────────────────────────
     # ── experiment ────────────────────────────────────────────────────────
@@ -175,6 +188,12 @@ def main():
         type=str,
         default=None,
         help="Time limit for each SLURM job (e.g. 00:30:00)",
+    )
+    exp_solve_parser.add_argument(
+        "--early_stop_tolerance",
+        type=float,
+        default=None,
+        help="Override early stop tolerance for all experiments",
     )
 
     # ── tree ──────────────────────────────────────────────────────────────

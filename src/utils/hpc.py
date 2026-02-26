@@ -69,6 +69,7 @@ def load_config(config_path):
         "solver",
         "T",
         "dt",
+        "early_stop_tolerance",
     }
 
     # Parameters allowed inside simulation_params.
@@ -85,6 +86,7 @@ def load_config(config_path):
         "bc_type",
         "geometry_type",
         "hyperemia",
+        "early_stop_tolerance",
     }
 
     # Parameters allowed inside the matrix section.
@@ -106,6 +108,8 @@ def load_config(config_path):
         "p_terminal",
         "q_in",
         "q_in_hyper",
+        "artery_mesh_size_from_curvature",
+        "early_stop_tolerance",
     }
 
     # Map each logical section name (after merging) to its allowed-key set.
@@ -580,6 +584,7 @@ def dispatch_hpc(args, unknown):
 
         filtered_args = []
         skip_next = False
+        num_cores = getattr(args, "cores", 1)
         for arg in sys.argv[1:]:  # Skip script name
             if skip_next:
                 skip_next = False
@@ -591,8 +596,13 @@ def dispatch_hpc(args, unknown):
                 continue
             if arg.startswith("--output_dir="):
                 continue
+            if arg == "--cores":
+                skip_next = True
+                continue
+            if arg.startswith("--cores="):
+                continue
             filtered_args.append(arg)
 
-        cmd = ["sbatch", str(script_path)] + filtered_args
+        cmd = ["sbatch", f"--ntasks={num_cores}", str(script_path)] + filtered_args
         print(f"[INFO] Submitting: {' '.join(cmd)}")
         subprocess.run(cmd, check=True)

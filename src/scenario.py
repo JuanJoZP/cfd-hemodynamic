@@ -17,9 +17,7 @@ from src.solverBase import SolverBase
 
 
 class Scenario(ABC):
-    EARLY_STOP_TOLERANCE = (
-        1e-5  # if |(u_sol-u_prev)|_inf < EARLY_STOP_TOLERANCE, stop simulation
-    )
+    # EARLY_STOP_TOLERANCE is now an instance variable
 
     @property
     @abstractmethod
@@ -52,9 +50,11 @@ class Scenario(ABC):
         dt: float,
         T: float,
         f: list,
+        early_stop_tolerance: float = 1e-5,
     ):
         self.solver_name = solver_name
         self.scenario_name = scenario_name
+        self.early_stop_tolerance = early_stop_tolerance
 
         # Load the solver class
         try:
@@ -154,8 +154,12 @@ class Scenario(ABC):
         progress = (
             tqdm(
                 desc="Solving",
-                total=float(T),
-                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+                total=float(T) if T != float("inf") else None,
+                bar_format=(
+                    "{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]"
+                    if T != float("inf")
+                    else "{l_bar}{bar}| {n_fmt} [{elapsed}]"
+                ),
                 file=sys.stdout,
             )
             if mesh.comm.rank == 0
@@ -198,7 +202,7 @@ class Scenario(ABC):
         while t < T:
             solver.solveStep()
 
-            if progress:
+            if progress is not None:
                 progress.update(self.dt)
 
             i += 1
@@ -222,11 +226,11 @@ class Scenario(ABC):
                 u_diff = solver.u_sol.x.array - solver.u_prev.x.array
                 u_diff_norm = np.linalg.norm(u_diff, ord=np.inf)
                 u_diff_norm = mesh.comm.allreduce(u_diff_norm, op=MPI.MAX)
-                if u_diff_norm < self.EARLY_STOP_TOLERANCE:
+                if u_diff_norm < self.early_stop_tolerance:
                     print(
                         f"Early stopping at t={t:.3f}, "
                         f"because ||u_sol - u_prev||_inf = {u_diff_norm:.3g} < "
-                        f"{self.EARLY_STOP_TOLERANCE}"
+                        f"{self.early_stop_tolerance}"
                     )
                     break
 
@@ -238,7 +242,7 @@ class Scenario(ABC):
         wss_file.close()
         if error_log:
             error_log.close()
-        if progress:
+        if progress is not None:
             progress.close()
 
         return output_folder

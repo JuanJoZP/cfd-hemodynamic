@@ -57,6 +57,7 @@ def run(args, _unknown=None):
             config_path,
             output_path,
             job_idx=args.job_idx,
+            early_stop_override=getattr(args, "early_stop_tolerance", None),
         )
     else:
         print("[ERROR] Subcomando de experiment no reconocido. Use 'mesh' o 'solve'.")

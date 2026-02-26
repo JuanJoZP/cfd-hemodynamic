@@ -16,7 +16,7 @@ if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
 
-def run_solving(config_path, output_base, job_idx=None):
+def run_solving(config_path, output_base, job_idx=None, early_stop_override=None):
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
 
@@ -108,6 +108,9 @@ def run_solving(config_path, output_base, job_idx=None):
             if rank == 0:
                 print(f"  [DEBUG] Scenario class created.", flush=True)
 
+            if early_stop_override is not None:
+                run_params["early_stop_tolerance"] = early_stop_override
+
             # 2. Utilizar la clase Simulation para orquestar la ejecución
             solver_name = run_params.get("solver")
             if not solver_name:
@@ -129,6 +132,7 @@ def run_solving(config_path, output_base, job_idx=None):
                 output_dir=output_base,
                 mu=run_params["mu"],
                 rho=run_params["rho"],
+                early_stop_tolerance=run_params["early_stop_tolerance"],
                 **{k: v for k, v in experiment.items() if k != "solver"},
             )
             if rank == 0:
