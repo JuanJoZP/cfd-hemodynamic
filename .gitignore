@@ -25,3 +25,4 @@ vascusynth.sif
 *.fls
 *.synctex.gz
 *.pdf
+.vscode/
