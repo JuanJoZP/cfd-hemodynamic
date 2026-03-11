@@ -299,11 +299,12 @@ def label_and_group(start_pt, end_pt):
         d_out = np.linalg.norm(center - np.array(end_pt))
         surf_data.append((tag, d_in, d_out))
 
-    min_d_in = min(d[1] for d in surf_data)
-    min_d_out = min(d[2] for d in surf_data)
+    # Sort by distance to start_pt (inlet) and end_pt (outlet) and pick top 5
+    surf_data_in = sorted(surf_data, key=lambda x: x[1])
+    inlets = [d[0] for d in surf_data_in[:5]]
 
-    inlets = [d[0] for d in surf_data if (d[1] - min_d_in) < 1e-3]
-    outlets = [d[0] for d in surf_data if (d[2] - min_d_out) < 1e-3]
+    surf_data_out = sorted(surf_data, key=lambda x: x[2])
+    outlets = [d[0] for d in surf_data_out[:5]]
     walls = [t for t in outer_surfs if t not in inlets and t not in outlets]
 
     if inlets:

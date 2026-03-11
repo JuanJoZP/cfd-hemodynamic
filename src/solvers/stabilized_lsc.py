@@ -169,7 +169,13 @@ class Solver(SolverBase):
         )
         F_vec.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
 
-    def setup(self, bcu: list[BoundaryCondition], bcp: list[BoundaryCondition]) -> None:
+    def setup(
+        self,
+        bcu: list[BoundaryCondition],
+        bcp: list[BoundaryCondition],
+        facet_tags=None,
+        tags=None,
+    ) -> None:
         # create linealizated problem
         du, dp = TrialFunctions(self.VQ)
 
@@ -244,13 +250,27 @@ class Solver(SolverBase):
 
         opts = PETSc.Options()
         prefix = "nonlinear_"
-        opts[f"{prefix}fieldsplit_1_pc_type"] = "lsc"
-        opts[f"{prefix}fieldsplit_1_ksp_type"] = "preonly"
-        opts[f"{prefix}fieldsplit_0_ksp_type"] = "preonly"
-        opts[f"{prefix}fieldsplit_0_pc_type"] = "lu"
+        opts[f"{prefix}snes_rtol"] = 1.0e-04
+        opts[f"{prefix}snes_max_it"] = 50
+        opts[f"{prefix}snes_ksp_ew"] = True
+
+        opts[f"{prefix}ksp_converged_reason"] = ""
+        opts[f"{prefix}ksp_max_it"] = 10000
+
+        opts[f"{prefix}fieldsplit_p_pc_type"] = "lsc"
+        opts[f"{prefix}fieldsplit_p_ksp_type"] = "preonly"
+        opts[f"{prefix}fieldsplit_u_ksp_type"] = "preonly"
+        opts[f"{prefix}fieldsplit_u_pc_type"] = "lu"
+        opts[f"{prefix}fieldsplit_u_pc_factor_mat_solver_type"] = "mumps"
+        opts[f"{prefix}fieldsplit_p_lsc_ksp_type"] = "preonly"
+        opts[f"{prefix}fieldsplit_p_lsc_pc_type"] = "lu"
 
         snes.setFromOptions()
         snes.setUp()
+
+        viewer = PETSc.Viewer.STDOUT(self.mesh.comm)
+        snes.view(viewer)
+
         self.solver = snes
 
         # constant pressure null space
@@ -275,6 +295,12 @@ class Solver(SolverBase):
         self.nullsp.remove(self.x_n)  # creo que se puede quitar?
 
         self.solver.solve(None, self.x_n)
+        its_snes = self.solver.getIterationNumber()
+        its_ksp = self.solver.getLinearSolveIterations()
+        PETSc.Sys.Print(
+            f"Solver converged in {its_snes} nonlinear iterations"
+            f" (with total number of {its_ksp} linear iterations)"
+        )
         self.updateSolution(self.x_n)
 
         reason = self.solver.getConvergedReason()

@@ -2,14 +2,13 @@ import os
 
 import gmsh
 import numpy as np
-from ufl import Measure, FacetNormal, grad, inner, as_vector
-from dolfinx.geometry import bb_tree, compute_collisions_points, compute_colliding_cells
-from dolfinx.fem import Function, form, assemble_scalar
-from dolfinx.io import XDMFFile
-from dolfinx.io import gmshio
+from dolfinx.fem import Function, assemble_scalar, form
+from dolfinx.geometry import bb_tree, compute_colliding_cells, compute_collisions_points
+from dolfinx.io import XDMFFile, gmshio
 from dolfinx.mesh import Mesh
 from mpi4py import MPI
 from petsc4py import PETSc
+from ufl import FacetNormal, Measure, as_vector, grad, inner
 
 from src.boundaryCondition import BoundaryCondition
 from src.scenario import Scenario

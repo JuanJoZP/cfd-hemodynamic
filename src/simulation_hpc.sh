@@ -5,6 +5,8 @@
 #SBATCH --error=/home/juanjo.zuluaga/data/logs/error_%j.log
 #SBATCH --ntasks=4
 #SBATCH --time=12:00:00
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=juanjo.zuluaga@urosario.edu.co
 
 mpich="/opt/ohpc/pub/mpi/mpich-gnu-ohpc/3.2.1/bin/mpirun"
 image="/home/juanjo.zuluaga/simulatio.nova/fenicsx.sif"

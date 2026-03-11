@@ -145,7 +145,7 @@ Integramos por partes el tensor de estrés,
 \begin{center}
   \begin{equation}
     \label{momentum_weak}
-    \int_{\Omega}\rho\frac{\partial u}{\partial t}\cdot v \; dx + \int_{\Omega} \rho u \cdot \nabla u \cdot v \; dx = -\int_{\Omega}\sigma(u,p) \cdot \nabla v \; dx + \int_{\Omega}(\sigma(u,p) \cdot n) \cdot v \; ds + \int_{\Omega}f \cdot v \; dx.
+    \int_{\Omega}\rho\frac{\partial u}{\partial t}\cdot v \; dx + \int_{\Omega} \rho u \cdot \nabla u \cdot v \; dx = -\int_{\Omega}\sigma(u,p) \cdot \nabla v \; dx + \int_{\partial \Omega}(\sigma(u,p) \cdot n) \cdot v \; ds + \int_{\Omega}f \cdot v \; dx.
   \end{equation}
 \end{center}
 \vspace{6pt}
@@ -165,7 +165,7 @@ Reorganizamos \cref{momentum_weak} y \cref{continuity_weak} para definir las for
 \begin{center}
   \begin{align}
     \label{bilinear_mom}
-    a(u, p, v) &= \int_{\Omega}\rho\frac{\partial u}{\partial t}\cdot v \; dx + \int_{\Omega} \rho u \cdot \nabla u \cdot v \; dx + \int_{\Omega}\sigma(u,p) \cdot \nabla v \; dx - \int_{\Omega}(\sigma(u,p) \cdot n) \cdot v \; ds - \int_{\Omega}f \cdot v \; dx,\\
+    a(u, p, v) &= \int_{\Omega}\rho\frac{\partial u}{\partial t}\cdot v \; dx + \int_{\Omega} \rho u \cdot \nabla u \cdot v \; dx + \int_{\Omega}\sigma(u,p) \cdot \nabla v \; dx - \int_{\partial \Omega}(\sigma(u,p) \cdot n) \cdot v \; ds - \int_{\Omega}f \cdot v \; dx,\\
     \label{bilinear_con}
     b(u, q) &= \int_{\Omega}\nabla \cdot u \cdot q \; dx.
   \end{align}

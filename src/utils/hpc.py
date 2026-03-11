@@ -73,6 +73,7 @@ def load_config(config_path):
         "T",
         "dt",
         "early_stop_tolerance",
+        "bc_type",
     }
 
     # Parameters allowed inside simulation_params.
@@ -112,6 +113,7 @@ def load_config(config_path):
         "p_terminal",
         "q_in",
         "q_in_hyper",
+        "p_outlet",
         "artery_mesh_size_from_curvature",
         "early_stop_tolerance",
     }
@@ -201,119 +203,86 @@ def load_config(config_path):
 
     except ImportError:
         print("[INFO] PyYAML not found. Using fallback parser for config.")
-        config = {"matrix": {}, "base_params": {}}
+        import re
 
-        current_section = None
-        buffer = ""
-        in_multiline_value = False
-        bracket_count = 0
-        current_key = None
-        expecting_value = False
+        config = {s: {} for s in KNOWN_SECTIONS if s not in MERGE_INTO_BASE}
+        config["base_params"] = {}
+
+        current_dict = None
+        # stack of (indent, dict_object)
+        stack = []
 
         with open(config_path, "r", encoding="utf-8") as f:
             lines = f.readlines()
 
         for line_no, line in enumerate(lines, start=1):
-            # Remove comments and whitespace
             line_content = line.split("#")[0]
             stripped = line_content.strip()
-
             if not stripped:
                 continue
 
-            # Determine indentation
             indent = len(line_content) - len(line_content.lstrip())
 
-            # Check for top-level sections
-            if indent == 0 and stripped.endswith(":"):
-                key = stripped[:-1]
-                if key not in KNOWN_SECTIONS:
+            # Match "key: value" or just "key:"
+            m = re.match(r"^([^:]+):\s*(.*)$", stripped)
+            if not m:
+                continue
+
+            key = m.group(1).strip()
+            val_str = m.group(2).strip()
+
+            if indent == 0:
+                # Top level section
+                sec_name = key
+                if sec_name in MERGE_INTO_BASE:
+                    current_dict = config["base_params"]
+                elif sec_name in KNOWN_SECTIONS:
+                    current_dict = config[sec_name]
+                else:
                     raise ValueError(
                         f"[CONFIG ERROR] {config_path} line {line_no}: "
-                        f"unknown top-level section '{key}'.\n"
-                        f"  Allowed sections: {sorted(KNOWN_SECTIONS)}"
+                        f"unknown section '{sec_name}'"
                     )
-                # Map structured sections into base_params
-                current_section = "base_params" if key in MERGE_INTO_BASE else key
-                if current_section not in config:
-                    config[current_section] = {}
-                current_key = None
-                buffer = ""
-                in_multiline_value = False
-                bracket_count = 0
-                expecting_value = False
+                stack = [(0, current_dict)]
                 continue
 
-            if not current_section:
+            if current_dict is None:
                 continue
 
-            # If we are parsing a multiline value
-            if in_multiline_value:
-                buffer += " " + stripped
-                bracket_count += stripped.count("[") - stripped.count("]")
-                if bracket_count == 0:
-                    try:
-                        val = ast.literal_eval(buffer)
-                        config[current_section][current_key] = val
-                    except (ValueError, SyntaxError):
-                        print(f"[WARN] Failed to ast.parse: {buffer}")
-                        config[current_section][current_key] = buffer
+            # Adjust stack based on indentation
+            while stack and indent <= stack[-1][0] and stack[-1][0] != 0:
+                stack.pop()
 
-                    in_multiline_value = False
-                    buffer = ""
-                    current_key = None
-                continue
+            if not stack:
+                continue  # Should not happen if indent > 0
 
-            if expecting_value:
-                if stripped.startswith("["):
-                    buffer = stripped
-                    bracket_count = stripped.count("[") - stripped.count("]")
-                    if bracket_count > 0:
-                        in_multiline_value = True
+            parent = stack[-1][1]
+
+            if not val_str:
+                # Nested block start
+                nested = {}
+                parent[key] = nested
+                stack.append((indent, nested))
+            else:
+                # Leaf key-value
+                try:
+                    # Handle basic types: [1,2], 0.1, true, false, "str"
+                    # For YAML 'true'/'false', ast needs 'True'/'False'
+                    p_val = val_str
+                    if p_val.lower() == "true":
+                        val = True
+                    elif p_val.lower() == "false":
+                        val = False
                     else:
                         try:
-                            val = ast.literal_eval(buffer)
-                        except Exception:
-                            val = buffer
-                        config[current_section][current_key] = val
-                        current_key = None
-                else:
-                    try:
-                        val = ast.literal_eval(stripped)
-                    except Exception:
-                        val = stripped
-                    config[current_section][current_key] = val
-                    current_key = None
-                expecting_value = False
-                continue
-
-            # Standard key parsing
-            if ":" in stripped:
-                parts = stripped.split(":", 1)
-                key = parts[0].strip()
-                val_str = parts[1].strip()
-
-                # Check if value starts a list but doesn't end it
-                if val_str.startswith("[") and not val_str.endswith("]"):
-                    current_key = key
-                    buffer = val_str
-                    bracket_count = val_str.count("[") - val_str.count("]")
-                    in_multiline_value = True
-                    continue
-
-                if not val_str:
-                    current_key = key
-                    expecting_value = True
-                    continue
-
-                try:
-                    val = ast.literal_eval(val_str)
-                except (ValueError, SyntaxError):
+                            val = ast.literal_eval(p_val)
+                        except:
+                            val = p_val
+                except:
                     val = val_str
+                parent[key] = val
 
-                config[current_section][key] = val
-
-        # Validate after full parse
+        # Final validation after full parse
         _validate(config, str(config_path))
         return config
 
@@ -527,7 +496,15 @@ def dispatch_hpc(args, unknown):
             if time_limit:
                 cmd.append(f"--time={time_limit}")
 
-            # Note: This command-line argument overrides the #SBATCH --array directive in the script.
+            if getattr(args, "monitor", False):
+                step_args.extend(
+                    [
+                        "-snes_monitor",
+                        "-snes_view",
+                        "-ksp_monitor",
+                    ]
+                )
+
             cmd.append(str(script_path))
             cmd.extend(step_args)
 

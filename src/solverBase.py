@@ -110,7 +110,8 @@ class SolverBase(ABC):
     ) -> None:
         """
         Initialize the function space for velocity `self.V`.
-        Initialize the solution function `self.u_sol` in the velocity space, this is used by simulation to save the solution to a file.
+        Initialize the solution function `self.u_sol` in the velocity space,
+        this is used by simulation to save the solution to a file.
         """
         element_v = element(family, cell, deegre, shape=shape)
         self._V = functionspace(self.mesh, element_v)
@@ -127,7 +128,8 @@ class SolverBase(ABC):
     ) -> None:
         """
         Initialize the function space for pressure `self.Q`.
-        Initialize the solution function `self.p_sol` in the pressure space, this is used by simulation to save the solution to a file.
+        Initialize the solution function `self.p_sol` in the pressure space,
+        this is used by simulation to save the solution to a file.
         """
         element_p = element(family, cell, deegre, shape=shape)
         self._Q = functionspace(self.mesh, element_p)

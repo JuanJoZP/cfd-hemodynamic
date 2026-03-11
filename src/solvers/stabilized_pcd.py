@@ -1,7 +1,6 @@
-# SUPG, PSPG, and LSIC stabilization, newton linealization, full schur preconditioning
-
 from typing import Callable
 
+import dolfinx.fem as fem
 import numpy as np
 from dolfinx.fem import Constant, DirichletBC, Function, form, functionspace
 from dolfinx.fem.petsc import (
@@ -11,10 +10,12 @@ from dolfinx.fem.petsc import (
     create_vector_block,
 )
 from dolfinx.mesh import Mesh
+from fenicsx_pctools.mat import create_splittable_matrix_block
 from petsc4py import PETSc
+from petsc4py import typing as petsc_typing
 from ufl import (
-    CellDiameter,
     FacetNormal,
+    Measure,
     MixedFunctionSpace,
     TestFunctions,
     TrialFunctions,
@@ -68,16 +69,14 @@ class Solver(SolverBase):
         u_sol = self.u_sol
         p_sol = self.p_sol
         u_prev = self.u_prev
-        u_mid = 0.5 * (u_sol + u_prev)
         n = FacetNormal(self.mesh)
 
         F = self.rho * inner(v, (u_sol - u_prev) / self.dt) * dx
-        F += self.rho * dot(v, dot(u_mid, nabla_grad(u_mid))) * dx
+        F += self.rho * dot(v, dot(u_sol, nabla_grad(u_sol))) * dx
         F -= inner(v, self.rho * self.f) * dx
-        F += inner(self.epsilon(v), self.sigma(u_mid, p_sol, self.mu)) * dx
-        # probar p_prev en vez de p_sol
-        F += dot(p_sol * n, v) * ds - dot(mu * nabla_grad(u_mid) * n, v) * ds
-        F += inner(q, div(u_mid)) * dx
+        F += inner(self.epsilon(v), self.sigma(u_sol, p_sol, self.mu)) * dx
+        F += dot(p_sol * n, v) * ds - dot(mu * nabla_grad(u_sol) * n, v) * ds
+        F += inner(q, div(u_sol)) * dx
 
         # stabilization terms
         V_dg0 = functionspace(mesh, ("DG", 0))
@@ -86,14 +85,13 @@ class Solver(SolverBase):
             mesh.topology.dim,
             np.arange(h.x.index_map.size_local + h.x.index_map.num_ghosts),
         )
-        # h = CellDiameter(self.mesh)
 
         vnorm = sqrt(
             inner(u_prev, u_prev)
         )  # u_prev instead of u_sol to avoid nonlinearity after derivation
 
-        R = self.rho * ((u_sol - u_prev) / self.dt + dot(u_mid, nabla_grad(u_mid)))
-        R -= div(self.sigma(u_mid, p_sol, self.mu))
+        R = self.rho * ((u_sol - u_prev) / self.dt + dot(u_sol, nabla_grad(u_sol)))
+        R -= div(self.sigma(u_sol, p_sol, self.mu))
         R -= self.rho * self.f
 
         # SUPG
@@ -106,7 +104,7 @@ class Solver(SolverBase):
         tau_supg = (
             1 / (tau_supg1**2) + 1 / (tau_supg2**2) + 1 / (tau_supg3**2)
         ) ** (-1 / 2)
-        F_supg = inner(tau_supg * R, dot(u_mid, nabla_grad(v))) * dx
+        F_supg = inner(tau_supg * R, dot(u_sol, nabla_grad(v))) * dx
 
         # PSPG
         tau_pspg = tau_supg
@@ -116,13 +114,13 @@ class Solver(SolverBase):
         Re = (vnorm * h) / (2.0 * (self.mu / self.rho))
         z = conditional(le(Re, 3), Re / 3, 1.0)
         tau_lsic = (vnorm * h * z) / 2.0
-        F_lsic = tau_lsic * inner(div(u_mid), self.rho * div(v)) * dx
+        F_lsic = tau_lsic * inner(div(u_sol), self.rho * div(v)) * dx
 
         F += F_supg + F_lsic
         F += F_pspg
         self.F = F
 
-    def updateSolution(self, x: PETSc.Vec) -> None:
+    def updateSolution(self, x: petsc_typing.Vec) -> None:
         "Updates the solution functions u_sol and p_sol with the values in x."
         start_u, end_u = self.u_prev.x.petsc_vec.getOwnershipRange()
         start_p, end_p = self.p_prev.x.petsc_vec.getOwnershipRange()
@@ -143,16 +141,22 @@ class Solver(SolverBase):
 
     def assembleJacobian(
         self,
-        snes: PETSc.SNES,
-        x: PETSc.Vec,
-        J_mat: PETSc.Mat,
-        P_mat: PETSc.Mat,
+        snes: petsc_typing.SNES,
+        x: petsc_typing.Vec,
+        J: petsc_typing.Mat,
+        P: petsc_typing.Mat,
         bcs: list[DirichletBC] = [],
     ) -> None:
         "Assembles the Jacobian matrix evaluated at u_sol and p_sol."
-        J_mat.zeroEntries()
-        assemble_matrix_block(J_mat, self.J_form, bcs)
-        J_mat.assemble()
+        J_mat = J.getPythonContext().Mat if J.getType() == "python" else J
+        J.zeroEntries()
+        fem.petsc.assemble_matrix_block(J_mat, self.J_form, bcs, diagonal=1.0)
+        J.assemble()
+        if P is not None and P != J:
+            P_mat = P.getPythonContext().Mat if P.getType() == "python" else P
+            P.zeroEntries()
+            fem.petsc.assemble_matrix_block(P_mat, self.J_form, bcs, diagonal=1.0)
+            P.assemble()
 
     def assembleResidual(
         self,
@@ -197,20 +201,90 @@ class Solver(SolverBase):
 
         self.bcu_d = [bc.getBC(self.V) for bc in bcu]
         self.bcp_d = [bc.getBC(self.Q) for bc in bcp]
+        bcs = [*self.bcu_d, *self.bcp_d]
 
-        # newton solver
+        # PCD secondary boundary conditions
+        inlet_dofs_p = fem.locate_dofs_topological(
+            self.Q, self.mesh.topology.dim - 1, facet_tags.find(tags["inlet"])
+        )
+        outlet_dofs_p = fem.locate_dofs_topological(
+            self.Q, self.mesh.topology.dim - 1, facet_tags.find(tags["outlet"])
+        )
+
+        pcd_type = "PCDPC_vY"
+        bcs_pcd = {
+            "PCDPC_vX": [fem.dirichletbc(fem.Function(self.Q), inlet_dofs_p)],
+            "PCDPC_vY": [fem.dirichletbc(fem.Function(self.Q), outlet_dofs_p)],
+        }[pcd_type]
+
+        ds_in = Measure(
+            "ds",
+            domain=self.mesh,
+            subdomain_data=facet_tags,
+            subdomain_id=tags["inlet"],
+        )
+        appctx = {
+            "nu": self.mu / self.rho,
+            "v": self.u_sol,
+            "bcs_pcd": bcs_pcd,
+            "ds_in": ds_in,
+        }
+
+        # Initialize Jacobian matrix
+        assemble_matrix_block(self.A, self.J_form, bcs)
+        self.A.assemble()
+
+        # Wrap matrix for FieldSplit / PCD
+        J_splittable = create_splittable_matrix_block(
+            self.A, extract_blocks(J), **appctx
+        )
+
+        # PETSc options configuration
+        problem_prefix = "ns_"
+        opts = PETSc.Options()
+        opts.prefixPush(problem_prefix)
+        opts["snes_type"] = "newtonls"
+        opts["snes_rtol"] = 1.0e-04
+        opts["snes_max_it"] = 50
+        opts["snes_ksp_ew"] = True
+
+        opts["ksp_converged_reason"] = ""
+        opts["ksp_max_it"] = 10000
+        opts["ksp_type"] = "fgmres"
+        opts["ksp_gmres_restart"] = 150
+        opts["ksp_pc_side"] = "right"
+
+        opts["pc_type"] = "python"
+        opts["pc_python_type"] = "fenicsx_pctools.pc.WrappedPC"
+        opts.prefixPush("wrapped_")
+        opts["pc_type"] = "fieldsplit"
+        opts["pc_fieldsplit_type"] = "schur"
+        opts["pc_fieldsplit_schur_fact_type"] = "upper"
+        opts["pc_fieldsplit_schur_precondition"] = "user"
+        opts["pc_fieldsplit_0_fields"] = 0  # velocity
+        opts["pc_fieldsplit_1_fields"] = 1  # pressure
+
+        opts["fieldsplit_0_ksp_type"] = "gmres"
+        opts["fieldsplit_0_pc_type"] = "hypre"
+
+        opts["fieldsplit_1_ksp_type"] = "preonly"
+        opts["fieldsplit_1_pc_type"] = "python"
+        opts["fieldsplit_1_pc_python_type"] = f"fenicsx_pctools.pc.{pcd_type}"
+        opts["fieldsplit_1_pcd_Mp_ksp_type"] = "preonly"
+        opts["fieldsplit_1_pcd_Mp_pc_type"] = "jacobi"
+        opts["fieldsplit_1_pcd_Ap_ksp_type"] = "cg"
+        opts["fieldsplit_1_pcd_Ap_pc_type"] = "hypre"
+        opts.prefixPop()  # wrapped_
+        opts.prefixPop()  # ns_
+
+        # Newton solver
         snes = PETSc.SNES().create(self.mesh.comm)
-        snes.setOptionsPrefix("nonlinear_")
-        snes.setType("newtonls")
-        snes.setFunction(
-            self.assembleResidual, f=self.b, kargs={"bcs": [*self.bcu_d, *self.bcp_d]}
-        )
+        snes.setFunction(self.assembleResidual, f=self.b, kargs={"bcs": bcs})
         snes.setJacobian(
-            self.assembleJacobian,
-            J=self.A,
-            P=None,
-            kargs={"bcs": [*self.bcu_d, *self.bcp_d]},
+            self.assembleJacobian, J=J_splittable, P=None, kargs={"bcs": bcs}
         )
+        snes.setOptionsPrefix(problem_prefix)
+        snes.setFromOptions()
 
         # x is the initial guess for the newton iteration = solution at previous time step
         start, end = self.x_n.getOwnershipRange()
@@ -222,76 +296,33 @@ class Solver(SolverBase):
         )
         self.x_n.assemble()
 
-        # fgmres global solver with field split (schur) preconditioner
-        ksp = snes.getKSP()
-        ksp.setType("fgmres")
-        snes.computeJacobian(self.x_n, self.A)  # asemble A in order to set up PC
-        ksp.setOperators(self.A)
-
-        pc = ksp.getPC()
-        pc.setType("fieldsplit")
-        pc.setFieldSplitType(PETSc.PC.CompositeType.SCHUR)
-        pc.setFieldSplitSchurFactType(PETSc.PC.SchurFactType.LOWER)
-        pc.setFieldSplitSchurPreType(PETSc.PC.SchurPreType.SELFP)
-
-        V_map = self.V.dofmap.index_map
-        Q_map = self.Q.dofmap.index_map
-        offset_u = (
-            V_map.local_range[0] * self.V.dofmap.index_map_bs + Q_map.local_range[0]
-        )
-        offset_p = offset_u + V_map.size_local * self.V.dofmap.index_map_bs
-        is_u = PETSc.IS().createStride(
-            V_map.size_local * self.V.dofmap.index_map_bs,
-            offset_u,
-            1,
-            comm=self.mesh.comm,
-        )
-        is_p = PETSc.IS().createStride(
-            Q_map.size_local, offset_p, 1, comm=self.mesh.comm
-        )
-        pc.setFieldSplitIS(("u", is_u), ("p", is_p))
-        pc.setUp()
-
-        # set solvers for schur and pressure blocks
-        ksp_u, ksp_p = pc.getFieldSplitSchurGetSubKSP()
-        ksp_u.setType("gmres")
-        ksp_u.getPC().setType("asm")
-        ksp_p.setType("preonly")
-        ksp_p.getPC().setType("asm")
-
-        ksp_u.getPC().setUp()
-        ksp_p.getPC().setUp()
-
-        snes.setFromOptions()
         snes.setUp()
 
+        print("\n--- CONFIGURACIÓN DEL SOLVER ---")
         viewer = PETSc.Viewer.STDOUT(self.mesh.comm)
         snes.view(viewer)
+        print("--------------------------------\n")
 
         self.solver = snes
 
-        # constant pressure null space
-        vec_const = self.A.createVecs()[0]
-        vec_const.set(0.0)
-        indices_p = is_p.getIndices()
-        for i in indices_p:
-            vec_const.setValue(i, 1.0)
-        vec_const.assemble()
-
-        norm = vec_const.norm(PETSc.NormType.NORM_2)
-        vec_const.scale(1.0 / norm)  # normalize
-
-        self.nullsp = PETSc.NullSpace().create(vectors=[vec_const], comm=self.mesh.comm)
+        # ojo aca faltan cosas de null space
 
     def solveStep(self):
-        if self.nullsp.test(self.A):
-            self.A.setNullSpace(
-                self.nullsp
-            )  # esto deberia moverse a setup pero da error
+        # if self.nullsp.test(self.A):
+        #     self.A.setNullSpace(
+        #         self.nullsp
+        #     )  # esto deberia moverse a setup pero da error
 
-        self.nullsp.remove(self.x_n)  # creo que se puede quitar?
+        # self.nullsp.remove(self.x_n)  # creo que se puede quitar?
 
+        PETSc.Sys.Print("Solving the nonlinear problem with SNES")
         self.solver.solve(None, self.x_n)
+        its_snes = self.solver.getIterationNumber()
+        its_ksp = self.solver.getLinearSolveIterations()
+        PETSc.Sys.Print(
+            f"Solver converged in {its_snes} nonlinear iterations"
+            f" (with total number of {its_ksp} linear iterations)"
+        )
         self.updateSolution(self.x_n)
 
         reason = self.solver.getConvergedReason()

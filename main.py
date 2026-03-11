@@ -195,6 +195,12 @@ def main():
         default=None,
         help="Override early stop tolerance for all experiments",
     )
+    exp_solve_parser.add_argument(
+        "--monitor",
+        action="store_true",
+        default=False,
+        help="Enable PETSc SNES/KSP monitoring and viewing",
+    )
 
     # ── tree ──────────────────────────────────────────────────────────────
     tree_parser = subparsers.add_parser(

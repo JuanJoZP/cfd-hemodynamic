@@ -1,3 +1,4 @@
+import inspect
 import os
 import sys
 from abc import ABC, abstractmethod
@@ -51,6 +52,7 @@ class Scenario(ABC):
         T: float,
         f: list,
         early_stop_tolerance: float = 1e-5,
+        **solver_kwargs,
     ):
         self.solver_name = solver_name
         self.scenario_name = scenario_name
@@ -75,10 +77,20 @@ class Scenario(ABC):
 
         self.solverClass: type[SolverBase] = solver_module.Solver
 
-        # Instantiate the solver
+        # Instantiate the solver, forwarding only the kwargs it declares
+        sig = inspect.signature(self.solverClass.__init__)
+        accepted = sig.parameters
+        has_var_keyword = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in accepted.values()
+        )
+        filtered_kwargs = (
+            solver_kwargs if has_var_keyword
+            else {k: v for k, v in solver_kwargs.items() if k in accepted}
+        )
         try:
             self.solver = self.solverClass(
-                self.mesh, dt, rho, mu, f, initial_velocity=self.initial_velocity
+                self.mesh, dt, rho, mu, f, initial_velocity=self.initial_velocity,
+                **filtered_kwargs,
             )
         except TypeError as e:
             raise RuntimeError(
@@ -112,8 +124,23 @@ class Scenario(ABC):
         except OSError:
             return ["(could not list)"]
 
+    @property
+    def facet_tags(self):
+        return getattr(self, "_ft", None)
+
+    @property
+    def tags(self) -> dict:
+        return {
+            "inlet": getattr(self, "inlet_marker", None),
+            "outlet": getattr(self, "outlet_marker", None),
+            "wall": getattr(self, "wall_marker", None),
+            "obstacle": getattr(self, "obstacle_marker", None),
+        }
+
     def setup(self):
-        self.solver.setup(self.bcu, self.bcp)
+        self.solver.setup(
+            self.bcu, self.bcp, facet_tags=self.facet_tags, tags=self.tags
+        )
 
         if self.mesh.comm.rank == 0:
             num_dofs_V = (
