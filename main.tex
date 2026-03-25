@@ -724,23 +724,40 @@ Para evaluar el desempeño y la precisión del solver implementado, se presentan
 
 \subsubsection{Flujo en cavidad inducida por tapa (Lid-Driven Cavity)}
 
-La \cref{fig:ldc_lineplot_re1000} muestra la comparación del perfil de la componente $x$ de la velocidad a lo largo de la recta $x=0.5$ utilizando diferentes esquemas numéricos, frente a los datos de referencia reportados por Ghia et al. \cite{ghia_high-re_1982} para $Re=1000$.
+Como paso previo a la comparación con datos de referencia, se realizó un estudio de convergencia de malla para $Re=1000$ con el fin de determinar una resolución suficientemente refinada. Se simuló hasta llegar a el estado estacionario en mallas uniformes de $N \times N$ elementos, con $N \in \{20, 30, 40, 50, 60, 70, 80, 90, 100\}$, y se registró la norma $L^2$ de la velocidad y de la presión en cada caso. Los resultados se muestran en la \cref{fig:ldc_convergencia_re1000}.
 
-% \begin{figure}[htbp]
-%   \centering
-%   \includegraphics[width=0.6\textwidth]{figures/template_lidriven_lineplot_solvers.png}
-%   \caption{Benchmark de cavidad inducida por tapa ($Re=1000$): comparación de la componente $x$ de la velocidad en la recta $x=0.5$ para los distintos solvers configurados, frente a los datos de Ghia et al. \cite{ghia_high-re_1982}.}
-%   \label{fig:ldc_lineplot_re1000}
-% \end{figure}
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.48\textwidth]{figures/norma_velocidad_lid_driven1000.png}
+  \hfill
+  \includegraphics[width=0.48\textwidth]{figures/norma_presion_lid_driven1000.png}
+  \caption{Convergencia de malla para el benchmark de cavidad inducida por tapa ($Re=1000$): norma $L^2$ de la velocidad (izquierda) y de la presión (derecha) en función de la resolución de malla $N$.}
+  \label{fig:ldc_convergencia_re1000}
+\end{figure}
 
-% Adicionalmente, en la \cref{fig:ldc_streamlines_re1000} se contrastan cualitativamente los mapas de líneas de corriente desarrollados en la cavidad.
+Ambas normas decrecen monótonamente al refinar la malla y se estabilizan a partir de $N=90$. En particular, la variación relativa entre las dos últimas mallas consecutivas ($N=90$ y $N=100$) fue inferior al $1\%$ en ambas variables: $0{,}11\%$ para la velocidad y $0{,}5\%$ para la presión. Este criterio confirma la convergencia de la solución y justifica el uso de $N=100$ como malla de referencia para las comparaciones posteriores.
 
-% \begin{figure}[htbp]
-%   \centering
-%   \includegraphics[width=0.8\textwidth]{figures/template_lid_driven_streamlines.png}
-%   \caption{Mapas de líneas de corriente en la cavidad inducida por tapa ($Re=10000$): (Izquierda) Resultados del solver implementado; (Derecha) Referencia de Ghia et al. \cite{ghia_high-re_1982}.}
-%   \label{fig:ldc_streamlines_re10000}
-% \end{figure}
+La \cref{fig:ldc_lineplot_re1000} muestra la comparación del perfil de la componente $x$ de la velocidad a lo largo de la recta $x=0.5$ frente a los datos de referencia reportados por Ghia et al. \cite{ghia_high-re_1982} para $Re=1000$, utilizando la malla de $N=100$.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.6\textwidth]{figures/ghia_comparison.png}
+  \caption{Benchmark de cavidad inducida por tapa ($Re=1000$): comparación de la componente $x$ de la velocidad en la recta $x=0.5$ para la simulación con $N=100$, frente a los datos de Ghia et al. \cite{ghia_high-re_1982}.}
+  \label{fig:ldc_lineplot_re1000}
+\end{figure}
+
+La curva simulada reproduce con fidelidad el perfil de referencia, capturando correctamente tanto las zonas de recirculación cercanas a las esquinas como el máximo de velocidad en la región central. El acuerdo cuantitativo con los datos tabulados de Ghia et al. confirma la validez del solver para este número de Reynolds.
+
+Adicionalmente, en la \cref{fig:ldc_streamlines_re1000} se contrastan cualitativamente los mapas de líneas de corriente desarrollados en la cavidad. Ambos muestran un vórtice primario centrado ligeramente por encima del centro geométrico de la cavidad, así como dos vórtices secundarios en las esquinas inferiores, estructura característica del flujo a este número de Reynolds. El patrón obtenido en la simulación concuerda cualitativamente con la referencia de Ghia et al.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.42\textwidth]{figures/streamlines_simulation.png}
+  \hfill
+  \includegraphics[width=0.42\textwidth]{figures/streamlines_ghia.png}
+  \caption{Líneas de corriente en la cavidad inducida por tapa ($Re=1000$): simulación con $N=100$ (izquierda) y referencia de Ghia et al. \cite{ghia_high-re_1982} (derecha).}
+  \label{fig:ldc_streamlines_re1000}
+\end{figure}
 
 \subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1)}
 
