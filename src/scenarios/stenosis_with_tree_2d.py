@@ -52,6 +52,9 @@ class StenosisWithTree2DSimulation(Scenario):
         *,
         rho: float = 1.060e-3,
         mu: float = 3.5e-3,
+        # Stenosis axial position as fraction of artery length (0–1).
+        # 0 → first control point at x=0, 1 → last control point at x=L.
+        stenosis_position: float = 0.2,
         # Tree parameters
         n_generations: int = 3,
         tree_gamma: float = 3.0,
@@ -78,7 +81,6 @@ class StenosisWithTree2DSimulation(Scenario):
             "R_in": 1.57,
             "R_out": 1.2,
             "res": 0.15,
-            "x_position_stenosis": 30.0,
             "severity": 0.567,
             "slope": 0.4,
             "tension": 0.5,
@@ -96,6 +98,42 @@ class StenosisWithTree2DSimulation(Scenario):
         for k, v in grade_params.items():
             if k not in kwargs:
                 self.mesh_options[k] = v
+
+        # Compute x_position_stenosis from stenosis_position fraction.
+        # dist_x (half-width of the bump) depends linearly on x_sten:
+        #   dist_x(x) = severity * (R_in + (R_out-R_in)*x/L) / slope
+        # We want:  frac=0 → cp1 at x=0  →  x_sten = dist_x
+        #           frac=1 → cp2 at x=L  →  x_sten = L - dist_x
+        # So: x_sten = dist_x(x_sten) + frac*(L - 2*dist_x(x_sten))
+        # Solving the linear equation exactly:
+        frac = float(np.clip(stenosis_position, 0.0, 1.0))
+        _L = self.mesh_options["L"]
+        _Ri = self.mesh_options["R_in"]
+        _Ro = self.mesh_options["R_out"]
+        _sev = self.mesh_options["severity"]
+        _slp = self.mesh_options["slope"]
+
+        if _slp > 0:
+            a = _sev * _Ri / _slp          # dist_x at x=0
+            b = _sev * (_Ro - _Ri) / (_slp * _L)  # d(dist_x)/dx
+            denom = 1.0 - b + 2.0 * frac * b
+            x_sten = (a * (1.0 - 2.0 * frac) + frac * _L) / denom
+        else:
+            dist_est = _L / 4.0
+            x_sten = dist_est + frac * (_L - 2.0 * dist_est)
+
+        # Clamp so control points stay inside [0, L]
+        r_at_x = _Ri + (_Ro - _Ri) * (x_sten / _L)
+        dx = _sev * r_at_x / _slp if _slp > 0 else _L / 4.0
+        dx = max(dx, _L * 0.05)
+        x_sten = max(x_sten, dx)
+        x_sten = min(x_sten, _L - dx)
+        self.mesh_options["x_position_stenosis"] = x_sten
+        print(
+            f"[INFO] stenosis_position={frac:.3f} → "
+            f"x_sten={x_sten:.2f}, dist_x={dx:.2f}, "
+            f"cp1={x_sten - dx:.2f}, cp2={x_sten + dx:.2f} (L={_L:.1f})"
+        )
 
         # Tree config
         self.tree_config = {
