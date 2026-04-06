@@ -448,161 +448,80 @@ Para la comparación de resultados se miden las fuerzas de arrastre y sustentaci
 
 La simulación se realiza en el intervalo de tiempo $t\in[0,8]$ con condición inicial en reposo $u(\cdot,0)=0$.
 
-\subsubsection{Flujo de Taylor-Green 3D}
-
-Este escenario se define en un dominio periódico donde se establece una condición inicial de velocidades y presiones basada en funciones trigonométricas que satisfacen analíticamente las ecuaciones de Navier-Stokes. A medida que el tiempo progresa, el flujo decae debido a los efectos viscosos sin la influencia de fronteras sólidas. La métrica de comparación es la evolución temporal de la energía cinética total del sistema y la tasa de disipación de energía, comparando los valores obtenidos por el solver frente a la solución analítica exacta del problema.
-
-poner las ecuaciones parametros y visual simple, resultados luego
 
 \subsection{Geometría arterial, EAC parametrizable} \label{sec:geom_arterial}
 
-%medidas 10.7759/cureus.46606
-Para estudiar de forma controlada el efecto de la Enfermedad Arterial Coronaria (EAC) en las variables hemodinámicas, se construyen geometrías arteriales con una estenosis axisimétrica parametrizada. En vez de trabajar con unos pocos casos fijos, se usa un parámetro continuo que permite recorrer desde un vaso sano hasta estenosis severas.
+Para estudiar de forma controlada el efecto de la Enfermedad Arterial Coronaria (EAC) en las variables hemodinámicas, se construyen geometrías arteriales bidimensionales con una estenosis simétrica parametrizada. Se usa un parámetro continuo que permite recorrer desde un vaso sano hasta estenosis severas.
 
-Se considera un segmento vascular idealizado definido por dos puntos extremos $\mathbf{P}_0$ y $\mathbf{P}_1$ en $\mathbb{R}^3$. El eje central se define como
-\begin{equation}
-  \label{eq:eac_axis}
-  \mathbf{e} = \frac{\mathbf{P}_1-\mathbf{P}_0}{\|\mathbf{P}_1-\mathbf{P}_0\|},
-  \qquad L = \|\mathbf{P}_1-\mathbf{P}_0\|.
-\end{equation}
-
-Para cualquier punto $\mathbf{x}\in\mathbb{R}^3$, se introduce un sistema de coordenadas locales $(s,r)$ dado por
-\begin{equation}
-  \label{eq:eac_local_coords}
-  s(\mathbf{x}) = \mathbf{e}\cdot(\mathbf{x}-\mathbf{P}_0)
-  \qquad
-  r(\mathbf{x}) = \left\|\left(I-\mathbf{e}\mathbf{e}^T\right)(\mathbf{x}-\mathbf{P}_0)\right\|.
-\end{equation}
-
-El radio del vaso se describe mediante una función $r(s)$ (en el plano $(s,r)$). Para permitir vasos con radio distinto en la entrada y la salida, se fijan dos radios base $R_{\mathrm{in}}$ y $R_{\mathrm{out}}$, y se define el radio de una transición lineal (sin estenosis) como
+Se considera un canal bidimensional de longitud $L$ a lo largo del eje $x$, donde la posición axial está dada por $x \in [0, L]$. El eje central del canal se ubica en $y = R_{\mathrm{in}}$. Para permitir vasos con perfil variable, se fijan dos radios base $R_{\mathrm{in}}$ y $R_{\mathrm{out}}$ en la entrada y la salida. La función que describe el radio de una transición lineal (vaso sano sin estenosis) es
 \begin{equation}
   \label{eq:eac_linear_taper}
-  R_{\mathrm{taper}}(s)
-  := R_{\mathrm{in}} + \left(R_{\mathrm{out}}-R_{\mathrm{in}}\right)\frac{s}{L},
-  \qquad s\in[0,L].
+  R_{\mathrm{taper}}(x)
+  := R_{\mathrm{in}} + \left(R_{\mathrm{out}}-R_{\mathrm{in}}\right)\frac{x}{L},
+  \qquad x\in[0,L].
 \end{equation}
-Sobre este perfil base, se parametriza el grado de estenosis con un parámetro adimensional
+
+Sobre este perfil base sano, se parametriza el grado de estenosis con una severidad adimensional
 \begin{equation}
   \label{eq:eac_severity}
   \eta \in [0,1],
   \qquad
-  R_{\min}(\eta)= (1-\eta)\,R_{\mathrm{taper}}(s_m),
+  R_{\min}(\eta)= (1-\eta)\,R_{\mathrm{taper}}(x_m),
 \end{equation}
-\noindent donde $s_m\in(0,L)$ es la posición axial de la estenosis
-y $R_{\min}$ es el radio en ese punto. De este modo, $\eta=0$ representa un vaso sin estenosis y $\eta\to 1$ una constricción extrema.
+\noindent donde $x_m \in (0,L)$ es la posición axial (centro) de la estenosis y $R_{\min}$ indica el radio interior efectivo en ese punto. De este modo, $\eta=0$ representa un modelo sin alteración de luz y $\eta\to 1$ refleja una constricción de severidad extrema.
 
-El perfil axial se construye por tramos. Fuera de la región de estenosis, el radio sigue el perfil lineal:
+El contorno del dominio de flujo está determinado por la pared superior en $y_{\mathrm{top}}(x) = R_{\mathrm{in}} + r(x)$ y la inferior en $y_{\mathrm{bot}}(x) = R_{\mathrm{in}} - r(x)$. El perfil del radio local $r(x)$ se define por tramos continuos. Fuera de la región de estenosis, el canal mantiene su estrechamiento fisiológico natural:
 \begin{equation}
   \label{eq:eac_healthy_segments}
-  r(s)=R_{\mathrm{taper}}(s),
-  \qquad s\in[0,\,s_m-d]\cup[s_m+d,\,L].
+  r(x)=R_{\mathrm{taper}}(x),
+  \qquad x\in[0,\,x_m-d]\cup[x_m+d,\,L].
 \end{equation}
 
-En la región de estenosis $s\in[s_m-d,\,s_m+d]$ se define una spline cúbica $\mathcal{S}(s)$ que interpola los tres puntos clave
-\begin{equation}
-  \label{eq:eac_spline_points}
-  \mathcal{S}(s_m-d)=R_{\mathrm{taper}}(s_m-d),
+En la región afectada por la estenosis $x\in[x_m-d,\,x_m+d]$, el perfil se genera mediante curvas de Bézier cúbicas. Para asegurar la continuidad y suavidad de la geometría, la interpolacion se establece mediante las siguientes condiciones en los extremos de la región y en el punto de estenosis crítico:
+\begin{align*}
+  r(x_m-d)=R_{\mathrm{taper}}(x_m-d),
   \qquad
-  \mathcal{S}(s_m)=R_{\min},
+  r(x_m)&=R_{\min},
   \qquad
-  \mathcal{S}(s_m+d)=R_{\mathrm{taper}}(s_m+d),
-\end{equation}
-\noindent y se imponen condiciones de tangencia en los puntos de empalme con el resto del perfil:
-\begin{equation}
-  \label{eq:eac_end_tangency}
-  \mathcal{S}'(s_m-d)=R_{\mathrm{taper}}'(s_m-d),
+  r(x_m+d)=R_{\mathrm{taper}}(x_m+d), \\
+  r'(x_m-d)=R_{\mathrm{taper}}'(x_m-d),
   \qquad
-  \mathcal{S}'(s_m+d)=R_{\mathrm{taper}}'(s_m+d).
-\end{equation}
+  r'(x_m)&=R_{\mathrm{taper}}'(x_m),
+  \qquad
+  r'(x_m+d)=R_{\mathrm{taper}}'(x_m+d).
+\end{align*}
 
 La distancia $d$ controla qué tan pronunciada es la transición y se define a partir de un parámetro de pendiente $\alpha>0$ como
 \begin{equation}
   \label{eq:eac_d_alpha}
-  d = \frac{R_{\mathrm{taper}}(s_m)-R_{\min}}{\alpha}.
+  d = \frac{R_{\mathrm{taper}}(x_m)-R_{\min}}{\alpha}.
 \end{equation}
 
-Finalmente, el radio del vaso se define como
-\begin{equation}
-  \label{eq:eac_radius_profile}
-  r(s) := \mathcal{S}(s), \qquad s\in[0,L].
-\end{equation}
-
-El dominio tridimensional se obtiene al revolver el perfil $r(s)$ alrededor del eje central definido por $\mathbf{e}$, generando una geometría axisimétrica. En todo punto la sección transversal se mantiene circular, y el radio local depende únicamente de la coordenada axial $s$.
-
-La discretización espacial se realiza con una malla tetraédrica. El tamaño local de elemento se adapta según la curvatura de la geometría, refinando alrededor de la estenosis y usando elementos más grandes en las zonas anchas.
+La discretización espacial se realiza con una malla de elementos triangulares. El tamaño local de elemento se adapta según la curvatura de la geometría, refinando alrededor de la estenosis y usando elementos más grandes en las zonas anchas.
 \vspace{10pt}
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.8\textwidth]{figures/geometria_arteria.png}
-  \caption{Ejemplo de geometría arterial mallada generada con $\eta=0.75$ y  $\alpha = 0.4$.}
+  \caption{Ejemplo de geometría arterial mallada generada con $\eta=0.6$ y  $\alpha = 0.3$.}
   \label{fig:eac_geometria_arteria}
 \end{figure}
 
-\subsection{Geometría microvascular, DMV parametrizable} \label{sec:geom_microvascular}
+\subsection{Geometría del lecho microvascular} \label{sec:geom_microvascular}
 
-Para representar explícitamente la microcirculación distal, se genera un árbol microvascular sintético utilizando VascuSynth. En particular, VascuSynth construye un grafo dirigido del árbol vascular a partir de un mapa de demanda de oxígeno y lo exporta en formato GXL. Esta salida se utiliza como entrada para un pipeline propio de reconstrucción geométrica y mallado.
+Para representar la red microvascular, se genera un árbol arterial. La geometría se genera mediante el uso progresivo de bifurcaciones simétricas.
 
-Para este trabajo se usó un mapa de damanda de oxigeno uniforme, y como paso previo de preprocesamiento, se ajustan las dimensiones de este mapa de tal forma que represente un cubo de volumen parametrizable.
+El descenso del radio entre las ramas de cada nivel vascular sigue la ley de Murray \cite{<cita_murray>}. Asumiendo una bifurcación simétrica y un exponente cúbico estándar $\gamma = 3$, el radio de las ramas hijas $r_{h}$ está dado por el radio de la rama padre $r_{p}$ como:
+\begin{equation}
+    r_{p}^{3} = 2 r_{h}^{3} \qquad \implies \qquad r_{h} = r_{p} \, 2^{-1/3}.
+\end{equation}
 
-Además, también se deben especificar valores para estos parámetros que afectan la generación del árbol:
-\begin{itemize}
-  \item Número de terminales ($N$): controla la granularidad del árbol. AL escoger un número mayor de terminales, el radio de estos vasos es necesariamente menor, de esta forma podemos controlar hasta que nivel de la microvasculatura simular.
-  \item Presión de perfusión y presión terminal ($P_{\mathrm{perf}}$, $P_{\mathrm{term}}$): fijan el gradiente de presión del árbol, escencial al escoger los radios de cada vaso para que sean fisiologicamente consistentes.
-  \item Exponente de bifurcación ($\gamma$): La ley de Murray \cite{<cita_murray>} define la relación del radio de la rama padre con los de las dos hijas en una bifurcación. Está dada por
-    \begin{equation}
-      r_{\mathrm{parent}}^{\gamma} = r_{\mathrm{left}}^{\gamma} + r_{\mathrm{right}}^{\gamma}.
-    \end{equation}
-\end{itemize}
+La longitud $L$ de los segmentos en red es directamente proporcional a su radio particular gracias a establecer la constante de proporción $\alpha$:
+\begin{equation}
+    L = \alpha r.
+\end{equation}
 
-A partir del archivo \texttt{GXL}, se parsea el grafo, se escalan posiciones y radios mediante un factor de conversión interno. Posteriormente, cada segmento vascular se reconstruye como un sólido 3D mediante el barrido de secciones circulares sobre splines que conectan nodos consecutivos. En las bifurcaciones, se emplean derivadas/tangentes consistentes y transiciones geométricas suaves (lofts) para asegurar una geometría suave en la unión de ramas.
-
-La geometría resultante se exporta en formato \texttt{BREP} y se discretiza en una malla volumétrica 3D usando \textit{gmsh}. En esta etapa se asignan etiquetas físicas para el volumen del fluido, la entrada, las salidas  y la pared; el etiquetado se realiza identificando de manera automatizada las superficies más cercanas a los puntos asociados a los nodos de interés. El refinamiento de la malla se controla imponiendo un número mínimo de elementos sobre la circunferencia local de cada sección transversal.
-
-\begin{figure}[!ht]
-  \centering
-  % Reemplazar por el archivo real (subir a la carpeta figures/).
-  \includegraphics[width=0.65\linewidth]{figures/arbol.png}
-  \caption{Árbol microvascular sintético generado con $N=5$, $\gamma=3$, $P_{\mathrm{perf}}=133000$, $P_{\mathrm{term}}=80000$, $Q_{\mathrm{in}}=2$ y volumen $=50\,\mathrm{ml}$.}
-  \label{fig:arbol-microvascular-N5-gamma3}
-\end{figure}
-
-Además de los parámetros globales de generación, se incorporan dos mecanismos simplificados para parametrizar la DMV sobre el árbol microvascular sintético: (i) la \emph{rarefacción capilar}, entendida como una reducción efectiva de la densidad microvascular distal por pérdida/eliminación de vasos, y (ii) el \emph{engrosamiento del lumen} en la microvasculatura, modelado como un cambio multiplicativo del radio en ciertos niveles del árbol. Estos mecanismos se introducen de forma controlada para explorar su impacto hemodinámico.~\cite{<cita_rarefaccion>,<cita_engrosamiento>}
-
-El engrosamiento se implementa aplicando un factor multiplicativo $f_{\mathrm{thick}}$ al radio de los vasos a partir de un umbral de nivel $L_{\mathrm{th}}$ en el árbol. En la práctica, para cada segmento se consulta el nivel asociado al nodo proximal y, si dicho nivel es mayor o igual que $L_{\mathrm{th}}$, se actualiza su radio multiplicándolo por $f_{\mathrm{thick}}$. Este esquema permite concentrar el remodelado en la microvasculatura distal y dejar sin cambios los segmentos proximales.
-
-\begin{figure}[!ht]
-  \centering
-  % Reemplazar por los archivos reales (subir a la carpeta figures/).
-  \includegraphics[width=0.49\linewidth]{figures/arbol_sin_engrosamiento.png}\hfill
-  \includegraphics[width=0.49\linewidth]{figures/arbol_con_engrosamiento.png}
-  \caption{Comparación del mismo árbol microvascular sin engrosamiento (izquierda) y con engrosamiento (derecha). Parámetro usado: $f_{\mathrm{thick}}=\,$\textit{0.4} y $L_{\mathrm{th}}=\,$\textit{2}.}
-  \label{fig:arbol-contra-engrosamiento}
-\end{figure}
-
-
-La rarefacción se modela como una poda aleatoria del árbol, se asigna a cada nodo una probabilidad de eliminación que aumenta con su nivel, escalada por un factor global de severidad. Cuando un nodo es marcado para eliminación, se elimina también todos los vasos que derivan de él, de modo que la estructura final siga siendo un árbol válido. Tras la poda, se reconstruye el conjunto de nodos y aristas activos eliminando los elementos que quedaron desconectados o pertenecen a subárboles removidos. Este procedimiento reduce la densidad de vasos terminales de forma controlada y reproducible.
-
-\begin{figure}[!ht]
-  \centering
-  % Reemplazar por los archivos reales (subir a la carpeta figures/).
-  \includegraphics[width=0.49\linewidth]{figures/arbol_sin_rarefaccion.png}\hfill
-  \includegraphics[width=0.49\linewidth]{figures/arbol_con_rarefaccion.png}
-  \caption{Comparación del mismo árbol microvascular sin rarefacción (izquierda) y con rarefacción (derecha). Parámetro usado: factor de rarefacción $=\,$\textit{0.5}.}
-  \label{fig:arbol-contra-rarefaccion}
-\end{figure}
-
-
-\subsection{Acoplamiento}
-
-Para acoplar la geometría de la estenosis con el árbol microvascular, se introduce una sección de transición con forma de cono truncado, cuyo radio varía suavemente desde el radio de salida de la estenosis hasta el radio de entrada del árbol. De esta forma se conserva una geometría suave en el empalme y se evitan discontinuidades geométricas. La transición se controla mediante un parámetro de pendiente.
-
-\begin{figure}[!ht]
-  \centering
-  \includegraphics[width=0.65\linewidth]{figures/acoplamiento_estenosis_arbol.png}
-  \caption{Ejemplo de acoplamiento con pendiente = 0.05.}
-  \label{fig:acoplamiento-estenosis-arbol}
-\end{figure}
+De igual forma, cada bifurcación establece un mismo ángulo de salida para las ramas hijas, originando finalmente una geometría simetrica y que es consistente con las leyes que rigen el flujo sanguíneo en la microvasculatura.
 
 \subsection{Plataforma para la implementación}
 
@@ -697,24 +616,173 @@ Finalmente, con el objetivo de garantizar la trazabilidad, cada resultado se alm
 
 \subsection{Condiciones de frontera}
 
+La presión de entrada $p_\mathrm{in}$ se impone de forma \emph{débil} siguiendo \cite{pressurebc}, lo que permite prescribir simultáneamente condiciones de presión y de velocidad sobre la misma frontera $\Gamma_\mathrm{in}$.
+
+Siguiendo la formulación de \cite{pressurebc}, el término de frontera del tensor de esfuerzos sobre $\Gamma_\mathrm{in}$ en \eqref{momentum_weak} se reemplaza por:
+
+\begin{equation}
+  \label{eq:inlet_pressure_bc}
+  \int_{\Gamma_\mathrm{in}} p_\mathrm{in} \, (v \cdot n) \, ds.
+\end{equation}
+
+Adicionalmente, para mejorar la estabilidad numérica , se decidió prescribir que la componente tangencial de la velocidad en el inlet sea nula, es decir, $u_T = u - (u \cdot n)\,n = 0$ sobre $\Gamma_\mathrm{in}$. Puesto que la frontera de entrada es tratada de forma débil, esta condición no puede imponerse como una restricción de Dirichlet estándar. Por ello, se emplea el \emph{método de Nitsche} \cite{nitsche_original}, que permite imponer de forma consistente y estable condiciones de contorno de tipo Dirichlet de forma débil.
+
+El método de Nitsche para la condición $u_T = 0$ introduce en el residuo los tres términos siguientes \cite{nitsche_ns}:
+
+\begin{equation}
+  \label{eq:nitsche_inlet}
+  -\int_{\Gamma_\mathrm{in}} \bigl(2\mu\,\varepsilon(u)\cdot n\bigr) \cdot v_T \, ds
+  -\int_{\Gamma_\mathrm{in}} \bigl(2\mu\,\varepsilon(v)\cdot n\bigr) \cdot u_T \, ds
+  +\frac{\beta_N \mu}{h} \int_{\Gamma_\mathrm{in}} u_T \cdot v_T \, ds,
+\end{equation}
+
+\noindent donde $v_T = v - (v \cdot n)\,n$ es la componente tangencial de la función de prueba, $h$ es la longitud característica local del elemento, y $\beta_N > 0$ es el parámetro de penalización de Nitsche. El primer término es la consistencia adjunta de la condición, el segundo garantiza la simetría de la formulación, y el tercero es el término de penalización que asegura la coercividad del problema y el cumplimiento de la condición $u_T = 0$. La formulación resultante es consistente (la solución exacta satisface la forma débil), simétrica e incondicionalmente estable para valores suficientemente grandes de $\beta_N$.
+
+En el \textit{outlet} $\Gamma_\mathrm{out}$, la condición de salida se impone de forma débil prescribiendo una presión $p_{\mathrm{out}}^n$ sobre la frontera. Esto se logra de la misma forma que con a presion en la frontera de entrada, añadiendo el término que reemplaza al término de tracción natural del tensor de esfuerzos sobre $\Gamma_\mathrm{out}$:
+\begin{equation}
+  \label{eq:outlet_pressure_weak}
+  \int_{\Gamma_\mathrm{out}} p_{\mathrm{out}}^n \, (v \cdot n) \; ds.
+\end{equation}
+
+No obstante, la condición de presión impuesta débilmente en el \textit{outlet} puede inducir inestabilidades numéricas cuando el flujo local se invierte, por ejemplo, al paso de vórtices o en regimen pulsátil. En esos instantes, el flujo que retrocede introduce energía cinética al sistema, lo que puede llevar a la divergencia del método \cite{bc_backflow_hemo,modified_bc_hemo}. Para suprimir este fenómeno, se añade el término de penalización de \textit{backflow} propuesto en \cite{bc_backflow_hemo}:
+\begin{equation}
+  \label{eq:backflow_term}
+  -\int_{\Gamma_\mathrm{out}} \beta_b \, \rho \, (u^{n-1} \cdot n)_- \; (u \cdot v) \; ds,
+\end{equation}
+\noindent donde $\beta_b > 0$ es el parámetro de penalización y
+\begin{equation*}
+  (u^{n-1} \cdot n)_- \;=\; \tfrac{1}{2}\bigl(u^{n-1}\cdot n \;-\; |u^{n-1}\cdot n|\bigr)
+\end{equation*}
+es la parte negativa de la velocidad normal evaluada en el paso anterior, de modo que el término solo penaliza donde el flujo retrocede.
+
+La elección de $p_{\mathrm{out}}^n$ requiere especial atención. La presión en la salida del dominio no es independiente de la geometría simulada: a mayor severidad de la estenosis, mayor es el gradiente de presión a través del vaso, y la presión en el \textit{outlet} también depende de la resistencia hidráulica del territorio distal (el árbol microvascular) que no se simula explícitamente por completo. En consecuencia, la presión de salida no puede prescribirse directamente a partir de datos conocidos a priori.
+
+Una elección consistente con la fisiología es suponer una relación lineal entre el flujo volumétrico $Q$ y la presión en el \textit{outlet}:
+\begin{equation}
+  \label{eq:resistance_bc}
+  p_{\mathrm{out}} = R \cdot Q,
+\end{equation}
+\noindent donde $R$ es la resistencia vascular periférica del lecho distal. Esta condición modela el dominio no simulado aguas abajo del \textit{outlet} y es independiente de la geometría interna del dominio principal. La relación \eqref{eq:resistance_bc} es consistente con un flujo de Poiseuille completamente desarrollado \cite{mcdonalds_fisiology}, donde la caída de presión es proporcional al caudal. Esta suposición es pertinente en la microvasculatura, dado que los radios de los vasos capilares son muy pequeños, el número de Reynolds local es bajo y el flujo es efectivamente laminar y completamente desarrollado \cite{outflow_resistance}.
+
+En la implementación se adopta un acoplamiento explícito, la presión de salida en el paso $n$ se calcula con el caudal del paso anterior,
+\begin{equation}
+  \label{eq:resistance_explicit}
+  p_c^n = R \cdot Q^{n-1}, \qquad Q^{n-1} = \int_{\Gamma_\mathrm{out}} u^{n-1} \cdot n \; ds.
+\end{equation}
+
+\subsubsection{Resistencia para el árbol microvascular}
+
+Para el escenario acoplado de la estenosis con el árbol microvascular explícito, la condición de frontera de resistencia prescrita en los terminales del árbol debe reflejar la resistencia periférica total ($R_{\mathrm{target}}$) descontando la resistencia propia de la parte de la red microvascular que sí es simulada de forma explícita ($R_{\mathrm{arbol}}$). Por lo tanto, el valor de resistencia a prescribir en las fronteras terminales del árbol es:
+\begin{equation}
+  R_{\mathrm{out}} = R_{\mathrm{target}} - R_{\mathrm{arbol}}.
+\end{equation}
+
+El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que conocemos el radio (semi-ancho) de los vasos en cada nivel gracias a la ley de Murray. Asumiendo el perfil de flujo de Poiseuille para canales en 2D (placas paralelas), la resistencia teórica de un conducto rectangular de anchura $w$ y altura $h$ es $R = \frac{12 \mu L}{h^3}$. Dado que la altura total del canal vaso es el diámetro ($h = 2r$), la resistencia local se simplifica:
+\begin{equation}
+  R = \frac{12 \mu L}{(2r)^3} = \frac{3 \mu L}{2 r^3}
+\end{equation}
+
+En la generación de esta malla, la longitud del vaso en cada nivel mantiene una proporción fijacon el radio ($\alpha$), de manera que $L = \alpha r$. Al sustituir esta definición, se observa que la resistencia local de la sección de vaso en el primer nivel del árbol (de radio $r_0$) es:
+\begin{equation}
+  R_0 = \frac{3 \mu \alpha}{2 r_0^2}
+\end{equation}
+
+Luego, la ley de Murray especifica que para una bifurcación simétrica se cumple que $r_{\mathrm{padre}}^3 = 2 r_{\mathrm{hija}}^3$, por lo que el radio para cualquier rama en un nivel del árbol $j$ es:
+\begin{align}
+  r_{\mathrm{j}} &= r_{\mathrm{j-1}} \, 2^{-1/3} \nonumber \\
+  r_j &= r_0 \prod_{i=1}^{j} 2^{-1/3} \nonumber \\
+  r_j &= r_0 \, 2^{-j/3}
+\end{align}
+
+Con esto, la resistencia local de un vaso en el nivel $j$ es:
+\begin{equation}
+  R_{\mathrm{vaso}, j} = \frac{3 \mu \alpha}{2 r_j^2} = \frac{3 \mu \alpha}{2 r_0^2} \left(\frac{1}{2^{-2j/3}}\right) = R_0 \, 2^{2j/3}
+\end{equation}
+
+Hay que tener en cuenta que en cada nivel del árbol, existen $2^j$ vasos idénticos dispuestos en paralelo. Por lo tanto, el caudal total del sistema ($Q_{\mathrm{total}}$) se divide equitativamente y cada vaso transporta una fracción del flujo: $Q_j = Q_{\mathrm{total}} / 2^j$.
+
+Al ser un sistema simétrico, la caída de presión $\Delta P_j$ al atravesar el nivel $j$ es la misma en cualquier vaso: $\Delta P_j = R_{\mathrm{vaso}, j} \cdot Q_j$. Sustituyendo la porción de caudal correspondiente observamos que:
+\begin{equation} \label{eq:deltap_nivel}
+  \Delta P_j = R_{\mathrm{vaso}, j} \left( \frac{Q_{\mathrm{total}}}{2^j} \right) = \left( \frac{R_{\mathrm{vaso}, j}}{2^j} \right) Q_{\mathrm{total}}
+\end{equation}
+
+La resistencia de un nivel entero se define como la razón entre su caída de presión y el caudal total del sistema: 
+\begin{equation} \label{eq:resistencia_nivel}
+  R_{\mathrm{nivel}, j} = \frac{\Delta P_j}{Q_{\mathrm{total}}}
+\end{equation}
+
+Reemplazando la caida de presión \eqref{eq:deltap_nivel} se obtiene:
+\begin{equation}
+  R_{\mathrm{nivel}, j} = \frac{R_{\mathrm{vaso}, j}}{2^j} = R_0 \frac{2^{2j/3}}{2^j} = R_0 \, 2^{-j/3}
+\end{equation}
+
+La resistencia total del árbol se obtiene sumando las resistencias de cada nivel:
+\begin{equation}
+  R_{\mathrm{arbol}} = \sum_{j=0}^{N_{\mathrm{gen}}-1} R_{\mathrm{nivel}, j} = \frac{3 \mu \alpha}{2 r_0^2} \sum_{j=0}^{N_{\mathrm{gen}}-1} 2^{-j/3}
+\end{equation}
+
+
 \subsection{Simulación}
 
-Todas las simulaciones numéricas reportadas en este trabajo se ejecutaron en la infraestructura de Cómputo de Alto Desempeño (HPC) de la Universidad del Rosario, a través del Laboratorio de Computación Avanzada -- CALDAS.
+\subsubsection{Parámetros de la simulación}
 
-\paragraph{(Template) Recursos computacionales y entorno.}
-\textit{[Especificar: nombre del clúster/partición (si aplica), número de nodos y núcleos usados por corrida, tipo de CPU/GPU, RAM por nodo, sistema operativo, y gestor de colas (p. ej., Slurm/PBS).]}
+La geometría del segmento arterial se parametrizó con base en medidas morfométricas de la arteria descendente anterior izquierda (LAD) obtenidas mediante angiogramas coronarios y angiografía de rayos X. La longitud del segmento se fijó en $L = 138\,\text{mm}$, valor que cae dentro del rango de $72.46$--$144.78\,\text{mm}$ reportado en \cite{lad_length}. El radio de entrada se estableció en $R_{\mathrm{in}} = 1.57\,\text{mm}$, mientras que el radio de salida se fijó en $R_{\mathrm{out}} = 1.20\,\text{mm}$, de acuerdo a los valores reportados en \cite{lad_diameter}.
 
-\paragraph{(Template) Software y versiones.}
-\textit{[Especificar: solver (p. ej., FEniCSx/SimVascular u otro), versiones, compiladores, bibliotecas (PETSc/MPI), y configuración relevante (p. ej., flags de compilación, precisión, etc.).]}
+La presión de entrada se fijó en $p_{\mathrm{in}} = 75\,\mathrm{mmHg}$, valor representativo de la presión diastólica normal \cite{blood_pressure_aha}. Para las propiedades del fluido se adoptaron valores estándar de la sangre: densidad $\rho = 1.060\times10^{-3}\,\mathrm{g/mm^3}$ y viscosidad dinámica $\mu = 3.5\times10^{-3}\,\mathrm{Pa\cdot s}$. Para el esquema numérico se seleccionó un paso de tiempo $\Delta t = 10^{-4}\,\mathrm{s}$, un parámetro de penalización de \textit{backflow} $\beta_b = 0.6$ y un parámetro de Nitsche $\beta_N = 100$.
 
-\paragraph{(Template) Configuración numérica.}
-\textit{[Especificar: régimen (estacionario/transitorio), esquema temporal, paso de tiempo $\Delta t$, tiempo total simulado, criterios de convergencia, tolerancias absolutas/relativas, precondicionador/solucionador lineal, y número máximo de iteraciones.]}
+Para el árbol microvascular, se decidió generar $3$ niveles. Esta elección se fundamenta en simulaciones preliminares que mostraron que, a partir de dicho nivel, el número de Reynolds es muy bajo ($Re < 5$) y el flujo entra en un régimen laminar y completamente desarrollado. En consecuencia, la dinámica de flujo en el resto del árbol vascular puede aproximarse adecuadamente de forma analítica.
 
-\paragraph{(Template) Malla y estudio de convergencia.}
-\textit{[Especificar: número de elementos/grados de libertad por caso, estrategia de refinamiento (garganta/bifurcaciones), métricas de calidad, y si se realizó estudio de independencia de malla (qué magnitud se monitoreó y umbral de cambio).]}
+Por otro lado, el valor de la resistencia de salida $R$ se estimó a partir de mediciones promedio de presión y flujo en pacientes sanos. Según \cite{velocity_lad}, la velocidad de flujo media en la LAD a nivel distal es de $v_{\mathrm{media}} = 280\,\mathrm{mm/s}$. La velocidad media sobre un diámetro transversal de altura $h$ se expresa como:
+\begin{equation*}
+  v_{\mathrm{media}} = \frac{1}{h} \int_0^h v(y) \; dy.
+\end{equation*}
 
-\paragraph{(Template) Postproceso y variables reportadas.}
-\textit{[Especificar: cómo se computan $\Delta p$, WSS, caudales, vFFR/índices funcionales, promedios temporales, y software de visualización (p. ej., ParaView) si aplica.]}
+Asumiendo que el flujo es laminar y, por lo tanto, la velocidad es normal a la sección transversal, podemos relacionar el caudal $Q$ con la velocidad media de la siguiente manera:
+\begin{equation}
+  Q = \int_0^h (v(y) \cdot n) \; dy = \int_0^h v(y) \; dy = v_{\mathrm{media}} \cdot h.
+\end{equation}
+
+Entonces, al considerar un diámetro $h = 2.41\,\mathrm{mm}$, el flujo resulta en $Q = 280\,\mathrm{mm/s} \cdot 2.41\,\mathrm{mm} = 674.8\,\mathrm{mm^2/s}$.
+
+Teniendo en cuenta la presión diastólica normal previamente seleccionada ($p = 75\,\mathrm{mmHg}$), la cual se puede expresar en el sistema de unidades empleado en la simulación asumiendo que $1\,\mathrm{mmHg} \approx 133\,\mathrm{Pa}$, se obtiene una presión efectiva de $p \approx 9310\,\mathrm{Pa}$, lo que equivale a $9310\,\mathrm{g/(mm \cdot s^2)}$. Con base en la relación general $p = R \cdot Q$, la resistencia a nivel distal de la arteria se estima como:
+\begin{equation}
+  R = \frac{p}{Q} = \frac{9310\,\mathrm{g/(mm \cdot s^2)}}{674.8\,\mathrm{mm^2/s}} \approx 13.79\,\mathrm{g \cdot s/mm}.
+\end{equation}.
+
+\subsubsection{Convergencia de malla}
+
+Se realizó un estudio de convergencia de malla con el fin de determinar una resolución suficientemente refinada para las simulaciones posteriores. 
+
+Se adoptó una estrategia de refinamiento hp, donde se reduce el tamaño de los elementos de la malla, al tiempo que se aumenta el orden de los polinomios de aproximación, hasta lograr convergencia de la solución. La convergencia se evaluó sobre el cambio en la norma $L^2$ tanto de la velocidad como de la presión entre dos simulaciones consecutivas.  
+
+Se analizó la geometria completa, estenosis y árbol microvascular con tres niveles; se consideraron tres escenarios: obstrucción leve (25\%), moderada (50\%) y severa (75\%). Se inicío con polinomios de grado uno y elementos de tamaño $0.3$ mm y se obtuvo convergencia (cambio $< 1\%$) con polinomios de grado dos y elementos de tamaño $0.15$ mm. 
+
+
+\subsubsection{Impacto de la ubicación axial de la estenosis}
+
+Con el objetivo de evaluar si la ubicación de la estenosis a lo largo de la arteria tiene algún impacto sobre los índices diagnósticos o el flujo en el árbol vascular, se ejecutaron escenarios de simulación específicos. Se seleccionaron tres niveles de severidad de la estenosis ($25\%$, $50\%$ y $75\%$), cada uno evaluado en dos posiciones axiales distintas: una ubicación proximal al inicio de la arteria ($25\%$ de la longitud total) y una ubicación distal hacia el final de la misma ($75\%$ de la longitud).
+
+\subsubsection{Impacto de la forma de la estenosis}
+
+Para investigar de qué manera la morfología de la lesión afecta las variables hemodinámicas y los índices diagnósticos, se evaluó el impacto de la forma geométrica de la oclusión. En particular, se buscó determinar si existe un comportamiento diferencial entre una estenosis prolongada y una focal, si la forma abrupta de la lesión supone un factor crítico, o si el impacto sobre el flujo vascular está regido principalmente por la relación entre la pendiente de transición y el nivel de severidad.
+
+Con este propósito, se plantearon $9$ escenarios de simulación correspondientes a todas las combinaciones posibles de tres niveles de severidad ($\eta \in \{0.3, 0.6, 0.9\}$) y tres parámetros de pendiente ($\alpha \in \{0.2, 0.5, 0.8\}$).
+
+% Espacio reservado para visualizar la diferencia de morfología
+\begin{figure}[htbp]
+  \centering
+  % \includegraphics[width=0.48\textwidth]{figures/estenosis_focal.png}
+  % \hfill
+  % \includegraphics[width=0.48\textwidth]{figures/estenosis_prolongada.png}
+  \caption{Comparación geométrica de perfiles: estenosis focal/abrupta (izquierda) frente a estenosis prolongada/gradual (derecha).}
+  \label{fig:comparacion_forma_estenosis}
+\end{figure}
+
+\subsubsection{Por decidir (bla bla resistencia severidad indices diagnosticos)}
+- explicacion calculo FFR/CFR
+- explicacion eleccion de intervalo de resistencia
+- experimento relacion severidad/pendiente/resistencia -> FFR/CFR
+
 
 \section{Resultados}
 
@@ -723,6 +791,8 @@ Todas las simulaciones numéricas reportadas en este trabajo se ejecutaron en la
 Para evaluar el desempeño y la precisión del solver implementado, se presentan a continuación los resultados obtenidos correspondientes a los diferentes benchmarks de validación introducidos en la sección anterior.
 
 \subsubsection{Flujo en cavidad inducida por tapa (Lid-Driven Cavity)}
+
+!! aca falta analisis de convergencia
 
 Como paso previo a la comparación con datos de referencia, se realizó un estudio de convergencia de malla para $Re=1000$ con el fin de determinar una resolución suficientemente refinada. Se simuló hasta llegar a el estado estacionario en mallas uniformes de $N \times N$ elementos, con $N \in \{20, 30, 40, 50, 60, 70, 80, 90, 100\}$, y se registró la norma $L^2$ de la velocidad y de la presión en cada caso. Los resultados se muestran en la \cref{fig:ldc_convergencia_re1000}.
 
@@ -763,17 +833,36 @@ Adicionalmente, en la \cref{fig:ldc_streamlines_re1000} se contrastan cualitativ
 
 % Template: Presentar los resultados obtenidos frente a los valores de referencia (fuerzas de arrastre y sustentación, etc.).
 
-\subsubsection{Flujo de Taylor-Green 3D}
+\subsection{Analisis descriptivo de parametros hemodinamicos}
 
-% Template: Presentar curvas de decaimiento de energía cinética y la tasa de disipación frente a la solución analítica.
+un analiss descriptivo de las variables tanto en stenosis y en arbol:
 
-\subsection{Resultados principales de simulación}
+en stenosis:
+- velocidad
+- presion
+- wss
+-streamlines
+- vorticidad
 
-\begin{itemize}
-  \item experimentos de esquemas numericos? compararlos entre ellos
-  \item analisis parametros hemodinamicos en CAD (lo de cilamce)
-  \item de aca en adelante, lo de arboles microvasculares? lo de el acoplamiento y los analisis de las simulaciones.
-\end{itemize}
+
+en arbol:
+- simetria
+y sobre un path:
+- velocidad
+- presion
+- wss
+-streamlines
+- vorticidad
+
+\subsubsection{Impacto de la ubicación axial de la estenosis}
+
+\subsection{Impacto de la forma de la estenosis}
+
+el experimento con severidad y pendiente a ffr/cfr
+
+\subsection{Por decidir (bla bla resistencia severidad indices diagnosticos)}
+
+en relacion a DMV y EAC
 
 \section{Discusión}
 Análisis en relación con hipótesis y otros trabajos.
@@ -783,7 +872,7 @@ Agradecemos a los docentes Diana Consuelo Rodríguez Burbano y Sebastián Jarami
 
 Agradecemos a la Universidad del Rosario por proporcionar acceso a la infraestructura HPC a través del Laboratorio de Computación Avanzada – CALDAS.
 
-\bibliographystyle{ieeetr} % Formato IEEE solicitado
-\bibliography{bibliography} % Nombre de tu archivo .bib
+\bibliographystyle{ieeetr} 
+\bibliography{bibliography}
 
 \end{document}
