@@ -677,14 +677,14 @@ Para el escenario acoplado de la estenosis con el árbol microvascular explícit
   R_{\mathrm{out}} = R_{\mathrm{target}} - R_{\mathrm{arbol}}.
 \end{equation}
 
-El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que conocemos el radio (semi-ancho) de los vasos en cada nivel gracias a la ley de Murray. Asumiendo el perfil de flujo de Poiseuille para canales en 2D (placas paralelas), la resistencia teórica de un conducto rectangular de anchura $w$ y altura $h$ es $R = \frac{12 \mu L}{h^3}$. Dado que la altura total del canal vaso es el diámetro ($h = 2r$), la resistencia local se simplifica:
+El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que conocemos el radio de los vasos en cada nivel gracias a la ley de Murray. Para este desarrollo, el perfil de flujo de Poiseuille entre 2 placas tiene varias limitaciones, por lo que asumimos el perfil de flujo de Poiseuille para conductos cilíndricos. Bajo estas condiciones, la resistencia hidráulica de un vaso de radio $r$ y longitud $L$ viene dada por:
 \begin{equation}
-  R = \frac{12 \mu L}{(2r)^3} = \frac{3 \mu L}{2 r^3}
+  R = \frac{8 \mu L}{\pi r^4}
 \end{equation}
 
-En la generación de esta malla, la longitud del vaso en cada nivel mantiene una proporción fijacon el radio ($\alpha$), de manera que $L = \alpha r$. Al sustituir esta definición, se observa que la resistencia local de la sección de vaso en el primer nivel del árbol (de radio $r_0$) es:
+En la generación de la geometria del árbol microvascular, la longitud del vaso en cada nivel mantiene una proporcion fija con el radio, de manera que $L = \alpha r$. Al sustituir esta definición, obtenemos que la resistencia particular de un vaso en el primer nivel del árbol (de radio $r_0$) es:
 \begin{equation}
-  R_0 = \frac{3 \mu \alpha}{2 r_0^2}
+  R_0 = \frac{8 \mu \alpha}{\pi r_0^3}
 \end{equation}
 
 Luego, la ley de Murray especifica que para una bifurcación simétrica se cumple que $r_{\mathrm{padre}}^3 = 2 r_{\mathrm{hija}}^3$, por lo que el radio para cualquier rama en un nivel del árbol $j$ es:
@@ -696,7 +696,7 @@ Luego, la ley de Murray especifica que para una bifurcación simétrica se cumpl
 
 Con esto, la resistencia local de un vaso en el nivel $j$ es:
 \begin{equation}
-  R_{\mathrm{vaso}, j} = \frac{3 \mu \alpha}{2 r_j^2} = \frac{3 \mu \alpha}{2 r_0^2} \left(\frac{1}{2^{-2j/3}}\right) = R_0 \, 2^{2j/3}
+  R_{\mathrm{vaso}, j} = \frac{8 \mu \alpha}{\pi r_j^3} = \frac{8 \mu \alpha}{\pi \left(r_0 \, 2^{-j/3}\right)^3} = R_0 \, 2^j
 \end{equation}
 
 Hay que tener en cuenta que en cada nivel del árbol, existen $2^j$ vasos idénticos dispuestos en paralelo. Por lo tanto, el caudal total del sistema ($Q_{\mathrm{total}}$) se divide equitativamente y cada vaso transporta una fracción del flujo: $Q_j = Q_{\mathrm{total}} / 2^j$.
@@ -713,12 +713,12 @@ La resistencia de un nivel entero se define como la razón entre su caída de pr
 
 Reemplazando la caida de presión \eqref{eq:deltap_nivel} se obtiene:
 \begin{equation}
-  R_{\mathrm{nivel}, j} = \frac{R_{\mathrm{vaso}, j}}{2^j} = R_0 \frac{2^{2j/3}}{2^j} = R_0 \, 2^{-j/3}
+  R_{\mathrm{nivel}, j} = \frac{R_{\mathrm{vaso}, j}}{2^j} = \frac{R_0 \, 2^j}{2^j} = R_0
 \end{equation}
 
 La resistencia total del árbol se obtiene sumando las resistencias de cada nivel:
-\begin{equation}
-  R_{\mathrm{arbol}} = \sum_{j=0}^{N_{\mathrm{gen}}-1} R_{\mathrm{nivel}, j} = \frac{3 \mu \alpha}{2 r_0^2} \sum_{j=0}^{N_{\mathrm{gen}}-1} 2^{-j/3}
+\begin{equation}\label{eq:resistencia_arbol}
+  R_{\mathrm{arbol}} = \sum_{j=0}^{N_{\mathrm{gen}}-1} R_{\mathrm{nivel}, j} = \sum_{j=0}^{N_{\mathrm{gen}}-1} R_0  = N_{\mathrm{gen}} \frac{8 \mu \alpha}{\pi r_0^3}
 \end{equation}
 
 
@@ -780,7 +780,43 @@ Con este propósito, se plantearon $9$ escenarios de simulación correspondiente
 
 \subsubsection{Por decidir (bla bla resistencia severidad indices diagnosticos)}
 - explicacion calculo FFR/CFR
-- explicacion eleccion de intervalo de resistencia
+
+Para evaluar el impacto hemodinámico de la disfunción microvascular (DMV), se planteó un análisis variando la resistencia periférica desde un estado sano hasta uno patológico. Esta transición simula las dos alteraciones principales de la DMV: la rarefacción capilar (pérdida de capilares) y el engrosamiento de pared (reducción uniforme de radios) \cite{concenso_minoca_arg}. 
+
+En primer lugar, se asume un árbol microvascular de referencia (sano). Para establecer su profundidad, se determinó el número de generaciones necesarias para que los vasos terminales alcancen dimensiones capilares (diámetro entre $5$ y $10\,\mu\mathrm{m}$) \cite{circulacion_capilar}. Evaluando la ley de Murray $r_j = r_0 \, 2^{-j/3} \le 0.0025\,\mathrm{mm}$ desde el vaso principal $r_0 = 1.2\,\mathrm{mm}$, se alcanzan las capilares en la generación $27$ ($r_{27} \approx 2.34\,\mu\mathrm{m}$). Estableciendo entonces $N_{\mathrm{gen}} = 27$, la resistencia de este árbol sano ($R_{\mathrm{geom}}^{\mathrm{sano}}$) se evalúa usando \eqref{eq:resistencia_arbol} y es igual a $27 R_0$.
+
+Posteriormente, se simulan las dos alteraciones patológicas en la topología para obtener la resistencia enferma ($R_{\mathrm{geom}}^{\mathrm{enfermo}}$):
+
+Primero se modela el engrosamiento de pared utilizando el porcentaje de área transversal ocupada por la pared respecto al área total del vaso. En un estudio de arteriolas coronarias intramiocárdicas \cite{dmv_remodelation_lumen}, los pacientes con presión arterial normal estaban en promedio en $66\%$, mientras que las de pacientes hipertensos en $69.9\%$. Definiendo el área luminal como el complemento ($100\% - \text{área de pared}$), el área de flujo en sujetos sanos es del $34\%$, mientras que en hipertensos se reduce al $30.1\%$. El estudio muestra que el radio externo se mantiene constante, por lo que el factor por el que se reduce el radio interno en pacientes enfermos es: $\beta = \sqrt{\frac{0.301}{0.340}} \approx 0.9409$. 
+  
+Luego se modela la rarefacción, los valores normales de densidad capilar varían entre $2500$ y $3000\,\mathrm{capilares/mm^2}$. Bajo ciertas patologías, la densidad disminuye a unos $1500 - 2000\,\mathrm{capilares/mm^2}$ \cite{rarefaction}, lo que equivale a una reducción de capilares ($\xi$) de entre un $20\%$ y $40\%$. Para reproducirlo matemáticamente, el número de ramas se reduce multiplicando el número de vasos en paralelo por el factor $(1-\xi)$. Esta disminución se aplica exclusivamente sobre las generaciones correspondientes a la microcirculación (niveles $j \ge N_{\mathrm{micro}}$).
+
+Aplicando la constricción luminal (que aumenta la resistencia tubular por un factor de $1/\beta^4$) y la reducción de capilares (que disminuyen el flujo en paralelo por $1-\xi$), la resistencia del arbol representativo de DMV es:
+\begin{equation}
+  R_{\mathrm{geom}}^{\mathrm{enfermo}} = \sum_{j=0}^{N_{\mathrm{micro}}-1} \frac{R_0}{\beta^4} + \sum_{j=N_{\mathrm{micro}}}^{N_{\mathrm{gen}}-1} \frac{R_0}{\beta^4 (1-\xi)}
+\end{equation}
+
+Con estas ecuaciones, el factor de aumento resistivo ($k_R$) se evalúa como:
+\begin{equation}
+  k_R = \frac{R_{\mathrm{geom}}^{\mathrm{enfermo}}}{R_{\mathrm{geom}}^{\mathrm{sano}}}
+\end{equation}
+
+Para evaluar la severidad máxima, se determinó el inicio de la red capilar ($N_{\mathrm{micro}}$) como el nivel donde el radio luminal es $\leq 10\,\mu\mathrm{m}$ \cite{circulacion_capilar}. Evaluando $r_0 \, 2^{-j/3} \le 0.01\,\mathrm{mm}$ con $r_0 = 1.2\,\mathrm{mm}$, se obtiene que la rarefacción inicia en $N_{\mathrm{micro}} = 21$.
+
+Se adoptaron los parámetros extremos para establecer la cota patológica máxima: un factor de contracción luminal $\beta = 0.9409$ (incrementando la resistencia tubular por el factor $1/\beta^4 \approx 1.275$) y una pérdida de densidad capilar del $40\%$ ($\xi = 0.40$, con una vascularidad remanente del $60\%$).
+
+Sustituyendo estos parámetros para las $N_{\mathrm{gen}} = 27$ generaciones y $N_{\mathrm{micro}} = 21$:
+\begin{equation}
+  k_R = \frac{\frac{R_0}{\beta^4} \left[ 21 + \frac{27-21}{0.6} \right]}{27 R_0} \approx \frac{1.275 \left[ 21 + 10 \right]}{27} \approx 1.464
+\end{equation}
+
+Escalando la resistencia basal, la condición de frontera para el árbol enfermo resulta en:
+\begin{equation}
+  R_{\mathrm{enfermo}} = R_{\mathrm{base}} \cdot 1.464 = 13.79 \cdot 1.464 \approx 20.19\,\mathrm{g \cdot s/mm}
+\end{equation}
+
+De esta manera, el rango de resistencias a explorar para determinar el impacto de la enfermedad es $[13.79, 20.19]\,\mathrm{g \cdot s/mm}$.
+
 - experimento relacion severidad/pendiente/resistencia -> FFR/CFR
 
 

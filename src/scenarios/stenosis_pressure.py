@@ -83,7 +83,7 @@ class StenosisPressureSimulation(Scenario):
         }
         grade_params = stenosis_grades.get(grade, stenosis_grades["severe"])
         for k, v in grade_params.items():
-            if k not in kwargs:
+            if k not in self.mesh_options:
                 self.mesh_options[k] = v
 
         self._bcu: list[BoundaryCondition] = None
@@ -212,7 +212,6 @@ class StenosisPressureSimulation(Scenario):
         h_sten = r_taper_mid - R_min
 
         dist_x = h_sten / slope if slope > 0 else L / 4
-        dist_x = max(dist_x, L * 0.05)
         dist_x = min(dist_x, min(x_sten, L - x_sten) * 0.95)
 
         cp1_x = x_sten - dist_x

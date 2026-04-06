@@ -73,7 +73,7 @@ class StenosisSimulation(Scenario):
 
         grade_params = self.stenosis_grades.get(grade, self.stenosis_grades["severe"])
         for k, v in grade_params.items():
-            if k not in kwargs:
+            if k not in self.mesh_options:
                 self.mesh_options[k] = v
 
         self._bcu: list[BoundaryCondition] = None
@@ -140,8 +140,9 @@ class StenosisSimulation(Scenario):
                 v_max = float(self._v_max)
 
                 def parabolic_inlet(x):
-                    values = np.zeros((self.mesh.geometry.dim, x.shape[1]),
-                                      dtype=PETSc.ScalarType)
+                    values = np.zeros(
+                        (self.mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType
+                    )
                     r = x[1] - center_y
                     values[0] = v_max * (1.0 - (r / R_in) ** 2)
                     return values
@@ -161,7 +162,11 @@ class StenosisSimulation(Scenario):
 
     def _compute_ffr(self, output_folder):
         """Compute FFR = p_distal / p_proximal at the channel centerline (y = R_in)."""
-        from dolfinx.geometry import bb_tree, compute_collisions_points, compute_colliding_cells
+        from dolfinx.geometry import (
+            bb_tree,
+            compute_collisions_points,
+            compute_colliding_cells,
+        )
 
         mesh = self.mesh
         R_in = self.mesh_options["R_in"]
@@ -169,10 +174,12 @@ class StenosisSimulation(Scenario):
         center_y = R_in
 
         # Proximal (inlet) and distal (outlet) points at channel center
-        points = np.array([
-            [0.0, center_y, 0.0],   # proximal (inlet)
-            [L, center_y, 0.0],      # distal (outlet)
-        ])
+        points = np.array(
+            [
+                [0.0, center_y, 0.0],  # proximal (inlet)
+                [L, center_y, 0.0],  # distal (outlet)
+            ]
+        )
 
         tree = bb_tree(mesh, mesh.topology.dim)
         cell_candidates = compute_collisions_points(tree, points)
@@ -186,9 +193,7 @@ class StenosisSimulation(Scenario):
 
         # Gather to rank 0 (only one rank owns each point)
         comm = mesh.comm
-        all_p = comm.allreduce(
-            np.where(np.isnan(p_values), 0.0, p_values), op=MPI.SUM
-        )
+        all_p = comm.allreduce(np.where(np.isnan(p_values), 0.0, p_values), op=MPI.SUM)
 
         if comm.rank == 0:
             p_proximal = all_p[0]
@@ -214,7 +219,9 @@ class StenosisSimulation(Scenario):
 
     def initial_velocity(self, x):
         if self._v_max is None:
-            return np.zeros((self.mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
+            return np.zeros(
+                (self.mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType
+            )
 
         R_in = self.mesh_options["R_in"]
         R_out = self.mesh_options["R_out"]
@@ -282,7 +289,6 @@ class StenosisSimulation(Scenario):
 
         # Half-width of the stenosis region (same formula as the 3D code)
         dist_x = h_sten / slope if slope > 0 else L / 4
-        dist_x = max(dist_x, L * 0.05)
         dist_x = min(dist_x, min(x_sten, L - x_sten) * 0.95)
 
         cp1_x = x_sten - dist_x
