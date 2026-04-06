@@ -118,6 +118,8 @@ class SolverBase(ABC):
         self._u_sol = Function(self.V)
         self._u_sol.name = "velocity"
         self._u_prev = Function(self.V)
+        self.u_residual = Function(self.V)
+        self.u_residual.name = "u_residual"
 
     def initPressureSpace(
         self,
@@ -136,6 +138,8 @@ class SolverBase(ABC):
         self._p_sol = Function(self.Q)
         self._p_sol.name = "pressure"
         self._p_prev = Function(self.Q)
+        self.p_residual = Function(self.Q)
+        self.p_residual.name = "p_residual"
 
     def initStressForm(self):
         scalar = functionspace(

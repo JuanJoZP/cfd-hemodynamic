@@ -1,5 +1,5 @@
 import numpy as np
-import pandas as pd
+# import pandas as pd
 from mpi4py import MPI
 from petsc4py import PETSc
 from matplotlib import pyplot as plt
@@ -13,12 +13,13 @@ from src.boundaryCondition import BoundaryCondition
 
 class LidDriven2DSimulation(Scenario):
     def __init__(
-        self, solver_name, dt, T, f: tuple[float, float] = (0, 0), *, rho=1, mu=1
+        self, solver_name, dt, T, f: tuple[float, float] = (0, 0), *, rho=1, mu=1, nx=50
     ):
         self._mesh: Mesh = None
         self._bcu: list[BoundaryCondition] = None
         self._bcp: list[BoundaryCondition] = None
         self.Re = str(int(1 / mu))
+        self.nx = int(nx)
         super().__init__(solver_name, "lid_driven2D", rho, mu, dt, T, f)
 
         self.setup()
@@ -26,7 +27,7 @@ class LidDriven2DSimulation(Scenario):
     @property
     def mesh(self):
         if not self._mesh:
-            self._mesh = create_unit_square(MPI.COMM_WORLD, 50, 50)
+            self._mesh = create_unit_square(MPI.COMM_WORLD, self.nx, self.nx)
 
         return self._mesh
 
@@ -87,37 +88,37 @@ class LidDriven2DSimulation(Scenario):
             print(f"Benchmark data for Re={self.Re} not found at {csv_path}. Skipping plot.")
             return
 
-        data = pd.read_csv(csv_path)
-        points = np.column_stack(
-            (
-                np.array((0.5,) * data["y"].size, dtype=np.float64),
-                data["y"].to_numpy(),
-                np.array((0,) * data["y"].size, dtype=np.float64),
-            )
-        )
+        # data = pd.read_csv(csv_path)
+        # points = np.column_stack(
+        #     (
+        #         np.array((0.5,) * data["y"].size, dtype=np.float64),
+        #         data["y"].to_numpy(),
+        #         np.array((0,) * data["y"].size, dtype=np.float64),
+        #     )
+        # )
 
-        tree = bb_tree(self.mesh, self.mesh.geometry.dim)
-        cell_candidates = compute_collisions_points(tree, points)
-        colliding_cells = compute_colliding_cells(self.mesh, cell_candidates, points)
+        # tree = bb_tree(self.mesh, self.mesh.geometry.dim)
+        # cell_candidates = compute_collisions_points(tree, points)
+        # colliding_cells = compute_colliding_cells(self.mesh, cell_candidates, points)
 
-        val_sol = np.array([])
-        val_bench = np.array([])
+        # val_sol = np.array([])
+        # val_bench = np.array([])
 
-        for i, p in enumerate(points):
-            val_sol = np.append(
-                val_sol, self.solver.u_sol.eval(p, colliding_cells.links(i)[:1])[0]
-            )
-            val_bench = np.append(val_bench, data["u"][i])
+        # for i, p in enumerate(points):
+        #     val_sol = np.append(
+        #         val_sol, self.solver.u_sol.eval(p, colliding_cells.links(i)[:1])[0]
+        #     )
+        #     val_bench = np.append(val_bench, data["u"][i])
 
-        fig, ax = plt.subplots()
-        ax.plot(val_sol, label="Del solver")
-        ax.plot(val_bench, label="Del benchmark")
-        ax.legend()
-        ax.set_ylabel("componente x de la velocidad")
-        ax.set_xticks(
-            np.arange(data["y"].size),
-            map(lambda x: round(x, 2), data["y"].to_list()),
-            rotation=30,
-        )
-        ax.set_title("Componente x de la velocidad en x=0.5")
-        fig.savefig(f"{results_path}/benchmark_{self.Re}.png")
+        # fig, ax = plt.subplots()
+        # ax.plot(val_sol, label="Del solver")
+        # ax.plot(val_bench, label="Del benchmark")
+        # ax.legend()
+        # ax.set_ylabel("componente x de la velocidad")
+        # ax.set_xticks(
+        #     np.arange(data["y"].size),
+        #     map(lambda x: round(x, 2), data["y"].to_list()),
+        #     rotation=30,
+        # )
+        # ax.set_title("Componente x de la velocidad en x=0.5")
+        # fig.savefig(f"{results_path}/benchmark_{self.Re}.png")

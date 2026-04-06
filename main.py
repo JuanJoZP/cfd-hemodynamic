@@ -34,6 +34,8 @@ def run_simulate(args, unknown):
         kwargs["mu"] = args.mu
     if args.rho is not None:
         kwargs["rho"] = args.rho
+    if args.p_grade is not None:
+        kwargs["p_grade"] = args.p_grade
 
     from mpi4py import MPI
 
@@ -122,6 +124,18 @@ def main():
         type=int,
         default=1,
         help="Number of MPI cores per job (for HPC solve)",
+    )
+    sim_parser.add_argument(
+        "--p_grade",
+        type=int,
+        default=None,
+        help="Polynomial degree for velocity and pressure spaces (p-refinement, default: 1)",
+    )
+    sim_parser.add_argument(
+        "--time_limit",
+        type=str,
+        default=None,
+        help="Time limit for SLURM job (e.g. 00:30:00, requires --hpc)",
     )
 
     # ── experiment ────────────────────────────────────────────────────────

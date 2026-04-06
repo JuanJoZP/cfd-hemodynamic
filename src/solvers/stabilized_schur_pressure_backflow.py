@@ -1,7 +1,8 @@
 # SUPG/PSPG/LSIC stabilization, Newton linearization, Schur fieldsplit preconditioner.
-# Inlet: strong Dirichlet parabolic velocity (from scenario).
+# Inlet: weak pressure BC + Nitsche for tangential velocity (u_T = 0)
 # Outlet: resistance BC p = R*Q + backflow stabilization (Moghadam et al. 2011, Eq. 10).
 #
+# Inlet traction: sigma·n = -p_inlet·n  + Nitsche penalty for u_T = 0
 # Outlet traction: sigma·n = -p_c·n - rho*theta*(u·n)_- * u
 #   where p_c = R_resistance * Q (Q computed from u_prev), theta = beta_backflow,
 #   (u·n)_- = (u·n - |u·n|) / 2  (active only when flow reverses at the outlet).
@@ -62,32 +63,35 @@ class Solver(SolverBase):
         mu: float,
         f: list,
         initial_velocity: Callable[[np.ndarray], np.ndarray] = None,
-        v_max: float = None,
-        p_grade: int = 1,
+        p_inlet: float = None,
+        beta_nitsche: float = 100.0,
         beta_backflow: float = 0.2,
         R_resistance: float = None,
         alpha_damping: float = 0.75,
+        p_grade: int = 1,
     ):
-        if v_max is None:
+        if p_inlet is None:
             raise ValueError(
-                "v_max is required for stabilized_schur_velocity_vascular_backflow. "
-                "Pass it via CLI: --v_max <value>"
+                "p_inlet is required for stabilized_schur_pressure_backflow. "
+                "Pass it via CLI: --p_inlet <value> (in physical units, e.g. Pa)"
             )
 
         if R_resistance is None:
             raise ValueError(
-                "R_resistance is required for stabilized_schur_velocity_vascular_backflow. "
+                "R_resistance is required for stabilized_schur_pressure_backflow. "
                 "Pass it via CLI: --R_resistance <value>"
             )
 
-        self.v_max = float(v_max)
+        self.p_inlet = float(p_inlet)
+        self.beta_nitsche = float(beta_nitsche)
         self.beta_backflow = float(beta_backflow)
         self.R_resistance = float(R_resistance)
         self.alpha_damping = float(alpha_damping)
 
         if mesh.comm.rank == 0:
             print(
-                f"[Solver] p_grade={p_grade}, v_max={self.v_max:.4f}, "
+                f"[Solver] p_grade={p_grade}, p_inlet={self.p_inlet:.4f}, "
+                f"beta_nitsche={self.beta_nitsche:.2f}, "
                 f"beta_backflow={self.beta_backflow:.2f}, "
                 f"R_resistance={self.R_resistance:.4e}, "
                 f"alpha_damping={self.alpha_damping:.2f}",
@@ -107,7 +111,6 @@ class Solver(SolverBase):
         if initial_velocity:
             self.u_prev.interpolate(initial_velocity)
 
-        # weak form
         u_sol = self.u_sol
         p_sol = self.p_sol
         u_prev = self.u_prev
@@ -121,7 +124,6 @@ class Solver(SolverBase):
         F += inner(self.epsilon(v), self.sigma(u_mid, p_sol, self.mu)) * dx
         F += inner(q, div(u_mid)) * dx
 
-        # stabilization terms
         V_dg0 = functionspace(mesh, ("DG", 0))
         h = Function(V_dg0)
         h.x.array[:] = mesh.h(
@@ -135,21 +137,18 @@ class Solver(SolverBase):
         R -= div(self.sigma(u_mid, p_sol, self.mu))
         R -= self.rho * self.f
 
-        # SUPG
         eps = Constant(self.mesh, np.finfo(PETSc.ScalarType()).resolution)
         tau_supg1 = h / conditional(ge((2.0 * vnorm), eps), (2.0 * vnorm), eps)
         tau_supg2 = self.dt / 2.0
         tau_supg3 = (h * h) / (4.0 * (self.mu / self.rho))
-        tau_supg = (
-            1 / (tau_supg1**2) + 1 / (tau_supg2**2) + 1 / (tau_supg3**2)
-        ) ** (-1 / 2)
+        tau_supg = (1 / (tau_supg1**2) + 1 / (tau_supg2**2) + 1 / (tau_supg3**2)) ** (
+            -1 / 2
+        )
         F_supg = inner(tau_supg * R, dot(u_mid, nabla_grad(v))) * dx
 
-        # PSPG
         tau_pspg = tau_supg
         F_pspg = (1 / self.rho) * inner(tau_pspg * R, grad(q)) * dx
 
-        # LSIC
         Re = (vnorm * h) / (2.0 * (self.mu / self.rho))
         z = conditional(le(Re, 3), Re / 3, 1.0)
         tau_lsic = (vnorm * h * z) / 2.0
@@ -159,6 +158,7 @@ class Solver(SolverBase):
         F += F_pspg
         self.F = F
         self._v_test = v
+        self._h = h
 
     def setup(
         self,
@@ -167,7 +167,12 @@ class Solver(SolverBase):
         facet_tags=None,
         tags=None,
     ) -> None:
-        # 1. Outlet subdomain measure
+        ds_in = Measure(
+            "ds",
+            domain=self.mesh,
+            subdomain_data=facet_tags,
+            subdomain_id=tags["inlet"],
+        )
         ds_out = Measure(
             "ds",
             domain=self.mesh,
@@ -177,14 +182,25 @@ class Solver(SolverBase):
 
         n = FacetNormal(self.mesh)
         self._n = n
+        self._ds_in = ds_in
         self._ds_out = ds_out
         v = self._v_test
         u = self.u_mid
+        h = self._h
 
-        # 2. Resistance outlet pressure p_c = R * Q  (Q from u_prev, updated after each step)
-        #    From IBP: −∫(σ·n)·v dΓ = −∫(2με(u)·n)·v dΓ + ∫p(v·n) dΓ
-        #    Replace p → p_c in the pressure boundary integral,
-        #    keep viscous boundary integral as natural (involves unknown u):
+        # 1. Inlet: weak pressure BC + Nitsche for tangential velocity
+        p_in_const = Constant(self.mesh, PETSc.ScalarType(self.p_inlet))
+        self.F += p_in_const * dot(v, n) * ds_in
+
+        u_T = u - dot(u, n) * n
+        v_T = v - dot(v, n) * n
+        self.F += (
+            -dot(dot(2 * self.mu * self.epsilon(u), n), v_T) * ds_in
+            - dot(dot(2 * self.mu * self.epsilon(v), n), u_T) * ds_in
+            + (self.beta_nitsche * self.mu / h) * dot(u_T, v_T) * ds_in
+        )
+
+        # 2. Outlet: resistance outlet pressure p_c = R * Q (Q from u_prev)
         Q_init = assemble_scalar(form(dot(self.u_prev, n) * ds_out))
         Q_init = self.mesh.comm.allreduce(Q_init, op=MPI.SUM)
         p_c_val = self.R_resistance * abs(Q_init)
@@ -192,16 +208,12 @@ class Solver(SolverBase):
         self.F += 0.5 * self._p_c * dot(v, n) * ds_out
         self.F -= dot(dot(2 * self.mu * self.epsilon(u), n), v) * ds_out
 
-        # Flux form for resistance BC: Q = ∫_outlet u_prev·n dΓ
         self._Q_form = form(dot(self.u_prev, n) * ds_out)
 
         # 3. Backflow stabilization (Moghadam et al. 2011, Eq. 10):
-        #    -beta * <w, rho * (u·n)_- * u>_{Gamma_out}
-        #    (u·n)_- = (u·n - |u·n|) / 2   (negative when backflow)
-        #    Semi-implicit: use u_prev for (u·n)_- coefficient, u_mid for velocity.
         u_prev = self.u_prev
         un_prev = dot(u_prev, n)
-        un_minus = 0.5 * (un_prev - abs(un_prev))  # <= 0 when backflow, 0 otherwise
+        un_minus = 0.5 * (un_prev - abs(un_prev))
         self.F -= self.beta_backflow * self.rho * un_minus * dot(u, v) * ds_out
 
         # 4. Linearize and compile
@@ -216,7 +228,7 @@ class Solver(SolverBase):
             self.V.dofmap.index_map.size_local + self.V.dofmap.index_map.num_ghosts
         ) * self.V.dofmap.index_map_bs
 
-        # 5. Dirichlet BCs (wall no-slip + inlet parabolic from scenario)
+        # 5. Dirichlet BCs (wall no-slip only; inlet/outlet are weakly imposed)
         self.bcu_d = [bc.getBC(self.V) for bc in bcu]
         self.bcp_d = []
 
@@ -291,7 +303,6 @@ class Solver(SolverBase):
 
         self.solver = snes
 
-        # Constant pressure null space
         vec_const = self.A.createVecs()[0]
         vec_const.set(0.0)
         indices_p = is_p.getIndices()
@@ -370,14 +381,10 @@ class Solver(SolverBase):
         )
 
     def _compute_outlet_flux(self) -> float:
-        """Compute Q = ∫_outlet u_prev·n dΓ (scalar, positive = outflow)."""
         Q_local = assemble_scalar(self._Q_form)
         return self.mesh.comm.allreduce(Q_local, op=MPI.SUM)
 
     def _update_outlet_pressure(self) -> None:
-        """Update outlet pressure from resistance model with damping:
-        p_c^{n+1} = alpha * R * Q + (1 - alpha) * p_c^{n}
-        """
         Q = self._compute_outlet_flux()
         p_new = self.R_resistance * abs(Q)
         p_old = float(self._p_c.value)
@@ -409,5 +416,4 @@ class Solver(SolverBase):
         if reason < 0:
             raise RuntimeError(f"Did not converge, reason: {reason}.")
 
-        # Fixed-point update: compute outlet flux → update outlet pressure for next step
         self._update_outlet_pressure()

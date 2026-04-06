@@ -1,0 +1,249 @@
+from src.scenario import Scenario
+import gmsh
+from mpi4py import MPI
+from petsc4py import PETSc
+import numpy as np
+from dolfinx.io import gmshio, XDMFFile
+from dolfinx.mesh import Mesh
+from dolfinx.fem import Function
+from dolfinx.io import VTXWriter
+
+from src.boundaryCondition import BoundaryCondition
+
+
+class StenosisSimulation(Scenario):
+    fluid_marker = 1
+    inlet_marker = 2
+    outlet_marker = 3
+    wall_marker = 4
+
+    stenosis_grades = {
+        "mild": {"severity": 0.25, "slope": 0.3},
+        "moderate": {"severity": 0.5, "slope": 0.5},
+        "severe": {"severity": 0.75, "slope": 0.},
+    }
+
+    def __init__(
+        self,
+        solver_name,
+        dt,
+        T,
+        f: tuple[float, float] = (0, 0),
+        grade="severe",
+        inlet_max_velocity=1.5,
+        *,
+        rho=1,
+        mu=3.3e-6,
+        **kwargs,
+    ):
+        self._mesh: Mesh = None
+        self._ft = None
+        self.inlet_max_velocity = float(inlet_max_velocity)
+
+        # Setup mesh options
+        self.mesh_options = kwargs.copy()
+
+        # Defaults
+        defaults = {"L": 0.03, "H": 0.003, "res": 0.0001, "x_position_stenosis": 0.01}
+        for k, v in defaults.items():
+            if k not in self.mesh_options:
+                self.mesh_options[k] = v
+
+        # Apply grade parameters
+        grade_params = self.stenosis_grades.get(grade, self.stenosis_grades["severe"])
+        for k, v in grade_params.items():
+            if k not in kwargs:
+                self.mesh_options[k] = v
+
+        self._bcu: list[BoundaryCondition] = None
+        self._bcp: list[BoundaryCondition] = None
+        super().__init__(solver_name, "stenosis", rho, mu, dt, T, f)
+
+        self.mesh.topology.create_connectivity(
+            self.mesh.topology.dim - 1, self.mesh.topology.dim
+        )
+        self.setup()
+
+    @property
+    def mesh(self):
+        if not self._mesh:
+            self._mesh, self._ft = self.generate_mesh(**self.mesh_options)
+
+        return self._mesh
+
+    @property
+    def bcu(self):
+        if not self._bcu:
+            fdim = self.mesh.topology.dim - 1
+            u_inlet = Function(self.solver.V)
+            u_inlet.interpolate(
+                self.inlet_velocity(
+                    self.inlet_max_velocity, self.mesh_options.get("H", 1)
+                )
+            )
+            entities_inflow = self._ft.find(self.inlet_marker)
+            bcu_inflow = BoundaryCondition(u_inlet)
+            bcu_inflow.initTopological(fdim, entities_inflow)
+
+            u_nonslip = Function(self.solver.V)
+            u_nonslip.x.array[:] = 0
+            entities_walls = self._ft.find(self.wall_marker)
+            bcu_walls = BoundaryCondition(u_nonslip)
+            bcu_walls.initTopological(fdim, entities_walls)
+
+            self._bcu = [bcu_inflow, bcu_walls]
+
+        return self._bcu
+
+    def solve(self, output_folder, afterStepCallback=None):
+        def update_dt(t):
+            if t > 10 * self.dt and self.dt < 1 / 1000:
+                self.dt = self.dt * 2
+                self.solver.dt.value = self.dt
+            if afterStepCallback:
+                afterStepCallback(t)
+
+        return super().solve(output_folder, update_dt)
+
+    @property
+    def bcp(self):
+        if not self._bcp:
+            fdim = self.mesh.topology.dim - 1
+            pr = Function(self.solver.Q)
+            pr.x.array[:] = 0
+            outflow_entities = self._ft.find(self.outlet_marker)
+            bc_outflow = BoundaryCondition(pr)
+            bc_outflow.initTopological(fdim, outflow_entities)
+
+            self._bcp = [bc_outflow]
+
+        return self._bcp
+
+    def initial_velocity(self, x):
+        values = np.zeros((self.mesh.geometry.dim, x.shape[1]), dtype=PETSc.ScalarType)
+        return values
+
+    def generate_mesh(self, **kwargs):
+        gmsh.initialize()
+
+        L = kwargs.get("L", 0.03)
+        H = kwargs.get("H", 0.003)
+        res = kwargs.get("res", 0.0001)
+        x_position = kwargs.get("x_position_stenosis", 0.01)
+        severity = kwargs.get("severity", 0.75)
+        slope = kwargs.get("slope", 0.6)
+
+        # Each wall protrudes inward by h_sten at the stenosis center.
+        # Follows the same logic as src/geom/stenosis/stenosis.py:
+        #   min_radius = (1 - severity) * R  →  h_sten = severity * H/2
+        #   dist_x = h_sten / slope  (half-width of stenosis region along x)
+        h_sten = severity * H / 2
+        if h_sten >= H / 2:
+            raise ValueError("severity must be < 1 to keep an open channel")
+
+        dist_x = h_sten / slope if slope > 0 else L / 4
+
+        min_dist = L * 0.05
+        dist_x = max(dist_x, min_dist)
+        max_dist_avail = min(x_position, L - x_position) * 0.95
+        dist_x = min(dist_x, max_dist_avail)
+
+        cp1_x = x_position - dist_x
+        cp2_x = x_position + dist_x
+
+        gdim = 2
+        mesh_comm = MPI.COMM_WORLD
+        model_rank = 0
+
+        if mesh_comm.rank == model_rank:
+            # Corner points
+            p_bl = gmsh.model.occ.addPoint(0, 0, 0)
+            p_tl = gmsh.model.occ.addPoint(0, H, 0)
+            p_tr = gmsh.model.occ.addPoint(L, H, 0)
+            p_br = gmsh.model.occ.addPoint(L, 0, 0)
+
+            # Bottom wall stenosis control points (protrude upward)
+            p_bot_cp1 = gmsh.model.occ.addPoint(cp1_x, 0, 0)
+            p_bot_mid = gmsh.model.occ.addPoint(x_position, h_sten, 0)
+            p_bot_cp2 = gmsh.model.occ.addPoint(cp2_x, 0, 0)
+
+            # Top wall stenosis control points (protrude downward)
+            p_top_cp1 = gmsh.model.occ.addPoint(cp1_x, H, 0)
+            p_top_mid = gmsh.model.occ.addPoint(x_position, H - h_sten, 0)
+            p_top_cp2 = gmsh.model.occ.addPoint(cp2_x, H, 0)
+
+            # Inlet
+            l_inlet = gmsh.model.occ.addLine(p_bl, p_tl)
+
+            # Top wall: flat line, spline through stenosis, flat line
+            l_top_pre = gmsh.model.occ.addLine(p_tl, p_top_cp1)
+            spline_top = gmsh.model.occ.addSpline([p_top_cp1, p_top_mid, p_top_cp2])
+            l_top_post = gmsh.model.occ.addLine(p_top_cp2, p_tr)
+
+            # Outlet
+            l_outlet = gmsh.model.occ.addLine(p_tr, p_br)
+
+            # Bottom wall (traversed right→left): flat line, spline, flat line
+            l_bot_pre = gmsh.model.occ.addLine(p_br, p_bot_cp2)
+            spline_bot = gmsh.model.occ.addSpline([p_bot_cp2, p_bot_mid, p_bot_cp1])
+            l_bot_post = gmsh.model.occ.addLine(p_bot_cp1, p_bl)
+
+            loop = gmsh.model.occ.addCurveLoop([
+                l_inlet, l_top_pre, spline_top, l_top_post,
+                l_outlet, l_bot_pre, spline_bot, l_bot_post,
+            ])
+            surface = gmsh.model.occ.addPlaneSurface([loop])
+            gmsh.model.occ.synchronize()
+
+        inflow, outflow, walls = [], [], []
+        if mesh_comm.rank == model_rank:
+            volumes = gmsh.model.getEntities(dim=gdim)
+            assert len(volumes) == 1
+            gmsh.model.addPhysicalGroup(
+                volumes[0][0], [volumes[0][1]], self.fluid_marker
+            )
+            gmsh.model.setPhysicalName(volumes[0][0], self.fluid_marker, "Fluid")
+
+            boundaries = gmsh.model.getBoundary(volumes, oriented=False)
+            for boundary in boundaries:
+                center_of_mass = gmsh.model.occ.getCenterOfMass(
+                    boundary[0], boundary[1]
+                )
+                if np.allclose(center_of_mass, [0, H / 2, 0]):
+                    inflow.append(boundary[1])
+                elif np.allclose(center_of_mass, [L, H / 2, 0]):
+                    outflow.append(boundary[1])
+                else:
+                    walls.append(boundary[1])
+
+            gmsh.model.addPhysicalGroup(1, walls, self.wall_marker)
+            gmsh.model.setPhysicalName(1, self.wall_marker, "Walls")
+            gmsh.model.addPhysicalGroup(1, inflow, self.inlet_marker)
+            gmsh.model.setPhysicalName(1, self.inlet_marker, "Inlet")
+            gmsh.model.addPhysicalGroup(1, outflow, self.outlet_marker)
+            gmsh.model.setPhysicalName(1, self.outlet_marker, "Outlet")
+
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", res)
+        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", res * 1.5)
+
+        if mesh_comm.rank == model_rank:
+            gmsh.option.setNumber("Mesh.Algorithm", 8)
+            gmsh.model.mesh.generate(gdim)
+            gmsh.model.mesh.setOrder(1)
+            gmsh.model.mesh.optimize("Netgen")
+
+        mesh, _, ft = gmshio.model_to_mesh(gmsh.model, mesh_comm, model_rank, gdim=gdim)
+        mesh.name = "Grid"
+        ft.name = "Facet markers"
+        gmsh.finalize()
+
+        return mesh, ft
+
+    @staticmethod
+    def inlet_velocity(v_max, y_max):
+        def velocity(x):
+            values = np.zeros((2, x.shape[1]), dtype=PETSc.ScalarType)
+            values[0] = 4 * v_max * x[1] * (y_max - x[1]) / (y_max**2)
+            return values
+
+        return velocity

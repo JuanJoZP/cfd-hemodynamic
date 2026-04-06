@@ -327,7 +327,7 @@ def dispatch_hpc(args, unknown):
                 print(f"[INFO] Dispatching single job for index {target_idx}")
                 array_range = target_idx
             else:
-                array_range = f"0-{num_experiments-1}"
+                array_range = f"0-{num_experiments - 1}"
 
             # Determine steps to run
             steps = []
@@ -454,7 +454,7 @@ def dispatch_hpc(args, unknown):
                 print(f"[INFO] Dispatching single job for index {target_idx}")
                 array_range = target_idx
             else:
-                array_range = f"0-{num_experiments-1}"
+                array_range = f"0-{num_experiments - 1}"
 
             # Output directory logic (must match meshing output location)
             # User correction: should use 'data/results' not 'data/meshes'
@@ -584,6 +584,45 @@ def dispatch_hpc(args, unknown):
                 continue
             filtered_args.append(arg)
 
-        cmd = ["sbatch", f"--ntasks={num_cores}", str(script_path)] + filtered_args
+        # Scenarios that need a bare-metal VascuSynth pre-job before fenicsx
+        SCENARIOS_WITH_TREE = {"stenosis_with_tree"}
+        simulation_name = None
+        for i, a in enumerate(filtered_args):
+            if a == "--simulation" and i + 1 < len(filtered_args):
+                simulation_name = filtered_args[i + 1]
+
+        dependency_flag = []
+        if simulation_name in SCENARIOS_WITH_TREE:
+            pretree_script = Path("src/geom/tree/vascusynth_pretree.sh")
+            print(f"[INFO] Submitting VascuSynth pre-job: {pretree_script}")
+            pretree_result = subprocess.run(
+                ["sbatch", str(pretree_script)],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+            )
+            print(pretree_result.stdout.strip())
+            pretree_job_id = None
+            for line in pretree_result.stdout.splitlines():
+                if line.startswith("Submitted batch job"):
+                    pretree_job_id = line.split()[-1]
+                    break
+            if pretree_job_id:
+                dependency_flag = [f"--dependency=afterok:{pretree_job_id}"]
+                print(
+                    f"[INFO] Simulation will start after pre-job {pretree_job_id} completes."
+                )
+
+        time_limit = getattr(args, "time_limit", None)
+        time_flag = [f"--time={time_limit}"] if time_limit else []
+
+        cmd = (
+            ["sbatch", f"--ntasks={num_cores}"]
+            + time_flag
+            + dependency_flag
+            + [str(script_path)]
+            + filtered_args
+        )
         print(f"[INFO] Submitting: {' '.join(cmd)}")
         subprocess.run(cmd, check=True)

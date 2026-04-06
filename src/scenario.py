@@ -201,6 +201,8 @@ class Scenario(ABC):
 
         u_file = VTXWriter(mesh.comm, f"{output_folder}/v.bp", self.solver.u_sol)
         p_file = VTXWriter(mesh.comm, f"{output_folder}/p.bp", self.solver.p_sol)
+        u_res_file = VTXWriter(mesh.comm, f"{output_folder}/u_residual.bp", self.solver.u_residual)
+        p_res_file = VTXWriter(mesh.comm, f"{output_folder}/p_residual.bp", self.solver.p_residual)
         solver.initStressForm()
         wss_file = VTXWriter(
             mesh.comm, f"{output_folder}/wss.bp", self.solver.shear_stress
@@ -211,6 +213,8 @@ class Scenario(ABC):
         solver.assemble_wss()
         u_file.write(t)
         p_file.write(t)
+        u_res_file.write(t)
+        p_res_file.write(t)
         wss_file.write(t)
 
         error_log = None
@@ -244,6 +248,8 @@ class Scenario(ABC):
             solver.assemble_wss()
             u_file.write(t)
             p_file.write(t)
+            u_res_file.write(t)
+            p_res_file.write(t)
             wss_file.write(t)
 
             if afterStepCallback:
@@ -266,6 +272,8 @@ class Scenario(ABC):
 
         u_file.close()
         p_file.close()
+        u_res_file.close()
+        p_res_file.close()
         wss_file.close()
 
         norm_v_form = form(inner(solver.u_sol, solver.u_sol) * dx)

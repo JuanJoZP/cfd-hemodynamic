@@ -54,6 +54,7 @@ class Solver(SolverBase):
         p_inlet: float = None,
         p_outlet: float = None,
         beta_nitsche: float = 100.0,
+        p_grade: int = 1,
     ):
         if p_inlet is None or p_outlet is None:
             raise ValueError(
@@ -64,12 +65,15 @@ class Solver(SolverBase):
         self._p_outlet_val = float(p_outlet) / 2
         self.beta_nitsche = beta_nitsche
 
+        if mesh.comm.rank == 0:
+            print(f"[Solver] p_grade={p_grade}, beta_nitsche={beta_nitsche}", flush=True)
+
         super().__init__(mesh, dt, rho, mu, f)
 
         super().initVelocitySpace(
-            "Lagrange", mesh.topology.cell_name(), 1, shape=(mesh.geometry.dim,)
+            "Lagrange", mesh.topology.cell_name(), p_grade, shape=(mesh.geometry.dim,)
         )
-        super().initPressureSpace("Lagrange", mesh.topology.cell_name(), 1)
+        super().initPressureSpace("Lagrange", mesh.topology.cell_name(), p_grade)
 
         self.VQ = MixedFunctionSpace(self.V, self.Q)
         v, q = TestFunctions(self.VQ)
@@ -267,9 +271,9 @@ class Solver(SolverBase):
 
         ksp_u, ksp_p = pc.getFieldSplitSchurGetSubKSP()
         ksp_u.setType("gmres")
-        ksp_u.getPC().setType("asm")
+        ksp_u.getPC().setType("lu")
         ksp_p.setType("preonly")
-        ksp_p.getPC().setType("asm")
+        ksp_p.getPC().setType("lu")
 
         ksp_u.getPC().setUp()
         ksp_p.getPC().setUp()

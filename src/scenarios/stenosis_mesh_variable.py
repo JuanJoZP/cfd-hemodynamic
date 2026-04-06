@@ -55,13 +55,11 @@ class StenosisSimulation(Scenario):
         v_max = kwargs.pop("v_max", None)
         self.mesh_options = kwargs.copy()
 
-        # Defaults: 80 mm long, inlet radius 1.5 mm, outlet radius 0.65 mm,
-        # stenosis at first quarter (x = 20 mm)
         defaults = {
             "L": 138.0,
-            "R_in": 1.57,  # inlet radius (mm)
-            "R_out": 1.2,  # outlet radius (mm)
-            "res": 0.15,
+            "R_in": 1.57,
+            "R_out": 1.2,
+            "n_elements_radial": 10,
             "x_position_stenosis": 30.0,
             "severity": 0.567,
             "slope": 0.4,
@@ -86,13 +84,10 @@ class StenosisSimulation(Scenario):
             "p_grade": p_grade,
             "beta_nitsche": beta_nitsche,
         }
-        # For backflow solvers: pass beta_backflow
         if beta_backflow is not None:
             solver_kwargs["beta_backflow"] = float(beta_backflow)
-        # For vascularbc_cbc solver: pass v_max (mm/s)
         if v_max is not None:
             solver_kwargs["v_max"] = float(v_max)
-        # For vascularbc solver: pass R_resistance and initial_ffr instead of p_outlet
         if R_resistance is not None:
             solver_kwargs["R_resistance"] = float(R_resistance)
             solver_kwargs["initial_ffr"] = initial_ffr
@@ -101,7 +96,7 @@ class StenosisSimulation(Scenario):
 
         super().__init__(
             solver_name,
-            "stenosis",
+            "stenosis_mesh_variable",
             rho,
             mu,
             dt,
@@ -168,10 +163,9 @@ class StenosisSimulation(Scenario):
         L = self.mesh_options["L"]
         center_y = R_in
 
-        # Proximal (inlet) and distal (outlet) points at channel center
         points = np.array([
-            [0.0, center_y, 0.0],   # proximal (inlet)
-            [L, center_y, 0.0],      # distal (outlet)
+            [0.0, center_y, 0.0],
+            [L, center_y, 0.0],
         ])
 
         tree = bb_tree(mesh, mesh.topology.dim)
@@ -184,7 +178,6 @@ class StenosisSimulation(Scenario):
             if len(cells) > 0:
                 p_values[i] = self.solver.p_sol.eval(point, cells[0])[0]
 
-        # Gather to rank 0 (only one rank owns each point)
         comm = mesh.comm
         all_p = comm.allreduce(
             np.where(np.isnan(p_values), 0.0, p_values), op=MPI.SUM
@@ -225,10 +218,8 @@ class StenosisSimulation(Scenario):
         center_y = R_in
         v_max = float(self._v_max)
 
-        # Linear taper radius
         R_taper = R_in + (R_out - R_in) * (x[0] / L)
 
-        # Stenosis bump (cosine approximation of the Bezier profile)
         r_taper_mid = R_in + (R_out - R_in) * (x_sten / L)
         h_sten = severity * r_taper_mid
         dist_x = h_sten / slope if slope > 0 else L / 4
@@ -245,7 +236,6 @@ class StenosisSimulation(Scenario):
 
         R_local = np.maximum(R_taper - bump, 1e-6)
 
-        # Conserve 2D flow rate: v_max_local * R_local = v_max * R_in
         v_max_local = v_max * R_in / R_local
 
         r = x[1] - center_y
@@ -259,16 +249,11 @@ class StenosisSimulation(Scenario):
         L = kwargs["L"]
         R_in = kwargs["R_in"]
         R_out = kwargs["R_out"]
-        res = kwargs["res"]
+        n_rad = kwargs["n_elements_radial"]
         x_sten = kwargs["x_position_stenosis"]
         severity = kwargs["severity"]
         slope = kwargs["slope"]
         tension = kwargs["tension"]
-
-        # Geometry follows the same logic as src/geom/stenosis/stenosis.py, but 2D:
-        #   - channel tapers linearly from diameter 2*R_in (inlet) to 2*R_out (outlet)
-        #   - at x_sten the radius is further reduced by severity relative to the
-        #     local taper radius:  R_min = (1 - severity) * r_taper(x_sten)
 
         # Linear taper radius at the stenosis centre
         r_taper_mid = R_in + (R_out - R_in) * (x_sten / L)
@@ -277,10 +262,7 @@ class StenosisSimulation(Scenario):
         if R_min <= 0:
             raise ValueError("severity too large: stenosis would close the channel")
 
-        # Depth of stenosis above the taper line
-        h_sten = r_taper_mid - R_min  # = severity * r_taper_mid
-
-        # Half-width of the stenosis region (same formula as the 3D code)
+        h_sten = r_taper_mid - R_min
         dist_x = h_sten / slope if slope > 0 else L / 4
         dist_x = max(dist_x, L * 0.05)
         dist_x = min(dist_x, min(x_sten, L - x_sten) * 0.95)
@@ -288,45 +270,47 @@ class StenosisSimulation(Scenario):
         cp1_x = x_sten - dist_x
         cp2_x = x_sten + dist_x
 
-        # Taper radius at the Bezier junction points
         cp1_r = R_in + (R_out - R_in) * (cp1_x / L)
         cp2_r = R_in + (R_out - R_in) * (cp2_x / L)
 
-        # Overall taper slope (dy_top/dx < 0, dy_bot/dx > 0 for a narrowing channel)
-        slope_top = (R_out - R_in) / L  # negative
-        slope_bot = (R_in - R_out) / L  # positive
+        slope_top = (R_out - R_in) / L
+        slope_bot = (R_in - R_out) / L
 
-        # Bezier handle length along x
         ha = tension * dist_x
         hb = tension * dist_x
 
-        # Key y-coordinates.
-        # Channel centre axis sits at y = R_in (fixed).
-        # Top wall:    y_top(x) = R_in + R_profile(x)
-        # Bottom wall: y_bot(x) = R_in - R_profile(x)
-        y_top_0 = 2.0 * R_in  # top-left  corner (inlet)
-        y_bot_0 = 0.0  # bottom-left corner (inlet)
+        y_top_0 = 2.0 * R_in
+        y_bot_0 = 0.0
         y_top_cp1 = R_in + cp1_r
         y_bot_cp1 = R_in - cp1_r
         y_top_mid = R_in + R_min
         y_bot_mid = R_in - R_min
         y_top_cp2 = R_in + cp2_r
         y_bot_cp2 = R_in - cp2_r
-        y_top_L = R_in + R_out  # top-right  corner (outlet)
-        y_bot_L = R_in - R_out  # bottom-right corner (outlet)
+        y_top_L = R_in + R_out
+        y_bot_L = R_in - R_out
+
+        # Compute characteristic lengths at key points based on n_elements_radial.
+        # At each location the element size = local_diameter / (2 * n_rad)
+        # so that n_rad elements span the radius.
+        lc_inlet = (2.0 * R_in) / (2.0 * n_rad)
+        lc_outlet = (2.0 * R_out) / (2.0 * n_rad)
+        lc_cp1 = (2.0 * cp1_r) / (2.0 * n_rad)
+        lc_cp2 = (2.0 * cp2_r) / (2.0 * n_rad)
+        lc_mid = (2.0 * R_min) / (2.0 * n_rad)
 
         gdim = 2
         mesh_comm = MPI.COMM_WORLD
         model_rank = 0
 
         if mesh_comm.rank == model_rank:
-            # Corner points
+            # Corner points with characteristic length
             p_bl = gmsh.model.occ.addPoint(0, y_bot_0, 0)
             p_tl = gmsh.model.occ.addPoint(0, y_top_0, 0)
             p_tr = gmsh.model.occ.addPoint(L, y_top_L, 0)
             p_br = gmsh.model.occ.addPoint(L, y_bot_L, 0)
 
-            # Stenosis junction points (where Bezier meets the straight taper lines)
+            # Stenosis junction and peak points
             p_top_cp1 = gmsh.model.occ.addPoint(cp1_x, y_top_cp1, 0)
             p_top_mid = gmsh.model.occ.addPoint(x_sten, y_top_mid, 0)
             p_top_cp2 = gmsh.model.occ.addPoint(cp2_x, y_top_cp2, 0)
@@ -334,17 +318,12 @@ class StenosisSimulation(Scenario):
             p_bot_mid = gmsh.model.occ.addPoint(x_sten, y_bot_mid, 0)
             p_bot_cp2 = gmsh.model.occ.addPoint(cp2_x, y_bot_cp2, 0)
 
-            # Bezier control handles.
-            # Tangent at the junction points follows the taper slope.
-            # Tangent at the stenosis peak also follows the taper slope → C1 continuity.
-            #
-            # Top wall (traversed left→right in the loop): cp1 → mid → cp2
+            # Bezier control handles
             pt_l1 = gmsh.model.occ.addPoint(cp1_x + ha, y_top_cp1 + ha * slope_top, 0)
             pt_l2 = gmsh.model.occ.addPoint(x_sten - hb, y_top_mid - hb * slope_top, 0)
             pt_r1 = gmsh.model.occ.addPoint(x_sten + hb, y_top_mid + hb * slope_top, 0)
             pt_r2 = gmsh.model.occ.addPoint(cp2_x - ha, y_top_cp2 - ha * slope_top, 0)
 
-            # Bottom wall (traversed right→left in the loop): cp2 → mid → cp1
             pb_r1 = gmsh.model.occ.addPoint(cp2_x - ha, y_bot_cp2 - ha * slope_bot, 0)
             pb_r2 = gmsh.model.occ.addPoint(x_sten + hb, y_bot_mid + hb * slope_bot, 0)
             pb_l1 = gmsh.model.occ.addPoint(x_sten - hb, y_bot_mid - hb * slope_bot, 0)
@@ -358,14 +337,12 @@ class StenosisSimulation(Scenario):
             l_bot_post = gmsh.model.occ.addLine(p_br, p_bot_cp2)
             l_bot_pre = gmsh.model.occ.addLine(p_bot_cp1, p_bl)
 
-            # Cubic Beziers — top wall (left→right), bottom wall (right→left)
+            # Cubic Beziers
             bez_top1 = gmsh.model.occ.addBezier([p_top_cp1, pt_l1, pt_l2, p_top_mid])
             bez_top2 = gmsh.model.occ.addBezier([p_top_mid, pt_r1, pt_r2, p_top_cp2])
             bez_bot2 = gmsh.model.occ.addBezier([p_bot_cp2, pb_r1, pb_r2, p_bot_mid])
             bez_bot1 = gmsh.model.occ.addBezier([p_bot_mid, pb_l1, pb_l2, p_bot_cp1])
 
-            # Counterclockwise loop:
-            # inlet (up) → top wall (right) → outlet (down) → bottom wall (left)
             loop = gmsh.model.occ.addCurveLoop(
                 [
                     l_inlet,
@@ -383,6 +360,54 @@ class StenosisSimulation(Scenario):
             gmsh.model.occ.addPlaneSurface([loop])
             gmsh.model.occ.synchronize()
 
+            # --- Variable resolution via mesh size fields ---
+            # Use a Distance field from the stenosis peak + Threshold to refine there,
+            # combined with a MathEval field for the baseline taper-aware size.
+
+            # Field 1: baseline size that varies with x based on local radius.
+            # local_radius(x) approximated by taper: R_in + (R_out - R_in) * x / L
+            # element size = local_radius / n_rad
+            f_base = gmsh.model.mesh.field.add("MathEval")
+            gmsh.model.mesh.field.setString(
+                f_base, "F",
+                f"({R_in} + ({R_out} - {R_in}) * x / {L}) / {n_rad}"
+            )
+
+            # Field 2: distance from the stenosis peak line (x = x_sten)
+            f_dist = gmsh.model.mesh.field.add("MathEval")
+            gmsh.model.mesh.field.setString(
+                f_dist, "F",
+                f"Abs(x - {x_sten})"
+            )
+
+            # Field 3: stenosis-refined size — uses R_min at the peak
+            f_sten = gmsh.model.mesh.field.add("MathEval")
+            gmsh.model.mesh.field.setString(
+                f_sten, "F",
+                f"{R_min} / {n_rad}"
+            )
+
+            # Field 4: threshold — blend between stenosis size and baseline
+            # within dist_x of the peak, use the stenosis size;
+            # outside 2*dist_x, use baseline; linear interpolation in between.
+            f_thresh = gmsh.model.mesh.field.add("Threshold")
+            gmsh.model.mesh.field.setNumber(f_thresh, "InField", f_dist)
+            gmsh.model.mesh.field.setNumber(f_thresh, "SizeMin", R_min / n_rad)
+            gmsh.model.mesh.field.setNumber(f_thresh, "SizeMax", max(R_in, R_out) / n_rad)
+            gmsh.model.mesh.field.setNumber(f_thresh, "DistMin", dist_x * 0.5)
+            gmsh.model.mesh.field.setNumber(f_thresh, "DistMax", dist_x * 2.0)
+
+            # Field 5: take the minimum of baseline and threshold
+            f_min = gmsh.model.mesh.field.add("Min")
+            gmsh.model.mesh.field.setNumbers(f_min, "FieldsList", [f_base, f_thresh])
+
+            gmsh.model.mesh.field.setAsBackgroundMesh(f_min)
+
+            # Disable default characteristic length so the fields control sizing
+            gmsh.option.setNumber("Mesh.MeshSizeExtendFromBoundary", 0)
+            gmsh.option.setNumber("Mesh.MeshSizeFromPoints", 0)
+            gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 0)
+
         inflow, outflow, walls = [], [], []
         if mesh_comm.rank == model_rank:
             volumes = gmsh.model.getEntities(dim=gdim)
@@ -392,13 +417,14 @@ class StenosisSimulation(Scenario):
             )
             gmsh.model.setPhysicalName(volumes[0][0], self.fluid_marker, "Fluid")
 
-            # Inlet centre: (0, R_in);  outlet centre: (L, R_in)
             boundaries = gmsh.model.getBoundary(volumes, oriented=False)
+            # Use a small tolerance based on typical element size at inlet
+            tol = lc_inlet
             for boundary in boundaries:
                 com = gmsh.model.occ.getCenterOfMass(boundary[0], boundary[1])
-                if np.isclose(com[0], 0.0, atol=res):
+                if np.isclose(com[0], 0.0, atol=tol):
                     inflow.append(boundary[1])
-                elif np.isclose(com[0], L, atol=res):
+                elif np.isclose(com[0], L, atol=tol):
                     outflow.append(boundary[1])
                 else:
                     walls.append(boundary[1])
@@ -410,11 +436,8 @@ class StenosisSimulation(Scenario):
             gmsh.model.addPhysicalGroup(1, outflow, self.outlet_marker)
             gmsh.model.setPhysicalName(1, self.outlet_marker, "Outlet")
 
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMin", res)
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", res * 1.5)
-
-        if mesh_comm.rank == model_rank:
-            gmsh.option.setNumber("Mesh.Algorithm", 8)
+            # Triangles only, Frontal-Delaunay algorithm
+            gmsh.option.setNumber("Mesh.Algorithm", 6)
             gmsh.model.mesh.generate(gdim)
             gmsh.model.mesh.setOrder(1)
             gmsh.model.mesh.optimize("Netgen")

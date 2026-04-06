@@ -1,0 +1,314 @@
+2. Vasculature Flow Model
+We begin, in this section, by describing the underly-
+ing physics-based vascular model that governs the way
+that the vascular structure is generated. Specifically, we
+discuss the flow and radii constraints of a branch in the
+vascular structure. Additionally, we present equations
+to calculate the reduced resistance as well as the pres-
+sure drop along a branch in the vascular structure. The
+flow and radii constraints, as well as the reduced resis-
+tance equations, are used to determine the radii of the
+branches in the generated vascular structure. The equa-
+tions and constraints presented here will be used in later
+sections when developing the iterative vascular genera-
+tion.
+Two flow constraints in a vascular network are of
+particular importance for the simulation: (i) Conserva-
+tion of flow, under which the flow entering a bifurca-
+tion point through the parent Q parent must equal the total
+flow leaving a bifurcation point via the ‘left’ and ‘right’
+child branches, Q le f t and Q right , i.e.
+Q parent = Q le f t + Q right . (1)
+(ii) The flow into each terminal node Qterm must be the
+same2 and equal to the perfusion flow Q per f at the root
+of the tree divided by the total number of terminal nodes
+N, i.e.
+Qterm = Q per f /N. (2)
+The radius of the parent branch r parent is related to the
+radii of its two children, rle f t and r right , as follows
+r γ
+parent = r γ
+le f t + r γ
+right (3)
+with γ set between 2.55 and 3 [20, 23]. The flow re-
+sistance Ri induced along a branch i with radius r i and
+length Li is
+Ri = 8ηL i
+πr 4
+i
+(4)
+where η is the viscosity of the fluid, which is assumed
+constant in this work for simplicity. The reduced re-
+sistance R ∗ for a terminal branch3 term is obtained by
+substituting r = 1 in (4),
+R∗
+term = 8ηLt /π (5)
+R∗ for a bifurcation sub-tree with (non-terminal)
+branch i as its root is given by [20]
+R∗
+i = 8ηLi
+π +
+￿ ￿rle f t /r i
+￿ 4
+R ∗
+le f t
++
+￿rright /ri
+￿ 4
+R∗
+right
+￿ −1
+(6)
+2 This assumption avoids having varying terminal flows and sub-
+sequently avoids the knapsack combinatorial optimization problem of
+choosing candidates.
+3 We assume a cut-off in the resolution of our model and hence
+ignore the capillary loops bringing blood back to the heart. With this
+assumption we assign a resistance even to the terminal branches of
+our model.
+2
+As we will see later, the reduced resistance is used
+for calculating the radii of branches. The pressure drop
+along a branch i is calculated as
+∆Pi = Q i Ri (7)
+Each terminal node is assumed to have the same ter-
+minal pressure, which means the pressure drop from the
+perfusion point to any terminal node must be the same.
+Since the flow at each terminal node is the same and
+likewise the terminal pressure, then the resistance from
+the perfusion point to any terminal node must also be
+the same.
+3. Vascular Tree Generation
+3.1. Overview
+The tree generation is performed by iteratively grow-
+ing a vascular structure based on a user-defined (possi-
+bly spatially-varying) oxygen demand map (section 3.2)
+while enforcing the physical constraints (section 2). At
+a high level (Figure 1), during each iteration, a candi-
+date terminal node is first chosen according to the oxy-
+gen demand map. Then an existing branch is bifurcated
+to supply this terminal node. The choice of the branch to
+bifurcate and the location of the bifurcation point along
+the branch is chosen in an optimal way as we explain
+later. The oxygen supply map is then updated accord-
+ingly, and a new terminal node is selected, and so on.
+After the tree has completed its growth, the final radii of
+the tree branches are calculated according to the afore-
+mentioned physical flow and radii constraints.
+3.2. Oxygen Demand Map
+An oxygen demand map ODM(x, y, z) : Ω ⊂ R3 →
+[0, 1] is a 3D scalar volume that covers the entire per-
+fusion volume Ω, with values ranging from 0 for ‘no
+demand’ to 1 for maximum demand for oxygen. ODM
+is provided as an input to the algorithm. A simple case
+is to have a constant (homogeneous) oxygen demand
+map. The steps in Section 3.4-3.10 are then repeated
+to iteratively construct tree branches that connect to ter-
+minal nodes, until a user-defined number N of accepted
+terminal nodes is reached.
+3.3. Perforation and Terminal Pressure
+A tree trunk node position, or perforation point, p =
+(px , py , p z ) must be provided to the algorithm. Altering
+this value will change the initial location of the vascular
+structure. The perforation pressure is the pressure of the
+vascular structure at the perforation point, i.e. Pper f =
+P(p). Since the flow is conserved (section 2), any in-
+crease in pressure requires a decrease in volume, which
+in turn means that as the perforation pressure increases,
+the radii of the branches decrease, and vice versa. The
+terminal pressure Pterm is the value of the pressure at
+any terminal node t i = (t x ,t y ,tz ), i.e. Pterm = P(t i ), for
+any i = 1, 2, . . . , N. Note that Pterm ≤ Pper f must be en-
+sured. Pper f and Pterm are used for calculating the radius
+of the root branch, which is then used to calculate the
+radii of all other branches (Section 3.8).
+3.4. Selecting Terminal Nodes
+A terminal node position is randomly selected from
+the perfusion volume such that the likelihood (probabil-
+ity) of selecting this node is proportional to the value
+of the ODM at the location of that node. The Mersenne
+Twister algorithm is used for the selection of a candidate
+terminal node [24]. The selected node is then used as a
+candidate for being attached to the tree. The candidate
+node is rejected, if all paths from the tree to the node
+pass through regions of zero demand, or if the node is
+within a certain user-specified distance, D B , to any ex-
+isting branch.
+3.5. Selecting a Branch to Supply a Terminal Node
+If no branches exist yet in the tree then a branch is
+created from the tree trunk node position p to the first
+terminal node t1 . Otherwise, each existing branch in the
+tree is temporarily connected to the candidate terminal
+node and each such solution is evaluated. Preference is
+given to trees that minimize the objective function
+∑∀ j L μ
+j r λ
+j (8)
+where j is an index over all branches in the tree. In-
+creasing λ will favour the configurations where the radii
+are smallest (and vice versa), while increasing μ will fa-
+vor configurations with shorter branches. If μ = 1 and
+λ = 2, then the objective function is proportional to the
+volume ∑∀ j L j πr 2
+j , i.e. union of cylindrical branches.
+According to [20], the branches closest to the can-
+didate terminal node are most likely to be chosen as the
+minimizers of (8), with the 1 st closest being chosen 60%
+of the time, dropping down to ≤ 1% for the 10th clos-
+est. In our work, we rely on this conclusion and examine
+only the k closest branches (k is user-specified). The op-
+timal branch which results in the minimal value of the
+objective function is chosen and that connection is made
+permanent. If every branch examined was rejected (i.e.
+all branches pass through a 0 demand region), then the
+terminal node is rejected and a new one is chosen (Sec-
+tion 3.4).
+
+3.6. Branch Bifurcation Points
+With an accepted terminal node i new , the chosen
+branch to bifurcate, originally connecting nodes i per f to
+iold and denoted i per f ⇒ iold , is now split into two parts
+via a new point i bi f (Figure 2). The location of i bi f is
+chosen arbitrarily midway at this stage and will be up-
+dated later (Section 3.9). This results in two branches
+i per f ⇒ ibi f and ibi f ⇒ iold , and a newly created branch
+i bi f ⇒ i new , i.e. a Y junction is formed.
+Figure 2: Introducing a bifurcating branch.
+3.7. Updating the Branches’ Reduced Resistance and
+Flow
+After a terminal node inew has been connected to the
+vascular structure at ibi f , the reduced resistance and flow
+are updated. The new branch i bi f ⇒ inew is assigned
+a flow value of Qterm . To satisfy the constraint in (1),
+Qterm is added to all the ancestor branches of ibi f ⇒ i new ,
+stopping at the root, up to which the flow accumulates
+to Q per f = NQterm (agreeing with (2)). The reduced re-
+sistance R∗ of ibi f ⇒ inew is calculated using (5) as it
+is initially connected to a terminal node. Then, recur-
+sively, R∗
+i of the parent branch is updated using (6) until
+the reduced resistance of the root R∗
+per f has been calcu-
+lated.
+3.8. Updating the Branch Radii
+The radius of a branch is calculated by first determin-
+ing the fraction of the branch’s radius to its parent’s ra-
+dius, and then multiplying the parent radius by the cal-
+culated fraction. In order to calculate the radii of all
+branches of the tree, the radius of the root-most (per-
+foration) branch is first calculated, then the radii of its
+two children are calculated, then the radii of the chil-
+dren’s children, and so on, until reaching the terminal
+4
+branches. The perforation radius is calculated by divid-
+ing (4) by (5) to obtain
+r per f =
+￿ R∗
+per f
+R per f
+￿ 1
+4
+(9)
+Using (7) to calculate R per f , we re-write (9) as
+r per f =
+￿ Q per f R∗
+per f
+Pper f − Pterm
+￿1/4
+(10)
+and calculate R ∗
+per f from (5). Once the radius of the
+root branch is calculated, the radii of the left and right
+child branches are calculated as follows. Dividing (3)
+by r γ
+le f t and re-arranging the terms, we calculate the
+fraction f le f t (and similarly for f right ) as
+f le f t = rle f t
+r per f
+=
+￿
+1 +
+￿ rright
+rle f t
+￿ γ ￿−1/γ
+(11)
+rle f t is then obtained by multiplying f le f t by r per f in
+(10). Note that the ratio rright /r le f t must be known in
+order to calculate f le f t (and similarly for f right ). This
+ratio is obtained by equating ∆Ple f t to ∆Pright (both cal-
+culated from(7)) and substituting Rle f t by R∗
+le f t /r 4
+le f t to
+obtain
+rle f t
+r right
+=
+￿ Q le f t R∗
+le f t
+Q right R∗
+right
+￿ 1
+4
+(12)
+With this rright /r le f t ratio in hand, f le f t and f right are
+calculated and multiplied by r per f to obtain r le f t and
+rright , respectively. The procedure is repeated to update
+the flow and radii for subsequent branch generations.
+3.9. Optimizing the Bifurcation Location
+Once the radii and flow values have been updated,
+the location of the bifurcation point, i bi f , is translated
+along the branch to minimize the aforementioned ob-
+jective function in (2). Once ibi f is moved, the entire
+tree must be updated again. This process is repeated un-
+til convergence. Any location of i bi f is rejected if either
+the branch ibi f ⇒ i new , i per f ⇒ ibi f , or i bi f ⇒ i old pass
+through a region of zero oxygen demand. If all possible
+ibi f positions are rejected then the branch is rejected.
+3.10. Updating the Demand Map to Reflect Existing
+Supply
+Since branches created in the volume supply nutrients
+to regions in the vicinity of terminal nodes perfused by
+these branches, the demand for nutrients in nearby re-
+gions must be lowered. The positions in the volume
+close to the position of a perfused terminal node are as-
+sumed to draw from this supply through the arteriolar
+networks, and hence the value of the oxygen demand
+map ODM at these nearby voxel locations is updated as
+ODM (v) ←
+￿ ODM (v) d (v,t) > D T
+ODM (v) w (d (v,t)) d (v,t) ≤ D T
+￿
+(13)
+where d(v,t) is the Euclidean distance between the
+voxel position v and the terminal node position t and
+w(d(v,t)) ∈ [0, 1] is a monotonically increasing func-
+tion (e.g. polynomial or exponential). The equation
+essentially states that: The demand at locations far
+away from the perfused nodes (d(v,t) > treshold D T )
+is not affected, whereas the demand at nearby locations
+(d(v,t) ≤ D T ) is decreased via the weighting by w, and
+the farther these locations are to the perfused terminal
+node the smaller the drop in demand.
+3.11. Graph-based Modeling of the Vasculature
+During the iterations of the algorithm, an attributed
+graph data structure G (V , E ) is constructed to describe
+the hierarchy and connectivity of the branches (parent-
+child relationships). V is the set of vertices vi repre-
+senting the bifurcation points of the vascular tree and
+E is the set of edges ei representing the branches. Ver-
+tex and edge attributes are also encoded in the graph to
+further capture the properties of the vasculature. Asso-
+ciated with each v i ∈ V are the 3D coordinates of the
+spatial location of the branching point. Associated with
+each e i ∈ E are the length, radius, and flow in the branch
+represented by e i , and indices to the two bifurcation or
+terminal nodes it connects. The attributed graph is for-
+malized using the Graph eXchange Language (GXL) 4 ,
+an open standard exchange format for graphs [25], ad-
+hering to the eXtensible Markup Language (XML) and
+constrained by a Document Type Definition (DTD). Our
+implementation is also capable of exporting the tree in
+the DOT language5 , a plain text graph description lan-
+guage, which can be imported into different software.
+We use the Graph Visualization software, Graphviz6 , to
+display the resulting graphs
