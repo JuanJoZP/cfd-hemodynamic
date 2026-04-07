@@ -817,7 +817,7 @@ Sustituyendo estos parámetros para las $N_{\mathrm{gen}} = 27$ generaciones y $
 \end{equation}
 
 Escalando la resistencia basal, la condición de frontera para el árbol enfermo resulta en:
-\begin{equation}
+\begin{equation} \label{eq:r_enfermo}
   R_{\mathrm{enfermo}} = R_{\mathrm{base}} \cdot 1.464 = 13.79 \cdot 1.464 \approx 20.19\,\mathrm{g \cdot s/mm}
 \end{equation}
 
@@ -1003,10 +1003,25 @@ En la \cref{tab:coeficientes_sem} se detallan los parámetros del modelo. Los re
 
 \subsection{Por decidir (bla bla resistencia severidad indices diagnosticos)}
 
+Se seleccionó para el FFR un rango objetivo de 0.2 a 1.0, Que abarca desde una oclusión muy severa hasta un vaso completamente sano. Para referencia, los manuales de cardiología de la sociedad europea de cardiología consideran que un FFR menor a 0.80 indica una estenosis hemodinámicamente significativa que debe ser intervenida \cite{manual_ffr08}. 
 
-el dominio de severity y slope para abarcar ffr de 0.2 a
+Para cubrir este rango, es necesario definir el dominio de los parámetros de severidad ($\eta$) y pendiente ($\alpha$). Asumiendo una estenosis centrada en la arteria ($x_m = L/2$), el radio base del vaso sano corresponde a $\bar{R} = (R_{\mathrm{in}} + R_{\mathrm{out}})/2$. 
 
-en relacion a DMV y EAC
+Con esto, la reducción de área relativa $\Delta A_{\text{rel}}$ es:
+\begin{equation}
+  \Delta A_{\text{rel}} = \frac{2 \eta^2 \bar{R}^2 / \alpha}{2 L \bar{R}} = \frac{R_{\mathrm{in}} + R_{\mathrm{out}}}{2 L} \frac{\eta^2}{\alpha}
+\end{equation}
+
+Sustituyendo los valores de la arteria LAD ($L=138, R_{\mathrm{in}}=1.57, R_{\mathrm{out}}=1.2$), queda un factor de $\approx 0.010036$. Al integrar esta relación en el modelo SEM seleccionado \eqref{eq:modelo_sem_final}, se puede despejar para el parámetro de pendiente $\alpha$ en función de la severidad $\eta$ y el FFR objetivo:
+\begin{equation}
+  \alpha(\eta, \text{FFR}) = \frac{0.8885 \cdot 0.010036 \cdot \eta^2}{1.0238 - 0.2004\,\eta - \text{FFR}} \approx \frac{0.008917\,\eta^2}{1.0238 - 0.2004\,\eta - \text{FFR}}
+\end{equation}
+
+Esta expresión permite construir el espacio de muestreo para el diseño de experimentos. Específicamente, para garantizar que se alcance el límite inferior de $\text{FFR}=0.2$, se seleccionó una severidad máxima de $\eta=0.85$, ya que para valores más grandes la geometría se vuelve difícil de mallar; con esto, el valor de la pendiente debe ser aproximadamente $\alpha \approx 0.0098$. Por otro lado, se definieron las otras cotas $\eta = 0.10$ y $\alpha = 0.40$, permitiendo alcanzar el estado de normalidad hemodinámica ($\text{FFR} \approx 1.0$) de sobra.
+
+Por otro lado, para evaluar el impacto de la disfunción microvascular, se adoptó el rango de resistencia vascular periférica $[13.79, 20.19]\,\mathrm{g \cdot s/mm}$ escogido previamente \eqref{eq:r_enfermo}.
+
+El espacio de muestreo delos parametros de este experimento es amplio, y además, correr cada escenario para calcular el FFR es computacionalmente costoso. Por lo anterior, se optó por un muestreo estratificado sobre el índice FFR, para tratar de que los datos se distribuyan uniformemente en el rango de FFR de interés. Debido a la rellación no lineal entre los parámetros morfológicos y el FFR, un muestreo uniforme en el espacio de parámetros morfológicos genera una distribución sesgada del índice diagnóstico. Por lo anterior, se definieron $N=15$ niveles de FFR equidistantes en el rango $[0.22, 0.98]$. Para cada nivel, se determinaron pares aleatorios de severidad ($\eta$) y pendiente ($\alpha$) que satisfacen la relación del modelo \eqref{eq:modelo_sem_final}. Finalmente, la resistencia vascular $R$ se muestreó de una distribución uniforme, asegurando que el diseño de experimentos cubra de forma sistemática tanto el espectro de isquemia como el compromiso microvascular.
 
 \section{Discusión}
 Análisis en relación con hipótesis y otros trabajos.
