@@ -771,11 +771,10 @@ Con el objetivo de evaluar si la ubicación de la estenosis a lo largo de la art
 
 \subsubsection{Impacto de la forma de la estenosis}
 
-Para investigar de qué manera la morfología de la lesión afecta las variables hemodinámicas y los índices diagnósticos, se evaluó el impacto de la forma geométrica de la oclusión. En particular, se buscó determinar si existe un comportamiento diferencial entre una estenosis prolongada y una focal, si la forma abrupta de la lesión supone un factor crítico, o si el impacto sobre el flujo vascular está regido principalmente por la relación entre la pendiente de transición y el nivel de severidad.
+Para investigar de qué manera la morfología de la lesión afecta las variables hemodinámicas y los índices diagnósticos, se evaluó el impacto de la forma geométrica de la oclusión. En particular, se buscó determinar si existe un comportamiento diferente entre una estenosis prolongada y una más corta, si la forma abrupta de la lesión supone un factor importante, o si el impacto sobre el flujo vascular está regido principalmente por el nivel de severidad.
 
-Con este propósito, se plantearon $9$ escenarios de simulación correspondientes a todas las combinaciones posibles de tres niveles de severidad ($\eta \in \{0.3, 0.6, 0.9\}$) y tres parámetros de pendiente ($\alpha \in \{0.2, 0.5, 0.8\}$).
+Con este propósito, se plantearon $9$ escenarios de simulación correspondientes a todas las combinaciones posibles de tres niveles de severidad ($\eta \in \{0.25, 0.5, 0.75\}$) y tres parámetros de pendiente ($\alpha \in \{0.05, 0.15, 0.3\}$).
 
-% Espacio reservado para visualizar la diferencia de morfología
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.9\textwidth]{figures/stenosis_severity75_slope005.png} \\
@@ -899,11 +898,113 @@ y sobre un path:
 
 \subsubsection{Impacto de la ubicación axial de la estenosis}
 
-\subsection{Impacto de la forma de la estenosis}
+\subsection{Impacto de la morfología de la estenosis}
 
-el experimento con severidad y pendiente a ffr/cfr
+Para investigar cómo la forma geométrica de la lesión afecta el comportamiento del flujo, se calculó el FFR para los nueve escenarios planteados y se modeló la relación entre la severidad ($\eta$), la pendiente ($\alpha$) como variables independientes y el FFR como variable dependiente. Inicialmente, se observó que un modelo de regresión lineal multivariante simple no lograba capturar adecuadamente la física del problema, especialmente en regímenes de baja severidad donde el efecto de la pendiente no es tan relevante.
+
+Con el fin de capturar esta interdependencia, se propuso un enfoque basado en Modelos de Ecuaciones Estructurales (SEM) introduciendo una variable latente de reducción de área relativa del canal ($\Delta A_{\text{rel}}$). Esta variable integra de forma no lineal tanto la severidad como la pendiente, basándose en la diferencia entre el perfil de radio luminal de la arteria sana ($R_{\mathrm{taper}}(x)$), que sigue una transición lineal desde el radio de entrada $R_{\mathrm{in}}$) hasta el radio de salida ($R_{\mathrm{out}}$), y el perfil luminal con estenosis $R_{\mathrm{sten}}(x)$, que es una curva de Bézier cúbica que se ajusta a la geometría de la lesión en torno al centro axial de la lesión ($x_m$):
+
+La estenosis reduce el radio luminal en una profundidad $h_{\mathrm{sten}}$ y se extiende en una longitud axial $2d$, definidos por la severidad ($\eta$) y la pendiente ($\alpha$) según:
+\begin{align*}
+  h_{\mathrm{sten}} &= R_{\mathrm{taper}}(x_m) - R_{\min} = \eta R_{\mathrm{taper}}(x_m) \\
+  d &= \frac{h_{\mathrm{sten}}}{\alpha} = \frac{\eta R_{\mathrm{taper}}(x_m)}{\alpha}
+\end{align*}
+
+La pérdida de área absoluta ($\Delta A_{\text{abs}}$) se obtiene integrando la diferencia entre el perfil de radio del taper sano y el perfil de Bézier de la estenosis para ambas paredes:
+\begin{equation}
+  \Delta A_{\text{abs}} = 2 \int_{x_m - d}^{x_m + d} \left[ R_{\mathrm{taper}}(x) - R_{\text{sten}}(x) \right] \, dx
+\end{equation}
+
+La integral del perfil de la estenosis no es trivial debido a su naturaleza paramétrica. Definimos la reducción del radio respecto al taper como una curva de Bézier cúbica $h(t)$ para el intervalo $x \in [x_m - d, x_m]$, donde $t \in [0, 1]$ es el parámetro de la curva. Los puntos de control para la coordenada radial de esta reducción son $h_0 = 0$, $h_1 = 0$, $h_2 = h_{\mathrm{sten}}$ y $h_3 = h_{\mathrm{sten}}$, lo que garantiza continuidad $C^1$ con el taper sano (tangente nula en la unión) y un máximo suave en el centro. El polinomio resultante es:
+\begin{equation*}
+  h(t) = (1-t)^3 h_0 + 3(1-t)^2 t h_1 + 3(1-t) t^2 h_2 + t^3 h_3 = h_{\mathrm{sten}}(3t^2 - 2t^3)
+\end{equation*}
+
+Para la coordenada axial $x(t)$, los puntos de control dependen de la tensión $\tau \in [0, 1]$ (parámetro \texttt{tension} en el código): $x_0 = x_m - d$, $x_1 = x_0 + \tau d$, $x_2 = x_m - \tau d$ y $x_3 = x_m$. La derivada axial respecto al parámetro es:
+\begin{equation*}
+  x'(t) = 3d \left[ \tau + (2-6\tau)t + (6\tau-2)t^2 \right]
+\end{equation*}
+
+De esta forma, la reducción de área para una pared en la mitad proximal de la estenosis se calcula como:
+\begin{equation*}
+  A_{\mathrm{red}, 1/2} = \int_{0}^{1} h(t) x'(t) \, dt = 3 d h_{\mathrm{sten}} \int_{0}^{1} (3t^2 - 2t^3) \left[ \tau + (2-6\tau)t + (6\tau-2)t^2 \right] \, dt
+\end{equation*}
+
+Al evaluar la integral, se observa una propiedad fundamental de la parametrización de tensión simétrica utilizada: los términos que dependen de $\tau$ se anulan sistemáticamente, resultando en:
+\begin{equation*}
+  A_{\mathrm{red}, 1/2} = 3 d h_{\mathrm{sten}} \left( \frac{1}{6} \right) = \frac{1}{2} d h_{\mathrm{sten}}
+\end{equation*}
+
+Considerando la simetría de la sección distal ($x > x_m$) y la presencia de dos paredes en el dominio 2D, la pérdida de área absoluta total es exactamente:
+\begin{equation*}
+  \Delta A_{\text{abs}} = 2 \times (2 A_{\mathrm{red}, 1/2}) = 2 d h_{\mathrm{sten}}
+\end{equation*}
+
+Sustituyendo $d$ y $h_{\mathrm{sten}}$ en función de los parámetros morfológicos ensayados:
+\begin{equation*}
+  \Delta A_{\text{abs}} = 2 \left( \frac{\eta R_{\mathrm{taper}}(x_m)}{\alpha} \right) (\eta R_{\mathrm{taper}}(x_m)) = \frac{2 \eta^2 R_{\mathrm{taper}}(x_m)^2}{\alpha}
+\end{equation*}
+
+Para obtener la reducción de área relativa ($\Delta A_{\text{rel}}$), normalizamos por el área total del dominio sano ($A_{\text{canal}} = L(R_{\mathrm{in}} + R_{\mathrm{out}})$), obteniendo la expresión final:
+\begin{equation}
+  \label{eq:delta_a_rel_final}
+  \Delta A_{\text{rel}} = \frac{\Delta A_{\text{abs}}}{A_{\text{canal}}} = \frac{2 R_{\mathrm{taper}}(x_m)^2}{L(R_{\mathrm{in}} + R_{\mathrm{out}})} \frac{\eta^2}{\alpha}
+\end{equation}
+
+Utilizando los valores nominales de la arteria LAD ensayada ($L=138, R_{\mathrm{in}}=1.57, R_{\mathrm{out}}=1.2, x_m=30$), la constante geométrica de normalización resulta en aproximadamente $0.01161$, permitiendo evaluar el impacto relativo para cualquier combinación de severidad y pendiente.
+
+Se evaluaron diversos modelos estructurales para determinar la combinación de variables que mejor predice el FFR (ver \cref{tab:modelo_sem_resultados}). El análisis demuestra que el modelo que incorpora la reducción de área relativa junto con la severidad axial ($\Delta A_{\text{rel}} + \eta$) es el que mejor predice el FFR, obteniendo un coeficiente de determinación de $R^2 = 0.8506$.
+
+\vspace{0.5cm}
+\begin{table}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \begin{tabular}{lccc}
+    \hline
+    \textbf{Configuración del Modelo} & $R^2$ & \textbf{RMSE} & \textbf{MAE} \\ \hline
+    \textbf{$\Delta A_{\text{rel}} + \eta$} & \textbf{0.8506} & \textbf{0.0283} & \textbf{0.0251} \\
+    $\Delta A_{\text{rel}} + \alpha$ & 0.7515 & 0.0365 & 0.0294 \\
+    $\eta + \alpha$ & 0.7635 & 0.0356 & 0.0296 \\
+    $\Delta A_{\text{rel}}$ & 0.6578 & 0.0428 & 0.0321 \\
+    $\eta / \alpha$ & 0.4247 & 0.0555 & 0.0465 \\
+    $\eta \cdot \alpha$ & 0.0396 & 0.0717 & 0.0584 \\ \hline
+  \end{tabular}
+  \vspace{0.5cm}
+  \caption{Comparativa de modelos estadísticos para la predicción del FFR.}
+  \label{tab:modelo_sem_resultados}
+\end{table}
+
+A continuación los coeficientes del mejor modelo:
+\begin{equation}
+  \label{eq:modelo_sem_final}
+  \text{FFR} = - 0.8885\,\Delta A_{\text{rel}} - 0.2004\,\eta + 1.0238 
+\end{equation}
+
+En este modelo, por cada incremento de un $10\%$ en la reducción de área relativa respecto al área total del canal ($\Delta A_{\text{rel}}$), el valor del FFR disminuye en aproximadamente $0.089$. Por otro lado, un aumento del $10\%$ en la severidad axial ($\eta$) provoca una reducción adicional de $0.020$ en el FFR.
+
+En la \cref{tab:coeficientes_sem} se detallan los parámetros del modelo. Los resultados de la prueba $t$ de Student realizada por variable muestran que tanto la reducción de área relativa como la severidad axial son significantes ($p < 0.05$). Esto permite rechazar la hipótesis nula de que los coeficientes son iguales a cero, confirmando que cada variable aporta información adicional que mejora la capacidad predictiva del modelo. Físicamente, esto valida que la caída de presión está regida tanto por la contracción máxima ($\eta$) como por la reducción de área del lumen del vaso ($\Delta A_{\text{rel}}$).
+
+\vspace{0.5cm}
+\begin{table}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \begin{tabular}{lcccc}
+    \hline
+    \textbf{Variable} & \textbf{Coeficiente} & \textbf{Error Est.} & $t$ & $p\text{-valor}$ \\ \hline
+    Intercepto & 1.0238 & 0.0261 & 39.272 & $< 0.0001$ \\
+    $\Delta A_{\text{rel}}$ & -0.8885 & 0.3136 & -2.833 & 0.0298 \\
+    $\eta$ (Severidad) & -0.2004 & 0.0588 & -3.408 & 0.0144 \\ \hline
+  \end{tabular}
+  \vspace{0.5cm}
+  \caption{Significancia de los coeficientes para el mejor modelo ($\Delta A_{\text{rel}} + \eta$).}
+  \label{tab:coeficientes_sem}
+\end{table}
+
 
 \subsection{Por decidir (bla bla resistencia severidad indices diagnosticos)}
+
+
+el dominio de severity y slope para abarcar ffr de 0.2 a
 
 en relacion a DMV y EAC
 
