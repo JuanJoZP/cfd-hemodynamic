@@ -523,6 +523,13 @@ La longitud $L$ de los segmentos en red es directamente proporcional a su radio 
 
 De igual forma, cada bifurcación establece un mismo ángulo de salida para las ramas hijas, originando finalmente una geometría simetrica y que es consistente con las leyes que rigen el flujo sanguíneo en la microvasculatura.
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.35\textwidth, angle=-90]{figures/geom_arbol.png}
+  \caption{Geometría de ejemplo para un árbol microvascular con 3 generaciones y relación de aspecto $\alpha = 16$.}
+  \label{fig:geom_arbol_ejemplo}
+\end{figure}
+
 \subsection{Plataforma para la implementación}
 
 La implementación del modelo numérico se construye sobre un ecosistema de código abierto, priorizando la transparencia y la reproducibilidad de los resultados. Para ello, el desarrollo se basa en la integración de dos librerías principales que permiten abordar la complejidad del problema:
@@ -771,10 +778,10 @@ Con este propósito, se plantearon $9$ escenarios de simulación correspondiente
 % Espacio reservado para visualizar la diferencia de morfología
 \begin{figure}[htbp]
   \centering
-  % \includegraphics[width=0.48\textwidth]{figures/estenosis_focal.png}
-  % \hfill
-  % \includegraphics[width=0.48\textwidth]{figures/estenosis_prolongada.png}
-  \caption{Comparación geométrica de perfiles: estenosis focal/abrupta (izquierda) frente a estenosis prolongada/gradual (derecha).}
+  \includegraphics[width=0.9\textwidth]{figures/stenosis_severity75_slope005.png} \\
+  \vspace{1cm}
+  \includegraphics[width=0.9\textwidth]{figures/stenosis_severity75_slope03.png}
+  \caption{Comparación de formas de estenosis: gradual con severidad del 75\% y pendiente de 0.05 (arriba) y abrupta con severidad del 75\% y pendiente de 0.3 (abajo).}
   \label{fig:comparacion_forma_estenosis}
 \end{figure}
 
