@@ -337,11 +337,11 @@ Finalmente, cuando no se prescribe presión mediante condiciones de Dirichlet, e
 
 \subsection{Benchmarks para validación}
 
-Antes de proceder con las simulaciones orientadas al estudio de la hemodinámica coronaria, es necesario asegurar que la implementación del solver sea robusta y capaz de resolver con precisión las ecuaciones de Navier-Stokes. En este sentido, se realizaron tres pruebas de validación utilizando escenarios estándar de la literatura.
+Antes de proceder con las simulaciones orientadas al estudio de la hemodinámica coronaria, es necesario asegurar que la implementación del solver sea robusta y capaz de resolver con precisión las ecuaciones de Navier-Stokes. En este sentido, se realizaron dos pruebas de validación utilizando escenarios estándar de la literatura.
 
 \subsubsection{Flujo 2D en Cavidad Inducida por Tapa (Lid-Driven Cavity)}
 
-Este benchmark se define sobre la cavidad cuadrada unitaria
+Este benchmark se define sobre un cuadrado unitario
 \begin{equation}
   \Omega = (0,1)\times(0,1),
   \qquad \partial\Omega = \Gamma_{\mathrm{lid}}\cup \Gamma_{\mathrm{walls}},
@@ -369,9 +369,11 @@ El número de Reynolds del problema se define (en variables adimensionales) como
 \end{equation}
 \noindent donde $U$ es la velocidad de la tapa y $\nu$ la viscosidad cinemática.
 
-% Los resultados obtenidos para este escenario se presentan detalladamente en la Sección \ref{sec:resultados_validacion}.
+El benchmark se resolvió para $Re=1000$ y se comparó con los resultados de la literatura. Se escogio este número de Reynolds porque de los disponibles en el benchmark era el más cercano a los números de Reynolds típicos del flujo coronario.
 
-\subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1, $Re=100$)}
+Los resultados obtenidos para este escenario se presentan detalladamente en la Sección \ref{sec:resultados_validacion}.
+
+\subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1)}
 
 Este benchmark corresponde al caso 2D-1 del proyecto de benchmarking de la DFG/FeatFlow \cite{Schfer1996BenchmarkCO}. La geometría consiste en un canal bidimensional con un obstáculo circular, definido por
 \begin{equation}
@@ -384,29 +386,25 @@ Este benchmark corresponde al caso 2D-1 del proyecto de benchmarking de la DFG/F
 % Template: sustituir el path por la imagen del dominio cuando esté disponible
 \begin{figure}[htbp]
   \centering
+  \captionsetup{justification=centering}
   \includegraphics[width=0.8\textwidth]{figures/dfg_geometry.png}
-  \caption{Geometría del benchmark DFG 2D-1 ($Re=100$): canal $[0,2.2]\times[0,0.41]$ con cilindro centrado en $(0.2,0.2)$ y radio $0.05$.}
+  \caption{Geometría del benchmark DFG 2D-1.}
   \label{fig:dfg2d1_geometry}
 \end{figure}
 
-Se consideran las ecuaciones de Navier--Stokes incompresibles (adimensionalizadas con $\rho=1$) en $\Omega$,
+Se consideran las ecuaciones de Navier--Stokes incompresibles (adimensionalizadas con $\rho=1$) en $\Omega$, con viscosidad cinemática $\nu = 0.001$.
 \begin{equation}
   \label{eq:dfg23_ns}
   \partial_t u - \nu\,\Delta u + (u\cdot\nabla)u + \nabla p = 0,
   \qquad \nabla\cdot u = 0,
 \end{equation}
-\noindent con viscosidad cinemática
-\begin{equation}
-  \label{eq:dfg23_nu}
-  \nu = 0.001.
-\end{equation}
 
-Las condiciones de frontera se imponen como sigue. En las paredes superior e inferior del canal y sobre la frontera del cilindro se prescribe no-deslizamiento:
+En las paredes superior e inferior del canal y sobre la frontera del disco se prescribe condición de frontera de no deslizamiento:
 \begin{equation}
   \label{eq:dfg23_noslip}
-  u=0\quad \text{en } \Gamma_{\mathrm{walls}}\cup \Gamma_{\mathrm{cyl}},
+  u=0\quad \text{en } \Gamma_{\mathrm{walls}}\cup \Gamma_{\mathrm{disk}},
 \end{equation}
-\noindent donde $\Gamma_{\mathrm{walls}} = ([0,2.2]\times\{0\})\cup([0,2.2]\times\{0.41\})$ y $\Gamma_{\mathrm{cyl}}=\partial B_r(c)$.
+\noindent donde $\Gamma_{\mathrm{walls}} = ([0,2.2]\times\{0\})\cup([0,2.2]\times\{0.41\})$ y $\Gamma_{\mathrm{disk}}=\partial B_r(c)$.
 
 En la entrada $\Gamma_{\mathrm{in}}=\{0\}\times[0,0.41]$ se prescribe un perfil parabólico dependiente del tiempo,
 \begin{equation}
@@ -426,7 +424,7 @@ El número de Reynolds se define usando la velocidad media asociada al perfil de
   Re = \frac{U_{\mathrm{mean}}\,L}{\nu} = \frac{1.0\cdot 0.1}{0.001}=100.
 \end{equation}
 
-Para la comparación de resultados se miden las fuerzas de arrastre y sustentación sobre el cilindro. Definiendo el tensor de esfuerzos (en esta formulación) como
+Para la comparación de resultados se miden las fuerzas de arrastre y sustentación sobre el cilindro. Definiendo el tensor de esfuerzos como
 \begin{equation}
   \label{eq:dfg23_stress}
   \sigma := \nu\,\nabla u - pI,
@@ -436,7 +434,7 @@ Para la comparación de resultados se miden las fuerzas de arrastre y sustentaci
   \label{eq:dfg23_forces}
   \begin{pmatrix}F_D\\F_L
   \end{pmatrix}
-  =\int_{\Gamma_{\mathrm{cyl}}}\sigma\,\eta\,ds,
+  =\int_{\Gamma_{\mathrm{disk}}}\sigma\,\eta\,ds,
 \end{equation}
 \noindent y los coeficientes adimensionales correspondientes se definen como
 \begin{equation}
