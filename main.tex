@@ -13,7 +13,7 @@
 \usepackage{amsmath,amscd}
 \usepackage{amssymb} %Mathematics
 \usepackage{hyperref}
-\usepackage{cleveref}
+\usepackage[spanish]{cleveref}
 \usepackage{parskip}
 
 % --- Configuración de Leyendas (Tablas arriba, Figuras abajo)  ---
@@ -131,7 +131,7 @@ Para resolver este problema usando CFD, debemos transformarlo a su forma variaci
 
 En términos prácticos, esto se consigue al multiplicar las ecuaciones por funciones de prueba pertenecientes a espacios funcionales adecuados e integrando sobre el dominio $\Omega$. Para el campo de velocidades, se emplean funciones del espacio de Sobolev $V = [H^1(\Omega)]^d$, que garantiza la integrabilidad de las derivadas primeras, mientras que para la presión se utiliza el espacio $Q = L^2(\Omega)$, correspondiente a funciones cuadrado integrables. Al aplicar integración por partes sobre el término del tensor de esfuerzos, obtenemos un sistema de ecuaciones donde las derivadas son de un orden menor que en la formulación fuerte.
 
-Primero, multiplicamos \cref{momentum} por una función de prueba $v$,
+Primero, multiplicamos la \cref{momentum} por una función de prueba $v$,
 
 \begin{center}
   \begin{equation*}
@@ -150,7 +150,7 @@ Integramos por partes el tensor de estrés,
 \end{center}
 \vspace{6pt}
 
-Ahora multiplicamos \cref{continuity} por una función de prueba $q$,
+Ahora multiplicamos la \cref{continuity} por una función de prueba $q$,
 
 \begin{center}
   \begin{equation}
@@ -160,7 +160,7 @@ Ahora multiplicamos \cref{continuity} por una función de prueba $q$,
 \end{center}
 \vspace{6pt}
 
-Reorganizamos \cref{momentum_weak} y \cref{continuity_weak} para definir las formas $a$ y $b$ que corresponden a las ecuaciones de momento y continuidad, respectivamente:
+Reorganizamos la \cref{momentum_weak} y la \cref{continuity_weak} para definir las formas $a$ y $b$ que corresponden a las ecuaciones de momento y continuidad, respectivamente:
 
 \begin{center}
   \begin{align}
@@ -199,7 +199,7 @@ y los términos espaciales (convectivo, viscoso y de presión) se evalúan en el
 
 La discretización resultante conduce a un sistema no lineal en cada paso de tiempo, el cual se resuelve mediante el algoritmo iterativo de Newton-Raphson.
 
-Para garantizar estabilidad numérica con pares de interpolación de igual orden ($P_1/P_1$) y en regímenes con advección dominante, se añaden términos de estabilización a la formulación variacional \cite{pspg, supg, lsic, leborgne_inf-sup_2023}. En todos los casos, se construyen a partir del \,\textit{residuo fuerte} de la ecuación de momento \cref{momentum}
+Para garantizar estabilidad numérica con pares de interpolación de igual orden ($P_1/P_1$) y en regímenes con advección dominante, se añaden términos de estabilización a la formulación variacional \cite{pspg, supg, lsic, leborgne_inf-sup_2023}. En todos los casos, se construyen a partir del residuo fuerte de la ecuación de momento (\ref{momentum}) 
 
 \begin{equation}
   \label{eq:strong_residual}
@@ -310,7 +310,7 @@ En forma de bloques, el sistema linealizado puede escribirse como
 
 \noindent donde $A$ corresponde al bloque de momento (incluyendo la contribución viscosa y convectiva linealizada), $B$ es el operador discreto de divergencia y $B^T$ el de gradiente. El bloque $C$ proviene de la estabilización de la presión (PSPG) y, en general, es nulo o pequeño en comparación con $A$.
 
-Para resolver \eqref{eq:saddle_point} de forma eficiente, se emplea un precondicionador basado en el complemento de Schur. El complemento de Schur asociado al bloque de presión se define como
+Para resolver la \cref{eq:saddle_point} de forma eficiente, se emplea un precondicionador basado en el complemento de Schur. El complemento de Schur asociado al bloque de presión se define como
 
 \begin{equation}
   \label{eq:schur_exact}
@@ -495,6 +495,20 @@ La distancia $d$ controla qué tan pronunciada es la transición y se define a p
   d = \frac{R_{\mathrm{taper}}(x_m)-R_{\min}}{\alpha}.
 \end{equation}
 
+Para implementar este perfil se define la reducción del radio respecto a $R_{\mathrm{taper}}$ como una curva de Bézier cúbica $h(t)$ para el intervalo axial $x \in [x_m - d, x_m]$, donde $t \in [0, 1]$ es el parámetro de la curva. Los puntos de control para la coordenada radial de esta reducción son $h_0 = 0$, $h_1 = 0$, $h_2 = h_{\mathrm{sten}}$ y $h_3 = h_{\mathrm{sten}}$ (siendo $h_{\mathrm{sten}} = R_{\mathrm{taper}}(x_m) - R_{\min}$). El polinomio resultante es:
+\begin{equation}
+  \label{eq:eac_bezier_h}
+  h(t) = (1-t)^3 h_0 + 3(1-t)^2 t h_1 + 3(1-t) t^2 h_2 + t^3 h_3 = h_{\mathrm{sten}}(3t^2 - 2t^3).
+\end{equation}
+
+Para la coordenada axial $x(t)$, se emplea otra curva de Bézier que permite controlar la distribución de los elementos de malla mediante un parámetro de tensión $\tau \in [0, 1]$. Los puntos de control axiales son $x_0 = x_m - d$, $x_1 = x_0 + \tau d$, $x_2 = x_m - \tau d$ y $x_3 = x_m$, definiendo el mapeo:
+\begin{equation}
+  \label{eq:eac_bezier_x}
+  x(t) = (1-t)^3 x_0 + 3(1-t)^2 t x_1 + 3(1-t) t^2 x_2 + t^3 x_3.
+\end{equation}
+
+Este esquema paramétrico se aplica de forma simétrica para la mitad distal del vaso ($x \in [x_m, x_m+d]$), completando la geometría de la estenosis.
+
 La discretización espacial se realiza con una malla de elementos triangulares. El tamaño local de elemento se adapta según la curvatura de la geometría, refinando alrededor de la estenosis y usando elementos más grandes en las zonas anchas.
 \vspace{10pt}
 
@@ -551,7 +565,7 @@ El sistema ha sido diseñado bajo una arquitectura modular de tres capas que sep
 Esta separación en capas permite, por ejemplo, evaluar distintos esquemas numéricos sobre una misma geometría, o probar diferentes condiciones de frontera sin modificar el solver. Para incorporar un nuevo escenario basta con implementar una subclase de \texttt{Scenario}; para añadir un nuevo esquema numérico, una subclase de \texttt{Solver}.
 
 
-Específicamente para el escenario de la enfermedad coronaria, se combinan las geometrías de la arteria \ref{sec:geom_arterial} y de la microvasculatura \ref{sec:geom_microvascular}. Este escenario se instancia a partir de archivos de configuración en formato YAML, en donde se especifican todos los parámetros necesarios, que comprenden la elección del escenario, generación de la geometría, parámetros físicos del flujo, parámetros del esquema numérico y elección de condiciones de frontera.
+Específicamente para el escenario de la enfermedad coronaria, se combinan las geometrías de la arteria y de la microvasculatura. Este escenario se instancia a partir de archivos de configuración en formato YAML, en donde se especifican todos los parámetros necesarios, que comprenden la elección del escenario, generación de la geometría, parámetros físicos del flujo, parámetros del esquema numérico y elección de condiciones de frontera.
 
 A continuación se detallan todos los parámetros disponibles en el sistema de configuración:
 
@@ -838,7 +852,7 @@ Como paso previo a la comparación con los datos de referencia, se realizó un e
   \includegraphics[width=0.48\textwidth]{figures/norma_velocidad_lid_driven1000.png}
   \hfill
   \includegraphics[width=0.48\textwidth]{figures/norma_presion_lid_driven1000.png}
-  \caption{Convergencia de malla para el benchmark de la \cref{sec:ldc}: norma $L^2$ de la velocidad (izquierda) y de la presión (derecha) en función de la resolución de malla $N$.}
+  \caption{Convergencia de malla para el benchmark de el \cref{sec:ldc}: norma $L^2$ de la velocidad (izquierda) y de la presión (derecha) en función de la resolución de malla $N$.}
   \label{fig:ldc_convergencia_re1000}
 \end{figure}
 
@@ -850,7 +864,7 @@ La \cref{fig:ldc_lineplot_re1000} muestra la comparación de la componente $x$ d
   \centering
   \captionsetup{justification=centering}
   \includegraphics[width=0.6\textwidth]{figures/ghia_comparison.png}
-  \caption{Componente $x$ de la velocidad en la recta $x=0.5$ para el benchmark de la \cref{sec:ldc} con $N=100$, frente a los datos de \cite{ghia_high-re_1982}.}
+  \caption{Componente $x$ de la velocidad en la recta $x=0.5$ para el benchmark de el \cref{sec:ldc} con $N=100$, frente a los datos de \cite{ghia_high-re_1982}.}
   \label{fig:ldc_lineplot_re1000}
 \end{figure}
 
@@ -864,7 +878,7 @@ Adicionalmente, en la \cref{fig:ldc_streamlines_re1000} se contrastan cualitativ
   \includegraphics[width=0.48\textwidth]{figures/streamlines_simulation.png}
   \hfill
   \includegraphics[width=0.465\textwidth]{figures/streamlines_ghia.png}
-  \caption{Líneas de corriente para el benchmark de la \cref{sec:ldc}: simulación con $N=100$ (izquierda) y referencia de \cite{ghia_high-re_1982} (derecha).}
+  \caption{Líneas de corriente para el benchmark de el \cref{sec:ldc}: simulación con $N=100$ (izquierda) y referencia de \cite{ghia_high-re_1982} (derecha).}
   \label{fig:ldc_streamlines_re1000}
 \end{figure}
 
@@ -921,42 +935,50 @@ La estenosis reduce el radio luminal en una profundidad $h_{\mathrm{sten}}$ y se
   d &= \frac{h_{\mathrm{sten}}}{\alpha} = \frac{\eta R_{\mathrm{taper}}(x_m)}{\alpha}
 \end{align*}
 
-La pérdida de área absoluta ($\Delta A_{\text{abs}}$) se obtiene integrando la diferencia entre el perfil de radio del taper sano y el perfil de Bézier de la estenosis para ambas paredes:
+La pérdida de área absoluta ($\Delta A_{\text{abs}}$) se obtiene integrando la diferencia entre el perfil de radio del \textit{taper} sano y el perfil de la estenosis. Debido a la simetría del problema respecto al eje central y respecto al centro de la lesión (mitades proximal y distal), el cálculo se simplifica a cuatro veces la integral de la reducción de área de una sola pared, en su mitad proximal ($x \in [x_m - d, x_m]$). Realizando el cambio de variable al parámetro $t \in [0, 1]$ (\cref{sec:geom_arterial}), se tiene:
+\begin{align}
+  \Delta A_{\text{abs}} &= 2 \int_{x_m - d}^{x_m + d} \left[ R_{\mathrm{taper}}(x) - R_{\text{sten}}(x) \right] \, dx \nonumber \\
+  &= 4 \int_{x_m - d}^{x_m} h(x) \, dx \qquad \text{con } x=x(t), \; dx=x'(t)dt \nonumber \\
+  &= 4 \int_{0}^{1} h(t) \cdot x'(t) \, dt \label{eq:sem_integral_total}
+\end{align}
+
+Donde $h(t)$ y $x(t)$ son los polinomios de Bézier definidos en las \cref{eq:eac_bezier_h,eq:eac_bezier_x}. A partir de estos, la derivada axial $x'(t)$ es:
 \begin{equation}
-  \Delta A_{\text{abs}} = 2 \int_{x_m - d}^{x_m + d} \left[ R_{\mathrm{taper}}(x) - R_{\text{sten}}(x) \right] \, dx
+  \label{eq:sem_x_prime}
+  x'(t) = 3d \left[ \tau + (2-6\tau)t + (6\tau-2)t^2 \right].
 \end{equation}
 
-La integral del perfil de la estenosis no es trivial debido a su naturaleza paramétrica. Definimos la reducción del radio respecto al taper como una curva de Bézier cúbica $h(t)$ para el intervalo $x \in [x_m - d, x_m]$, donde $t \in [0, 1]$ es el parámetro de la curva. Los puntos de control para la coordenada radial de esta reducción son $h_0 = 0$, $h_1 = 0$, $h_2 = h_{\mathrm{sten}}$ y $h_3 = h_{\mathrm{sten}}$, lo que garantiza continuidad $C^1$ con el taper sano (tangente nula en la unión) y un máximo suave en el centro. El polinomio resultante es:
-\begin{equation*}
-  h(t) = (1-t)^3 h_0 + 3(1-t)^2 t h_1 + 3(1-t) t^2 h_2 + t^3 h_3 = h_{\mathrm{sten}}(3t^2 - 2t^3)
-\end{equation*}
+Sustituyendo los términos en la \cref{eq:sem_integral_total}, la integral paramétrica completa es:
+\begin{equation}
+  \label{eq:sem_full_parametric_integral}
+  \Delta A_{\text{abs}} = 4 \int_{0}^{1} h_{\mathrm{sten}}(3t^2 - 2t^3) \cdot 3d \left[ \tau + (2-6\tau)t + (6\tau-2)t^2 \right] \, dt.
+\end{equation}
 
-Para la coordenada axial $x(t)$, los puntos de control dependen de la tensión $\tau \in [0, 1]$ (parámetro \texttt{tension} en el código): $x_0 = x_m - d$, $x_1 = x_0 + \tau d$, $x_2 = x_m - \tau d$ y $x_3 = x_m$. La derivada axial respecto al parámetro es:
-\begin{equation*}
-  x'(t) = 3d \left[ \tau + (2-6\tau)t + (6\tau-2)t^2 \right]
-\end{equation*}
+Al evaluar esta integral, podemos separar los términos que dependen del parámetro de tensión $\tau$ de aquellos que no:
+\begin{align*}
+  \Delta A_{\text{abs}} &= 12 d h_{\mathrm{sten}} \left[ \int_{0}^{1} (3t^2 - 2t^3) (2t - 2t^2) \, dt + \tau \int_{0}^{1} (3t^2 - 2t^3) (1 - 6t + 6t^2) \, dt \right]
+\end{align*}
 
-De esta forma, la reducción de área para una pared en la mitad proximal de la estenosis se calcula como:
-\begin{equation*}
-  A_{\mathrm{red}, 1/2} = \int_{0}^{1} h(t) x'(t) \, dt = 3 d h_{\mathrm{sten}} \int_{0}^{1} (3t^2 - 2t^3) \left[ \tau + (2-6\tau)t + (6\tau-2)t^2 \right] \, dt
-\end{equation*}
+Observamos que la segunda integral se anula:
+\begin{equation}
+  \int_{0}^{1} (3t^2 - 20t^3 + 30t^4 - 12t^5) \, dt = \left[ t^3 - 5t^4 + 6t^5 - 2t^6 \right]_0^1 = 1 - 5 + 6 - 2 = 0
+\end{equation}
+mientras que la primera integral resulta en $1/6$:
+\begin{equation}
+  \int_{0}^{1} (3t^2 - 2t^3) (2t - 2t^2) \, dt = 2 \int_{0}^{1} (3t^3 - 5t^4 + 2t^5) \, dt = 2 \left[ \frac{3}{4}t^4 - t^5 + \frac{1}{3}t^6 \right]_0^1 = \frac{1}{6}
+\end{equation}
 
-Al evaluar la integral, se observa una propiedad fundamental de la parametrización de tensión simétrica utilizada: los términos que dependen de $\tau$ se anulan sistemáticamente, resultando en:
-\begin{equation*}
-  A_{\mathrm{red}, 1/2} = 3 d h_{\mathrm{sten}} \left( \frac{1}{6} \right) = \frac{1}{2} d h_{\mathrm{sten}}
-\end{equation*}
+Entonces la pérdida de área por la estenosis es:
+\begin{equation}
+  \Delta A_{\text{abs}} = 12 d h_{\mathrm{sten}} \left( \frac{1}{6} \right) = 2 d h_{\mathrm{sten}}
+\end{equation}
 
-Considerando la simetría de la sección distal ($x > x_m$) y la presencia de dos paredes en el dominio 2D, la pérdida de área absoluta total es exactamente:
-\begin{equation*}
-  \Delta A_{\text{abs}} = 2 \times (2 A_{\mathrm{red}, 1/2}) = 2 d h_{\mathrm{sten}}
-\end{equation*}
-
-Sustituyendo $d$ y $h_{\mathrm{sten}}$ en función de los parámetros morfológicos ensayados:
+Sustituyendo $d$ y $h_{\mathrm{sten}}$ en función de los parámetros morfológicos con los que se genera la geometria:
 \begin{equation*}
   \Delta A_{\text{abs}} = 2 \left( \frac{\eta R_{\mathrm{taper}}(x_m)}{\alpha} \right) (\eta R_{\mathrm{taper}}(x_m)) = \frac{2 \eta^2 R_{\mathrm{taper}}(x_m)^2}{\alpha}
 \end{equation*}
 
-Para obtener la reducción de área relativa ($\Delta A_{\text{rel}}$), normalizamos por el área total del dominio sano ($A_{\text{canal}} = L(R_{\mathrm{in}} + R_{\mathrm{out}})$), obteniendo la expresión final:
+Para obtener la reducción de área relativa, normalizamos por el área total del dominio sano ($A_{\text{canal}} = L(R_{\mathrm{in}} + R_{\mathrm{out}})$), obteniendo la expresión final:
 \begin{equation}
   \label{eq:delta_a_rel_final}
   \Delta A_{\text{rel}} = \frac{\Delta A_{\text{abs}}}{A_{\text{canal}}} = \frac{2 R_{\mathrm{taper}}(x_m)^2}{L(R_{\mathrm{in}} + R_{\mathrm{out}})} \frac{\eta^2}{\alpha}
@@ -993,7 +1015,7 @@ A continuación los coeficientes del mejor modelo:
 
 En este modelo, por cada incremento de un $10\%$ en la reducción de área relativa respecto al área total del canal ($\Delta A_{\text{rel}}$), el valor del FFR disminuye en aproximadamente $0.089$. Por otro lado, un aumento del $10\%$ en la severidad axial ($\eta$) provoca una reducción adicional de $0.020$ en el FFR.
 
-En la \cref{tab:coeficientes_sem} se detallan los parámetros del modelo. Los resultados de la prueba $t$ de Student realizada por variable muestran que tanto la reducción de área relativa como la severidad axial son significantes ($p < 0.05$). Esto permite rechazar la hipótesis nula de que los coeficientes son iguales a cero, confirmando que cada variable aporta información adicional que mejora la capacidad predictiva del modelo. Físicamente, esto valida que la caída de presión está regida tanto por la contracción máxima ($\eta$) como por la reducción de área del lumen del vaso ($\Delta A_{\text{rel}}$).
+En el \cref{tab:coeficientes_sem} se detallan los parámetros del modelo. Los resultados de la prueba $t$ de Student realizada por variable muestran que tanto la reducción de área relativa como la severidad axial son significantes ($p < 0.05$). Esto permite rechazar la hipótesis nula de que los coeficientes son iguales a cero, confirmando que cada variable aporta información adicional que mejora la capacidad predictiva del modelo. Físicamente, esto valida que la caída de presión está regida tanto por la contracción máxima ($\eta$) como por la reducción de área del lumen del vaso ($\Delta A_{\text{rel}}$).
 
 \vspace{0.5cm}
 \begin{table}[htbp]
@@ -1028,11 +1050,11 @@ Sustituyendo los valores de la arteria LAD ($L=138, R_{\mathrm{in}}=1.57, R_{\ma
   \alpha(\eta, \text{FFR}) = \frac{0.8885 \cdot 0.010036 \cdot \eta^2}{1.0238 - 0.2004\,\eta - \text{FFR}} \approx \frac{0.008917\,\eta^2}{1.0238 - 0.2004\,\eta - \text{FFR}}
 \end{equation}
 
-Esta expresión permite construir el espacio de muestreo para el diseño de experimentos. Específicamente, para garantizar que se alcance el límite inferior de $\text{FFR}=0.2$, se seleccionó una severidad máxima de $\eta=0.85$, ya que para valores más grandes la geometría se vuelve difícil de mallar; con esto, el valor de la pendiente debe ser aproximadamente $\alpha \approx 0.0098$. Por otro lado, se definieron las otras cotas $\eta = 0.10$ y $\alpha = 0.40$, permitiendo alcanzar el estado de normalidad hemodinámica ($\text{FFR} \approx 1.0$) de sobra.
+Esta expresión permite construir el espacio de muestreo para el diseño de experimentos. Específicamente, para garantizar que se alcance el límite inferior de $\text{FFR}=0.2$, se seleccionó una severidad máxima de $\eta=0.85$, ya que para valores más grandes la geometría se vuelve difícil de mallar; con esto, el valor de la pendiente debe ser aproximadamente $\alpha \approx 0.0098$. Por otro lado, se definieron las otras cotas $\eta = 0.10$ y $\alpha = 0.40$, permitiendo alcanzar el estado de normalidad hemodinámica de sobra.
 
 Por otro lado, para evaluar el impacto de la disfunción microvascular, se adoptó el rango de resistencia vascular periférica $[13.79, 20.19]\,\mathrm{g \cdot s/mm}$ escogido previamente \eqref{eq:r_enfermo}.
 
-El espacio de muestreo delos parametros de este experimento es amplio, y además, correr cada escenario para calcular el FFR es computacionalmente costoso. Por lo anterior, se optó por un muestreo estratificado sobre el índice FFR, para tratar de que los datos se distribuyan uniformemente en el rango de FFR de interés. Debido a la rellación no lineal entre los parámetros morfológicos y el FFR, un muestreo uniforme en el espacio de parámetros morfológicos genera una distribución sesgada del índice diagnóstico. Por lo anterior, se definieron $N=15$ niveles de FFR equidistantes en el rango $[0.22, 0.98]$. Para cada nivel, se determinaron pares aleatorios de severidad ($\eta$) y pendiente ($\alpha$) que satisfacen la relación del modelo \eqref{eq:modelo_sem_final}. Finalmente, la resistencia vascular $R$ se muestreó de una distribución uniforme, asegurando que el diseño de experimentos cubra de forma sistemática tanto el espectro de isquemia como el compromiso microvascular.
+El espacio de muestreo de los parametros de este experimento es amplio, y además, correr cada escenario para calcular el FFR es computacionalmente costoso. Por lo anterior, se optó por un muestreo estratificado sobre el índice FFR, para tratar de que los datos se distribuyan uniformemente en el rango de FFR de interés. Debido a la rellación no lineal entre los parámetros morfológicos y el FFR, un muestreo uniforme en el espacio de parámetros morfológicos genera una distribución sesgada del índice diagnóstico. Por lo anterior, se definieron $N=15$ niveles de FFR equidistantes en el rango $[0.22, 0.98]$. Para cada nivel, se determinaron pares aleatorios de severidad ($\eta$) y pendiente ($\alpha$) que satisfacen la relación del modelo \eqref{eq:modelo_sem_final}. Finalmente, la resistencia vascular $R$ se muestreó de una distribución uniforme, asegurando que el diseño de experimentos cubra de forma sistemática tanto el espectro de isquemia como el compromiso microvascular.
 
 \section{Discusión}
 Análisis en relación con hipótesis y otros trabajos.
