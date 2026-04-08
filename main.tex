@@ -373,7 +373,7 @@ El benchmark se resolvió para $Re=1000$ y se comparó con los resultados de la 
 
 Los resultados obtenidos para este escenario se presentan detalladamente en la Sección \ref{sec:resultados_validacion}.
 
-\subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1)}
+\subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1)} \label{sec:dfg_benchmark}
 
 Este benchmark corresponde al caso 2D-1 del proyecto de benchmarking de la DFG/FeatFlow \cite{Schfer1996BenchmarkCO}. La geometría consiste en un canal bidimensional con un obstáculo circular, definido por
 \begin{equation}
@@ -884,7 +884,21 @@ Adicionalmente, en la \cref{fig:ldc_streamlines_re1000} se contrastan cualitativ
 
 \subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1)} \label{sec:dfg_results}
 
-Como paso previo a la validación con los valores de referencia, se realizó un estudio de convergencia de malla para determinar una resolución suficientemente refinada en las cercanías del obstáculo. Se simuló hasta llegar a estado estacionario para distintas resoluciones, $res \in \{0.01, 0.005, 0.0025\}$, ajustando el refinamiento local alrededor del cilindro y tanto para interpolación con polinomios de primer orden como de segundo orden. En cada caso se registraron los coeficientes de arrastre ($C_D$) y sustentación ($C_L$). Los resultados se muestran en la \cref{fig:dfg1_convergencia}.
+Como paso previo a la validación con los valores de referencia, se realizó un estudio de convergencia de malla para determinar una resolución suficientemente refinada en las cercanías del obstáculo. Inicialmente, se evaluó la convergencia de la solución analizando el cambio en la norma $L^2$ de los campos de velocidad y presión para distintas resoluciones, $res \in \{0.01, 0.005, 0.0025\}$, utilizando elementos de segundo y de primer orden. Los resultados se presentan en la \cref{fig:dfg1_l2_convergencia}. 
+
+\begin{figure}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  % \includegraphics[width=0.48\textwidth]{figures/norma_velocidad_dfg1.png}
+  % \hfill
+  % \includegraphics[width=0.48\textwidth]{figures/norma_presion_dfg1.png}
+  \caption{Convergencia de malla para el benchmark del \cref{sec:dfg_benchmark}: norma $L^2$ de la velocidad (izquierda) y de la presión (derecha) en función de los grados de libertad del sistema.}
+  \label{fig:dfg1_l2_convergencia}
+\end{figure}
+
+Se obtuvo convergencia en ambas variables; el cambio entre la norma $L^2$ tanto para el campo de velocidades como para el de presiones entre las dos últimas simulaciones fue menor al $x\%$. Este comportamiento permite asegurar que la resolución espacial es adecuada para capturar los gradientes del flujo.
+
+Posteriormente, se registraron los coeficientes de arrastre ($C_D$) y sustentación ($C_L$) para el cilindro. Se muestran en la \cref{fig:dfg1_convergencia}.
 
 \begin{figure}[htbp]
   \centering
@@ -892,13 +906,11 @@ Como paso previo a la validación con los valores de referencia, se realizó un 
   % \includegraphics[width=0.48\textwidth]{figures/dfg1_drag_convergence.png}
   % \hfill
   % \includegraphics[width=0.48\textwidth]{figures/dfg1_lift_convergence.png}
-  \caption{Convergencia de malla para el benchmark DFG 2D-1: coeficiente de arrastre $C_D$ (izquierda) y de sustentación $C_L$ (derecha) en función del parámetro de resolución $res$.}
+  \caption{Convergencia de los coeficientes de fuerza para el benchmark del \cref{sec:dfg_benchmark}: coeficiente de arrastre $C_D$ (izquierda) y de sustentación $C_L$ (derecha) en función de los grados de libertad del sistema.}
   \label{fig:dfg1_convergencia}
 \end{figure}
 
-Se observa que ambos coeficientes convergen monótonamente hacia los valores tabulados a medida que se reduce el valor de $res$. La variación relativa entre las mallas de $res=0.007$ y $res=0.005$ fue inferior al $0.5\%$, lo que justifica el uso de $res=0.005$ como resolución de referencia para las comparaciones presentadas a continuación.
-
-
+Se observa que ambos coeficientes convergen monótonamente hacia los valores tabulados a medida que se refina la malla. La variación relativa entre las mallas más finas fue inferior al $x\%$, y el error respecto a los valores de referencia de \cite{Schfer1996BenchmarkCO} fue del $x\%$. Estos resultados garantizan que el esquema numérico es robusto y fiable en escenarios como este, que se asemejan a las condiciones de flujo en arterias.
 
 \subsection{Analisis descriptivo de parametros hemodinamicos}
 
