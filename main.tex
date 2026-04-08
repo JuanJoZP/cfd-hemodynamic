@@ -889,28 +889,28 @@ Como paso previo a la validación con los valores de referencia, se realizó un 
 \begin{figure}[htbp]
   \centering
   \captionsetup{justification=centering}
-  % \includegraphics[width=0.48\textwidth]{figures/norma_velocidad_dfg1.png}
-  % \hfill
-  % \includegraphics[width=0.48\textwidth]{figures/norma_presion_dfg1.png}
+  \includegraphics[width=0.48\textwidth]{figures/norma_velocidad_dfg1.png}
+  \hfill
+  \includegraphics[width=0.48\textwidth]{figures/norma_presion_dfg1.png}
   \caption{Convergencia de malla para el benchmark del \cref{sec:dfg_benchmark}: norma $L^2$ de la velocidad (izquierda) y de la presión (derecha) en función de los grados de libertad del sistema.}
   \label{fig:dfg1_l2_convergencia}
 \end{figure}
 
-Se obtuvo convergencia en ambas variables; el cambio entre la norma $L^2$ tanto para el campo de velocidades como para el de presiones entre las dos últimas simulaciones fue menor al $x\%$. Este comportamiento permite asegurar que la resolución espacial es adecuada para capturar los gradientes del flujo.
+Se obtuvo convergencia en ambas variables; el cambio entre la norma $L^2$ tanto para el campo de velocidades como para el de presiones entre las dos últimas simulaciones fue menor al $2\%$. Este comportamiento permite asegurar que la resolución espacial es adecuada para capturar los gradientes del flujo.
 
 Posteriormente, se registraron los coeficientes de arrastre ($C_D$) y sustentación ($C_L$) para el cilindro. Se muestran en la \cref{fig:dfg1_convergencia}.
 
 \begin{figure}[htbp]
   \centering
   \captionsetup{justification=centering}
-  % \includegraphics[width=0.48\textwidth]{figures/dfg1_drag_convergence.png}
-  % \hfill
-  % \includegraphics[width=0.48\textwidth]{figures/dfg1_lift_convergence.png}
+  \includegraphics[width=0.48\textwidth]{figures/dfg1_drag_convergence.png}
+  \hfill
+  \includegraphics[width=0.48\textwidth]{figures/dfg1_lift_convergence.png}
   \caption{Convergencia de los coeficientes de fuerza para el benchmark del \cref{sec:dfg_benchmark}: coeficiente de arrastre $C_D$ (izquierda) y de sustentación $C_L$ (derecha) en función de los grados de libertad del sistema.}
   \label{fig:dfg1_convergencia}
 \end{figure}
 
-Se observa que ambos coeficientes convergen monótonamente hacia los valores tabulados a medida que se refina la malla. La variación relativa entre las mallas más finas fue inferior al $x\%$, y el error respecto a los valores de referencia de \cite{Schfer1996BenchmarkCO} fue del $x\%$. Estos resultados garantizan que el esquema numérico es robusto y fiable en escenarios como este, que se asemejan a las condiciones de flujo en arterias.
+Se observa que ambos coeficientes convergen hacia los valores tabulados a medida que se refina la malla. La variación relativa entre las mallas más finas fue inferior al $5\%$, y el error respecto a los valores de referencia de \cite{Schfer1996BenchmarkCO} fue del $5\%$, en promedio. Estos resultados garantizan que el esquema numérico es robusto y fiable en escenarios como este, que se asemejan a las condiciones de flujo en arterias.
 
 \subsection{Analisis descriptivo de parametros hemodinamicos}
 
