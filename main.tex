@@ -15,6 +15,8 @@
 \usepackage{hyperref}
 \usepackage[spanish]{cleveref}
 \usepackage{parskip}
+\usepackage{booktabs}
+\usepackage{tabularx}
 
 % --- Configuración de Leyendas (Tablas arriba, Figuras abajo)  ---
 \captionsetup[table]{position=top, justification=raggedright, singlelinecheck=false}
@@ -524,12 +526,12 @@ La discretización espacial se realiza con una malla de elementos triangulares. 
 Para representar la red microvascular, se genera un árbol arterial. La geometría se genera mediante el uso progresivo de bifurcaciones simétricas.
 
 El descenso del radio entre las ramas de cada nivel vascular sigue la ley de Murray \cite{ley_murray}. Asumiendo una bifurcación simétrica y un exponente cúbico estándar $\gamma = 3$, el radio de las ramas hijas $r_{h}$ está dado por el radio de la rama padre $r_{p}$ como:
-\begin{equation}
+\begin{equation} \label{eq:ley_murray}
     r_{p}^{3} = 2 r_{h}^{3} \qquad \implies \qquad r_{h} = r_{p} \, 2^{-1/3}.
 \end{equation}
 
 La longitud $L$ de los segmentos en red es directamente proporcional a su radio particular gracias a establecer la constante de proporción $\alpha$:
-\begin{equation}
+\begin{equation} \label{eq:tree_alpha}
     L = \alpha r.
 \end{equation}
 
@@ -541,96 +543,6 @@ De igual forma, cada bifurcación establece un mismo ángulo de salida para las 
   \caption{Geometría de ejemplo para un árbol microvascular con 3 generaciones y relación de aspecto $\alpha = 16$.}
   \label{fig:geom_arbol_ejemplo}
 \end{figure}
-
-\subsection{Plataforma para la implementación}
-
-La implementación del modelo numérico se construye sobre un ecosistema de código abierto, priorizando la transparencia y la reproducibilidad de los resultados. Para ello, el desarrollo se basa en la integración de dos librerías principales que permiten abordar la complejidad del problema:
-
-\begin{itemize}
-  \item \textbf{FEniCSx:} Se utiliza para la definición de las formas variacionales y su asociación con la geometría del dominio \cite{BarattaEtal2023}. Esta librería permite realizar la discretización y el ensamblaje del sistema de ecuaciones, integrando las condiciones de frontera previamente definidas.
-
-  \item \textbf{PETSc:} Se encarga de resolver los sistemas de ecuaciones resultantes de forma paralela y eficiente \cite{dalcin_parallel_2011}. En este sentido, se emplea el método de Newton para la no linealidad y los métodos de Krylov para la resolución iterativa de los sistemas lineales, garantizando un alto rendimiento computacional.
-\end{itemize}
-
-El sistema ha sido diseñado bajo una arquitectura modular de tres capas que separa la física del problema, el método numérico y la orquestación del experimento:
-
-\begin{itemize}
-  \item \textbf{Scenario:} Define la física del problema: geometría del dominio, propiedades del fluido ($\mu$, $\rho$), condiciones iniciales y condiciones de frontera (velocidad y presión). Toda nueva geometría o escenario físico se implementa heredando de esta clase abstracta, sobrescribiendo únicamente los métodos \texttt{mesh}, \texttt{bcu}, \texttt{bcp} e \texttt{initial\_velocity}.
-
-  \item \textbf{Solver:} Contiene el esquema numérico para las ecuaciones de Navier--Stokes incompresibles: definición de las formas variacionales, integración temporal y aplicación de condiciones de contorno. Distintos solvers (\textit{estabilizado por bloques}, \textit{Schur}, \textit{LSC}, entre otros) heredan de esta clase y pueden intercambiarse sin modificar el escenario.
-
-  \item \textbf{Simulation:} Actúa como orquestador del experimento: recibe una instancia de \texttt{Scenario} y un \texttt{Solver}, gestiona el bucle temporal, el guardado de resultados y la trazabilidad de los parámetros. Desacopla completamente la lógica de ejecución de la física y del esquema numérico, permitiendo combinar cualquier escenario con cualquier solver y repetir o extender experimentos sin reescribir código.
-\end{itemize}
-
-Esta separación en capas permite, por ejemplo, evaluar distintos esquemas numéricos sobre una misma geometría, o probar diferentes condiciones de frontera sin modificar el solver. Para incorporar un nuevo escenario basta con implementar una subclase de \texttt{Scenario}; para añadir un nuevo esquema numérico, una subclase de \texttt{Solver}.
-
-
-Específicamente para el escenario de la enfermedad coronaria, se combinan las geometrías de la arteria y de la microvasculatura. Este escenario se instancia a partir de archivos de configuración en formato YAML, en donde se especifican todos los parámetros necesarios, que comprenden la elección del escenario, generación de la geometría, parámetros físicos del flujo, parámetros del esquema numérico y elección de condiciones de frontera.
-
-A continuación se detallan todos los parámetros disponibles en el sistema de configuración:
-
-\begin{description}
-
-  \item[\texttt{artery\_params}.] Parámetros de la arteria y la estenosis:\leavevmode
-  \begin{itemize}
-    \item \texttt{radius\_in} [mm]: Radio de la arteria en la sección de entrada.
-    \item \texttt{radius\_out} [mm]: Radio de la arteria en la sección de salida, en el punto de conexión con el árbol microvascular.
-    \item \texttt{length} [mm]: Longitud del segmento arterial principal.
-    \item \texttt{coupling\_slope} [adimensional]: Pendiente del cono de transición que empalma la arteria con el árbol. Un valor menor produce una transición más gradual.
-    \item \texttt{stenosis\_severity} [adimensional]: Severidad de la estenosis ($\eta \in [0, 1]$); $\eta = 0$ representa un vaso sano y $\eta \to 1$ una oclusión extrema.
-    \item \texttt{stenosis\_position} [adimensional $\in [0,1]$]: Posición relativa de la estenosis a lo largo del eje axial ($s_m / L$); $0$ es el extremo proximal y $1$ el distal.
-    \item \texttt{stenosis\_slope} [adimensional]: Parámetro de pendiente $\alpha$ que controla cuán abrupta es la transición en la zona de estenosis.
-  \end{itemize}
-
-  \item[\texttt{tree\_params}.] Parámetros de la microvasculatura:\leavevmode
-  \begin{itemize}
-    \item \texttt{perf\_pressure} [dyn/cm$^2$]: Presión de perfusión objetivo empleada por \textit{VascuSynth} para dimensionar los radios del árbol ($\approx 133\,322$ dyn/cm$^2$ $\approx$ 100 mmHg).
-    \item \texttt{term\_pressure} [dyn/cm$^2$]: Presión objetivo en los nodos terminales empleada por \textit{VascuSynth}.
-    \item \texttt{tree\_volume} [ml]: Volumen del dominio cúbico que contiene el árbol microvascular. Determina la escala física de la red.
-    \item \texttt{n\_terminal} [entero]: Número de vasos terminales; controla la densidad y la resolución de la red distal.
-    \item \texttt{murray\_exponent} [adimensional]: Exponente $\gamma$ de la ley de Murray, que rige la relación de radios en cada bifurcación: $r_\text{parent}^\gamma = r_\text{left}^\gamma + r_\text{right}^\gamma$.
-    \item \texttt{mu} [g/(mm$\cdot$s)]: Viscosidad dinámica de la sangre ($\mu \approx 0.0035\,\text{Pa}\cdot\text{s}$). Utilizada por \textit{VascuSynth} para el dimensionamiento hidráulico del árbol.
-    \item \texttt{rho} [g/mm$^3$]: Densidad de la sangre ($\rho \approx 0.00106\,\text{g/mm}^3$). Utilizada por \textit{VascuSynth} durante la generación del árbol.
-    \item \texttt{wall\_thickening\_severity} [adimensional $\in [0,1]$]: Severidad de la microangiopatía, modelada como engrosamiento de la pared arteriolar y capilar que estrecha el lumen. El factor reduce el radio efectivo de los vasos distales: $r_\text{eff} = r \cdot (1 - \eta_w)$, donde $\eta_w = 0$ representa vasculatura sana y $\eta_w \to 1$ una oclusión completa del lumen. Este parámetro se aplica a los vasos a partir del nivel de árbol definido por \texttt{thickening\_level\_threshold}.
-    \item \texttt{thickening\_level\_threshold} [entero]: Nivel del árbol a partir del cual se aplica el engrosamiento de pared. Los vasos en niveles inferiores al umbral (más proximales) no se ven afectados, concentrando la patología en la microvasculatura distal.
-    \item \texttt{vessel\_loss\_factor} [adimensional $\in [0,1]$]: Factor de severidad de rarefacción capilar; controla la probabilidad de eliminación de ramas distales del árbol sintético.
-    \item \texttt{hyperemia\_dilation\_factor} [adimensional]: Factor multiplicativo de vasodilatación aplicado a los radios del árbol cuando \texttt{hyperemia = true}.
-  \end{itemize}
-
-  \item[\texttt{simulation\_params}.] Parámetros del esquema numérico y condiciones de frontera:\leavevmode
-  \begin{itemize}
-    \item \texttt{T} [s]: Tiempo físico total a simular.
-    \item \texttt{dt} [s]: Paso de tiempo $\Delta t$ para la integración temporal.
-    \item \texttt{solver}: Esquema numérico empleado. Opciones disponibles: \texttt{stabilized\_staggered}, \texttt{stabilized\_schur}, \texttt{stabilized\_schur\_lsc}, \texttt{solver1}, \texttt{solver2}.
-    \item \texttt{mu} [g/(mm$\cdot$s)]: Viscosidad dinámica de la sangre usada en el esquema numérico.
-    \item \texttt{rho} [g/mm$^3$]: Densidad de la sangre usada en el esquema numérico.
-    \item \texttt{q\_in} [ml/s]: Caudal volumétrico de entrada en condiciones basales. Cuando se prescribe una condición de frontera de velocidad en la entrada, este valor se divide por el área de la sección transversal para obtener la velocidad media $\bar{u} = q_{\mathrm{in}} / A_{\mathrm{in}}$ con la cual se prescribe el perfil de velocidad, ya sea uniforme o parabólico.
-    \item \texttt{q\_in\_hyper} [ml/s]: Caudal volumétrico de entrada en hiperemia, utilizado de forma análoga a \texttt{q\_in} cuando \texttt{hyperemia = true}.
-    \item \texttt{p\_inlet} [dyn/cm$^2$]: Presión estática prescrita en la entrada, utilizada cuando la condición de frontera de entrada es de tipo presión.
-    \item \texttt{p\_terminal} [dyn/cm$^2$]: Presión estática prescrita en las salidas del dominio (arteria o árbol), utilizada cuando la condición de frontera de salida es de tipo presión.
-    \item \texttt{bc\_type}: Especifica las condiciones de frontera de entrada y salida:
-    \begin{itemize}
-      \item \texttt{bc\_type.inlet}: Condición en la entrada. Valores posibles:
-        \texttt{velocity\_parabolic} perfil de Poiseuille
-        \texttt{velocity\_constant} perfil uniforme,
-        \texttt{pressure} presión constante.
-      \item \texttt{bc\_type.outlet}: Condición en la salida. Valores posibles:
-        \texttt{pressure} presión constante,
-        \texttt{none} salida libre,
-        \texttt{velocity\_zero} velocidad nula, como una pared.
-    \end{itemize}
-    \item \texttt{geometry\_type}: Topología de la malla sobre la que se ejecuta la simulación: \texttt{stenosis} (solo arteria), \texttt{tree} (solo árbol microvascular) o \texttt{full} (geometría acoplada completa).
-    \item \texttt{hyperemia} [booleano]: Si es \texttt{true}, el escenario usa \texttt{q\_in\_hyper} en lugar de \texttt{q\_in} y activa la vasodilatación del árbol según \texttt{hyperemia\_dilation\_factor}.
-  \end{itemize}
-
-  \item[\texttt{matrix}.] Matriz de experimentos:
-  Esta sección es opcional y se usa cuando se desea ejecutar un experimento de múltiples escenarios. Cada clave acepta una lista de valores; se calcula el producto cartesiano de todas las listas y se genera un escenario para cada combinación. Los valores de \texttt{matrix} tienen precedencia sobre los declarados en las secciones anteriores para ese escenario concreto.
-
-  Cualquier parámetro de las secciones anteriores puede incluirse en la matriz.
-\end{description}
-
-
-Finalmente, con el objetivo de garantizar la trazabilidad, cada resultado se almacena junto con sus metadatos correspondientes. La información se organiza automáticamente en subcarpetas con una jerarquía que identifica claramente el tipo de simulación, el solver empleado y los parámetros específicos de la ejecución, facilitando el post-procesamiento y los análisis posteriores.
 
 
 \subsection{Condiciones de frontera}
@@ -697,7 +609,7 @@ Para el escenario acoplado de la estenosis con el árbol microvascular explícit
 \end{equation}
 
 El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que conocemos el radio de los vasos en cada nivel gracias a la ley de Murray. Para este desarrollo, el perfil de flujo de Poiseuille entre 2 placas tiene varias limitaciones, por lo que asumimos el perfil de flujo de Poiseuille para conductos cilíndricos. Bajo estas condiciones, la resistencia hidráulica de un vaso de radio $r$ y longitud $L$ viene dada por:
-\begin{equation}
+\begin{equation} \label{eq:resistencia_vaso}
   R = \frac{8 \mu L}{\pi r^4}
 \end{equation}
 
@@ -740,6 +652,70 @@ La resistencia total del árbol se obtiene sumando las resistencias de cada nive
   R_{\mathrm{arbol}} = \sum_{j=0}^{N_{\mathrm{gen}}-1} R_{\mathrm{nivel}, j} = \sum_{j=0}^{N_{\mathrm{gen}}-1} R_0  = N_{\mathrm{gen}} \frac{8 \mu \alpha}{\pi r_0^3}
 \end{equation}
 
+
+
+\subsection{Plataforma para la implementación}
+
+La implementación del modelo numérico se construye sobre un ecosistema de código abierto, priorizando la transparencia y la reproducibilidad de los resultados. Para ello, el desarrollo se basa en la integración de dos librerías principales que permiten abordar la complejidad del problema:
+
+\paragraph{FEniCSx:} Se utiliza para la definición de las formas variacionales y su asociación con la geometría del dominio \cite{BarattaEtal2023}. Esta librería permite realizar la discretización y el ensamblaje del sistema de ecuaciones, integrando las condiciones de frontera previamente definidas.
+
+\paragraph{PETSc:} Se encarga de resolver los sistemas de ecuaciones resultantes de forma paralela y eficiente \cite{dalcin_parallel_2011}. En este sentido, se emplea el método de Newton para la no linealidad y los métodos de Krylov para la resolución iterativa de los sistemas lineales, garantizando un alto rendimiento computacional.
+
+El sistema ha sido diseñado bajo una arquitectura modular de tres capas que separa la física del problema, el método numérico y la orquestación del experimento:
+
+\paragraph{Scenario:} Define la física del problema, incluyendo la geometría del dominio, las propiedades del fluido y las condiciones iniciales y de frontera. Toda nueva configuración física se implementa heredando de esta clase abstracta, lo que garantiza una interfaz consistente y permite extender el sistema a nuevas geometrías únicamente implementando los métodos esenciales como \texttt{mesh}, \texttt{bcu} o \texttt{initial\_velocity}.
+
+\paragraph{Solver:} Contiene el esquema numérico para la resolución de las ecuaciones de Navier--Stokes incompresibles. Este componente gestiona la definición de las formas variacionales, la integración temporal y la aplicación de condiciones de contorno. Debido a su diseño modular, distintos esquemas de solución (como \textit{estabilizado por bloques}, \textit{Schur} o \textit{LSC}) pueden intercambiarse de forma transparente sin alterar la definición del escenario físico.
+
+\paragraph{Simulation:} Actúa como el orquestador global del experimento. Recibe instancias de \textit{Scenario} y \textit{Solver} para gestionar el bucle temporal, la persistencia de resultados y la trazabilidad de parámetros. Al desacoplar la lógica de ejecución de la física y el esquema numérico, permite realizar estudios paramétricos complejos combinando cualquier par de componentes sin necesidad de reescribir código.
+
+Esta separación en capas permite, por ejemplo, evaluar distintos esquemas numéricos sobre una misma geometría, o probar diferentes condiciones de frontera sin modificar el solver. Para incorporar un nuevo escenario basta con implementar una subclase de \texttt{Scenario}; para añadir un nuevo esquema numérico, una subclase de \texttt{Solver}.
+
+
+Específicamente para el escenario de la enfermedad coronaria, se combinan las geometrías de la arteria y de la microvasculatura. Estas simulaciones se parametrizan mediante un sistema integrado de configuración que abarca desde la morfología vascular hasta los esquemas de estabilización numérica. Los parámetros disponibles se consolidan en el \cref{tab:parametros_sistema}.
+
+\begin{table}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \small
+  \label{tab:parametros_sistema}
+  \begin{tabularx}{\textwidth}{@{} l l c X @{}}
+    \toprule
+    \textbf{Categoría} & \textbf{Nombre} & \textbf{Rango} & \textbf{Descripción} \\ \midrule
+    \textit{Arteria} & \texttt{L} [mm] & $\mathbb{R}^{+}$ & Longitud axial total del segmento. \\
+    & \texttt{R\_in} [mm] & $\mathbb{R}^{+}$ & Radio del vaso en la sección de entrada $x=0$ (\cref{eq:eac_linear_taper}). \\
+    & \texttt{R\_out} [mm] & $\mathbb{R}^{+}$ & Radio del vaso en la sección de salida $x=L$ (\cref{eq:eac_linear_taper}). \\
+    & \texttt{stenosis\_pos} & $[0, 1]$ & Centro axial de la lesión como fracción $x_m / L$. \\
+    & \texttt{severity} ($\eta$) & $[0, 1)$ & Grado de oclusión radial fraccionaria (\cref{eq:eac_severity}). \\
+    & \texttt{slope} ($\alpha$) & $\mathbb{R}^{+}$ & Pendiente de la transición de la estenosis (\cref{eq:eac_d_alpha}). \\
+    & \texttt{tension} ($\tau$) & $[0, 1]$ & Parámetro de tensión para el mapeo axial $x(t)$ (\cref{eq:eac_bezier_x}). \\
+    & \texttt{res} [mm] & $\mathbb{R}^{+}$ & Resolución de la malla (tamaño característico de celda $h$). \\ \midrule
+    \textit{Árbol 2D} & \texttt{n\_gen} & $\mathbb{Z}^{+}$ & Cantidad de niveles de ramificación binaria (\cref{sec:geom_microvascular}). \\
+    & \texttt{tree\_gamma} & $\mathbb{R}^{+}$ & Exponente $\gamma$ de la ley de Murray para radios (\cref{eq:ley_murray}). \\
+    & \texttt{tree\_angle} [$^\circ$] & $[0, 180]$ & Ángulo de apertura en cada bifurcación. \\
+    & \texttt{tree\_len\_ratio} & $\mathbb{R}^{+}$ & Relación de aspecto $\alpha = L/r$ de los vasos (\cref{eq:tree_alpha}). \\
+    & \texttt{tree\_asym} & $[0, 1]$ & Factor de reparto de flujo entre ramas (0.5 para simetría). \\
+    & \texttt{couple\_slope} & $\mathbb{R}^{+}$ & Pendiente de la transición entre la arteria y el árbol. \\ \midrule
+    \textit{Solver} & \texttt{T} [s] & $\mathbb{R}^{+}$ & Tiempo físico total de la simulación. \\
+    & \texttt{dt} [s] & $\mathbb{R}^{+}$ & Paso de tiempo para la integración temporal. \\
+    & \texttt{p\_inlet} [mmHg] & $\mathbb{R}$ & Presión estática prescrita en la entrada (\cref{eq:inlet_pressure_bc}). \\
+    & \texttt{R\_resistance} & $\mathbb{R}_{0}^{+}$ & Resistencia periférica total del lecho distal (\cref{eq:resistance_bc}). \\
+    & \texttt{v\_max} [mm/s] & $\mathbb{R}_{0}^{+}$ & Velocidad para el perfil de inicialización (Stokes). \\
+    & \texttt{rho} [g/mm$^3$] & $\mathbb{R}^{+}$ & Densidad del fluido (sangre). \\
+    & \texttt{mu} [g/mm$\cdot$s] & $\mathbb{R}^{+}$ & Viscosidad dinámica del fluido. \\
+    & \texttt{p\_grade} & $\{1, 2\}$ & Orden polinomial de la discretización (hp-refinement). \\
+    & \texttt{beta\_nitsche} & $\mathbb{R}^{+}$ & Penalización para condición tangencial $u_T = 0$ (\cref{eq:nitsche_inlet}). \\
+    & \texttt{beta\_backflow} & $\mathbb{R}_{0}^{+}$ & Estabilización ante flujos reversos en salida (\cref{eq:backflow_term}). \\
+    & \texttt{early\_stop} & $\mathbb{R}^{+}$ & Tolerancia para alcanzar estado estacionario. \\
+    \bottomrule
+  \end{tabularx}
+  \vspace{0.5em}
+  \caption{Parámetros de entrada para el sistema de modelado y simulación coronaria.}
+\end{table}
+
+
+Finalmente, con el objetivo de garantizar la trazabilidad, cada resultado se almacena junto con sus metadatos correspondientes. La información se organiza automáticamente en subcarpetas con una jerarquía que identifica claramente el tipo de simulación, el solver empleado y los parámetros específicos de la ejecución, facilitando el post-procesamiento y los análisis posteriores.
 
 \subsection{Simulación}
 
