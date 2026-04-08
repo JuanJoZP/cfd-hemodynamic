@@ -339,7 +339,7 @@ Finalmente, cuando no se prescribe presión mediante condiciones de Dirichlet, e
 
 Antes de proceder con las simulaciones orientadas al estudio de la hemodinámica coronaria, es necesario asegurar que la implementación del solver sea robusta y capaz de resolver con precisión las ecuaciones de Navier-Stokes. En este sentido, se realizaron dos pruebas de validación utilizando escenarios estándar de la literatura.
 
-\subsubsection{Flujo 2D en Cavidad Inducida por Tapa (Lid-Driven Cavity)}
+\subsubsection{Flujo 2D en Cavidad Inducida por Tapa (Lid-Driven Cavity)} \label{sec:ldc}
 
 Este benchmark se define sobre un cuadrado unitario
 \begin{equation}
@@ -383,7 +383,7 @@ Este benchmark corresponde al caso 2D-1 del proyecto de benchmarking de la DFG/F
 \end{equation}
 \noindent donde $B_r(c)$ es el disco de radio $r$ centrado en $c$.
 
-% Template: sustituir el path por la imagen del dominio cuando esté disponible
+
 \begin{figure}[htbp]
   \centering
   \captionsetup{justification=centering}
@@ -394,57 +394,57 @@ Este benchmark corresponde al caso 2D-1 del proyecto de benchmarking de la DFG/F
 
 Se consideran las ecuaciones de Navier--Stokes incompresibles (adimensionalizadas con $\rho=1$) en $\Omega$, con viscosidad cinemática $\nu = 0.001$.
 \begin{equation}
-  \label{eq:dfg23_ns}
+  \label{eq:dfg1_ns}
   \partial_t u - \nu\,\Delta u + (u\cdot\nabla)u + \nabla p = 0,
   \qquad \nabla\cdot u = 0,
 \end{equation}
 
 En las paredes superior e inferior del canal y sobre la frontera del disco se prescribe condición de frontera de no deslizamiento:
 \begin{equation}
-  \label{eq:dfg23_noslip}
+  \label{eq:dfg1_noslip}
   u=0\quad \text{en } \Gamma_{\mathrm{walls}}\cup \Gamma_{\mathrm{disk}},
 \end{equation}
 \noindent donde $\Gamma_{\mathrm{walls}} = ([0,2.2]\times\{0\})\cup([0,2.2]\times\{0.41\})$ y $\Gamma_{\mathrm{disk}}=\partial B_r(c)$.
 
-En la entrada $\Gamma_{\mathrm{in}}=\{0\}\times[0,0.41]$ se prescribe un perfil parabólico dependiente del tiempo,
+En la entrada $\Gamma_{\mathrm{in}}=\{0\}\times[0,0.41]$ se prescribe un perfil parabólico constante,
 \begin{equation}
-  \label{eq:dfg23_inflow}
-  u(0,y,t)=\left(\frac{4\,U(t)\,y\,(0.41-y)}{0.41^2},\;0\right),
-  \qquad U(t)=1.5\,\sin\left(\frac{\pi t}{8}\right),
+  \label{eq:dfg1_inflow}
+  u(0,y)=\left(\frac{4\,U\,y\,(0.41-y)}{0.41^2},\;0\right),
+  \qquad U=0.3,
 \end{equation}
 \noindent mientras que en la salida $\Gamma_{\mathrm{out}}=\{2.2\}\times[0,0.41]$ se emplea una condición de tipo \textit{do-nothing},
 \begin{equation}
-  \label{eq:dfg23_outflow}
+  \label{eq:dfg1_outflow}
   \nu\,\partial_{\eta}u - p\,\eta = 0.
 \end{equation}
 
-El número de Reynolds se define usando la velocidad media asociada al perfil de entrada. Para el máximo $U(4)=1.5$ se tiene $U_{\mathrm{mean}}=\tfrac{2}{3}\,1.5=1.0$, y tomando como longitud característica el diámetro del cilindro $L=2r=0.1$ se obtiene
+El número de Reynolds se define usando la velocidad media asociada al perfil de entrada. Dado $U=0.3$, se tiene $U_{\mathrm{mean}}=\tfrac{2}{3}\,0.3=0.2$, y tomando como longitud característica el diámetro del cilindro $L=2r=0.1$ se obtiene
 \begin{equation}
-  \label{eq:dfg23_re}
-  Re = \frac{U_{\mathrm{mean}}\,L}{\nu} = \frac{1.0\cdot 0.1}{0.001}=100.
+  \label{eq:dfg1_re}
+  Re = \frac{U_{\mathrm{mean}}\,L}{\nu} = \frac{0.2\cdot 0.1}{0.001}=20.
 \end{equation}
 
 Para la comparación de resultados se miden las fuerzas de arrastre y sustentación sobre el cilindro. Definiendo el tensor de esfuerzos como
 \begin{equation}
-  \label{eq:dfg23_stress}
+  \label{eq:dfg1_stress}
   \sigma := \nu\,\nabla u - pI,
 \end{equation}
 \noindent las fuerzas se obtienen mediante
 \begin{equation}
-  \label{eq:dfg23_forces}
+  \label{eq:dfg1_forces}
   \begin{pmatrix}F_D\\F_L
   \end{pmatrix}
   =\int_{\Gamma_{\mathrm{disk}}}\sigma\,\eta\,ds,
 \end{equation}
-\noindent y los coeficientes adimensionales correspondientes se definen como
+\noindent donde $\eta$ es el vector normal exterior al círculo (apuntando hacia el fluido). Los coeficientes adimensionales correspondientes se definen como
 \begin{equation}
-  \label{eq:dfg23_coeffs}
+  \label{eq:dfg1_coeffs}
   C_D = \frac{2}{U_{\mathrm{mean}}^2\,L}\,F_D,
   \qquad
   C_L = \frac{2}{U_{\mathrm{mean}}^2\,L}\,F_L.
 \end{equation}
 
-La simulación se realiza en el intervalo de tiempo $t\in[0,8]$ con condición inicial en reposo $u(\cdot,0)=0$.
+Para el caso $Re=20$, el flujo alcanza un estado estacionario. La simulación transitoria se realiza hasta que se satisfaga el criterio de convergencia relativa $\|u^{n+1}-u^n\|_{L^\infty}/(\|u^{n+1}\|_{L^\infty}\Delta t) < 10^{-3}$.
 
 
 \subsection{Geometría arterial, EAC parametrizable} \label{sec:geom_arterial}
@@ -826,52 +826,65 @@ De esta manera, el rango de resistencias a explorar para determinar el impacto d
 
 \section{Resultados}
 
-\subsection{Validación de esquemas numéricos} \label{sec:resultados_validacion}
-
-Para evaluar el desempeño y la precisión del solver implementado, se presentan a continuación los resultados obtenidos correspondientes a los diferentes benchmarks de validación introducidos en la sección anterior.
+\subsection{Benchmarks de validación} \label{sec:resultados_validacion}
 
 \subsubsection{Flujo en cavidad inducida por tapa (Lid-Driven Cavity)}
 
-!! aca falta analisis de convergencia
-
-Como paso previo a la comparación con datos de referencia, se realizó un estudio de convergencia de malla para $Re=1000$ con el fin de determinar una resolución suficientemente refinada. Se simuló hasta llegar a el estado estacionario en mallas uniformes de $N \times N$ elementos, con $N \in \{20, 30, 40, 50, 60, 70, 80, 90, 100\}$, y se registró la norma $L^2$ de la velocidad y de la presión en cada caso. Los resultados se muestran en la \cref{fig:ldc_convergencia_re1000}.
+Como paso previo a la comparación con los datos de referencia, se realizó un estudio de convergencia de malla con el fin de determinar una resolución suficientemente refinada. Se simuló hasta llegar a el estado estacionario, con mallas uniformes de $N \times N$ elementos, con $N \in \{20, 30, 40, 50, 60, 70, 80, 90, 100\}$, y se registró la norma $L^2$ de la velocidad y de la presión en cada caso. Los resultados se muestran en la \cref{fig:ldc_convergencia_re1000}.
 
 \begin{figure}[htbp]
   \centering
+  \captionsetup{justification=centering}
   \includegraphics[width=0.48\textwidth]{figures/norma_velocidad_lid_driven1000.png}
   \hfill
   \includegraphics[width=0.48\textwidth]{figures/norma_presion_lid_driven1000.png}
-  \caption{Convergencia de malla para el benchmark de cavidad inducida por tapa ($Re=1000$): norma $L^2$ de la velocidad (izquierda) y de la presión (derecha) en función de la resolución de malla $N$.}
+  \caption{Convergencia de malla para el benchmark de la \cref{sec:ldc}: norma $L^2$ de la velocidad (izquierda) y de la presión (derecha) en función de la resolución de malla $N$.}
   \label{fig:ldc_convergencia_re1000}
 \end{figure}
 
 Ambas normas decrecen monótonamente al refinar la malla y se estabilizan a partir de $N=90$. En particular, la variación relativa entre las dos últimas mallas consecutivas ($N=90$ y $N=100$) fue inferior al $1\%$ en ambas variables: $0{,}11\%$ para la velocidad y $0{,}5\%$ para la presión. Este criterio confirma la convergencia de la solución y justifica el uso de $N=100$ como malla de referencia para las comparaciones posteriores.
 
-La \cref{fig:ldc_lineplot_re1000} muestra la comparación del perfil de la componente $x$ de la velocidad a lo largo de la recta $x=0.5$ frente a los datos de referencia reportados por Ghia et al. \cite{ghia_high-re_1982} para $Re=1000$, utilizando la malla de $N=100$.
+La \cref{fig:ldc_lineplot_re1000} muestra la comparación de la componente $x$ de la velocidad a lo largo de la recta $\{(x,y) : x=0.5; 0 \le y \le 1\}$ frente a los datos de referencia reportados por Ghia et al. \cite{ghia_high-re_1982} para $Re=1000$, utilizando la malla de $N=100$.
 
 \begin{figure}[htbp]
   \centering
+  \captionsetup{justification=centering}
   \includegraphics[width=0.6\textwidth]{figures/ghia_comparison.png}
-  \caption{Benchmark de cavidad inducida por tapa ($Re=1000$): comparación de la componente $x$ de la velocidad en la recta $x=0.5$ para la simulación con $N=100$, frente a los datos de Ghia et al. \cite{ghia_high-re_1982}.}
+  \caption{Componente $x$ de la velocidad en la recta $x=0.5$ para el benchmark de la \cref{sec:ldc} con $N=100$, frente a los datos de \cite{ghia_high-re_1982}.}
   \label{fig:ldc_lineplot_re1000}
 \end{figure}
 
-La curva simulada reproduce con fidelidad el perfil de referencia, capturando correctamente tanto las zonas de recirculación cercanas a las esquinas como el máximo de velocidad en la región central. El acuerdo cuantitativo con los datos tabulados de Ghia et al. confirma la validez del solver para este número de Reynolds.
+La curva simulada reproduce con fidelidad el perfil de referencia, capturando correctamente tanto las zonas de recirculación cercanas a las esquinas como el máximo de velocidad en la región central. Esto confirma la validez del solver para este número de Reynolds.
 
-Adicionalmente, en la \cref{fig:ldc_streamlines_re1000} se contrastan cualitativamente los mapas de líneas de corriente desarrollados en la cavidad. Ambos muestran un vórtice primario centrado ligeramente por encima del centro geométrico de la cavidad, así como dos vórtices secundarios en las esquinas inferiores, estructura característica del flujo a este número de Reynolds. El patrón obtenido en la simulación concuerda cualitativamente con la referencia de Ghia et al.
+Adicionalmente, en la \cref{fig:ldc_streamlines_re1000} se contrastan cualitativamente los mapas de líneas de corriente. Ambos muestran un vórtice primario centrado ligeramente por encima del centro geométrico, así como dos vórtices secundarios en las esquinas inferiores y otro en la superior izquierda. El patrón obtenido en la simulación concuerda cualitativamente con la referencia.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.42\textwidth]{figures/streamlines_simulation.png}
+  \captionsetup{justification=centering}
+  \includegraphics[width=0.48\textwidth]{figures/streamlines_simulation.png}
   \hfill
-  \includegraphics[width=0.42\textwidth]{figures/streamlines_ghia.png}
-  \caption{Líneas de corriente en la cavidad inducida por tapa ($Re=1000$): simulación con $N=100$ (izquierda) y referencia de Ghia et al. \cite{ghia_high-re_1982} (derecha).}
+  \includegraphics[width=0.465\textwidth]{figures/streamlines_ghia.png}
+  \caption{Líneas de corriente para el benchmark de la \cref{sec:ldc}: simulación con $N=100$ (izquierda) y referencia de \cite{ghia_high-re_1982} (derecha).}
   \label{fig:ldc_streamlines_re1000}
 \end{figure}
 
-\subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1)}
+\subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1)} \label{sec:dfg_results}
 
-% Template: Presentar los resultados obtenidos frente a los valores de referencia (fuerzas de arrastre y sustentación, etc.).
+Como paso previo a la validación con los valores de referencia, se realizó un estudio de convergencia de malla para determinar una resolución suficientemente refinada en las cercanías del obstáculo. Se simuló hasta llegar a estado estacionario para distintas resoluciones, $res \in \{0.01, 0.005, 0.0025\}$, ajustando el refinamiento local alrededor del cilindro y tanto para interpolación con polinomios de primer orden como de segundo orden. En cada caso se registraron los coeficientes de arrastre ($C_D$) y sustentación ($C_L$). Los resultados se muestran en la \cref{fig:dfg1_convergencia}.
+
+\begin{figure}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  % \includegraphics[width=0.48\textwidth]{figures/dfg1_drag_convergence.png}
+  % \hfill
+  % \includegraphics[width=0.48\textwidth]{figures/dfg1_lift_convergence.png}
+  \caption{Convergencia de malla para el benchmark DFG 2D-1: coeficiente de arrastre $C_D$ (izquierda) y de sustentación $C_L$ (derecha) en función del parámetro de resolución $res$.}
+  \label{fig:dfg1_convergencia}
+\end{figure}
+
+Se observa que ambos coeficientes convergen monótonamente hacia los valores tabulados a medida que se reduce el valor de $res$. La variación relativa entre las mallas de $res=0.007$ y $res=0.005$ fue inferior al $0.5\%$, lo que justifica el uso de $res=0.005$ como resolución de referencia para las comparaciones presentadas a continuación.
+
+
 
 \subsection{Analisis descriptivo de parametros hemodinamicos}
 

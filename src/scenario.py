@@ -51,7 +51,7 @@ class Scenario(ABC):
         dt: float,
         T: float,
         f: list,
-        early_stop_tolerance: float = 1e-5,
+        early_stop_tolerance: float = 1e-3,
         **solver_kwargs,
     ):
         self.solver_name = solver_name
@@ -84,12 +84,18 @@ class Scenario(ABC):
             p.kind == inspect.Parameter.VAR_KEYWORD for p in accepted.values()
         )
         filtered_kwargs = (
-            solver_kwargs if has_var_keyword
+            solver_kwargs
+            if has_var_keyword
             else {k: v for k, v in solver_kwargs.items() if k in accepted}
         )
         try:
             self.solver = self.solverClass(
-                self.mesh, dt, rho, mu, f, initial_velocity=self.initial_velocity,
+                self.mesh,
+                dt,
+                rho,
+                mu,
+                f,
+                initial_velocity=self.initial_velocity,
                 **filtered_kwargs,
             )
         except TypeError as e:
@@ -201,8 +207,12 @@ class Scenario(ABC):
 
         u_file = VTXWriter(mesh.comm, f"{output_folder}/v.bp", self.solver.u_sol)
         p_file = VTXWriter(mesh.comm, f"{output_folder}/p.bp", self.solver.p_sol)
-        u_res_file = VTXWriter(mesh.comm, f"{output_folder}/u_residual.bp", self.solver.u_residual)
-        p_res_file = VTXWriter(mesh.comm, f"{output_folder}/p_residual.bp", self.solver.p_residual)
+        u_res_file = VTXWriter(
+            mesh.comm, f"{output_folder}/u_residual.bp", self.solver.u_residual
+        )
+        p_res_file = VTXWriter(
+            mesh.comm, f"{output_folder}/p_residual.bp", self.solver.p_residual
+        )
         solver.initStressForm()
         wss_file = VTXWriter(
             mesh.comm, f"{output_folder}/wss.bp", self.solver.shear_stress
@@ -256,13 +266,39 @@ class Scenario(ABC):
                 afterStepCallback(t)
 
             if (i + 1) % 10 == 0:
-                u_diff = solver.u_sol.x.array - solver.u_prev.x.array
+                u_sol_arr = solver.u_sol.x.array
+                u_prev_arr = solver.u_prev.x.array
+
+                u_sol_norm = np.linalg.norm(u_sol_arr, ord=np.inf)
+                u_sol_norm = mesh.comm.allreduce(u_sol_norm, op=MPI.MAX)
+
+                u_prev_norm = np.linalg.norm(u_prev_arr, ord=np.inf)
+                u_prev_norm = mesh.comm.allreduce(u_prev_norm, op=MPI.MAX)
+
+                u_diff = u_sol_arr - u_prev_arr
                 u_diff_norm = np.linalg.norm(u_diff, ord=np.inf)
                 u_diff_norm = mesh.comm.allreduce(u_diff_norm, op=MPI.MAX)
-                if u_diff_norm < self.early_stop_tolerance:
+
+                # Relative difference criterion
+                rel_diff = (u_diff_norm / max(u_sol_norm, 1e-12)) / self.dt
+
+                # Debug print
+                if mesh.comm.rank == 0:
+                    print(f"DEBUG Step {i+1}: t={t:.3f}")
+                    print(
+                        f"  IDs: u_sol={id(solver.u_sol)}, u_prev={id(solver.u_prev)}"
+                    )
+                    print(
+                        f"  Norms: ||u_sol||={u_sol_norm:.6e}, ||u_prev||={u_prev_norm:.6e}, ||diff||={u_diff_norm:.6e}"
+                    )
+                    print(f"  First values u_sol: {u_sol_arr[:5]}")
+                    print(f"  First values u_prev: {u_prev_arr[:5]}")
+                    print(f"  rel_diff/dt={rel_diff:.6e}")
+
+                if rel_diff < self.early_stop_tolerance:
                     print(
                         f"Early stopping at t={t:.3f}, "
-                        f"because ||u_sol - u_prev||_inf = {u_diff_norm:.3g} < "
+                        f"because (||u_sol - u_prev||_inf / ||u_sol||_inf) / dt = {rel_diff:.20e} < "
                         f"{self.early_stop_tolerance}"
                     )
                     break
