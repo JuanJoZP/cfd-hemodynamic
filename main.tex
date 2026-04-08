@@ -17,6 +17,9 @@
 \usepackage{parskip}
 \usepackage{booktabs}
 \usepackage{tabularx}
+\usepackage{epstopdf}
+\epstopdfDeclareGraphicsRule{.tiff}{pdf}{.pdf}{tiff2pdf #1 -o \OutputFile}
+\AppendGraphicsExtensions{.tiff}
 
 % --- Configuración de Leyendas (Tablas arriba, Figuras abajo)  ---
 \captionsetup[table]{position=top, justification=raggedright, singlelinecheck=false}
@@ -888,7 +891,61 @@ Posteriormente, se registraron los coeficientes de arrastre ($C_D$) y sustentaci
 
 Se observa que ambos coeficientes convergen hacia los valores tabulados a medida que se refina la malla. La variación relativa entre las mallas más finas fue inferior al $5\%$, y el error respecto a los valores de referencia de \cite{Schfer1996BenchmarkCO} fue del $5\%$, en promedio. Estos resultados garantizan que el esquema numérico es robusto y fiable en escenarios como este, que se asemejan a las condiciones de flujo en arterias.
 
+
 \subsection{Analisis descriptivo de parametros hemodinamicos}
+En esta sección se presenta un análisis descriptivo de las variables hemodinámicas obtenidas en los distintos escenarios, con el fin de caracterizar cualitativa y cuantitativamente los fenómenos hemodinámicos inducidos por la patología.
+
+\subsubsection{Geometría con estenosis}
+
+El comportamiento del flujo en la arteria estenosada varía drásticamente según el nivel de severidad ($\eta$) y, en menor medida, según la pendiente de la lesión ($\alpha$).
+
+Para casos de severidad baja ($\eta = 0.25$), se observa un régimen predominantemente laminar que alcanza el estado estacionario rápidamente. En estos escenarios, la pendiente de la estenosis juega un rol diferenciador, ya que las pendientes bajas ($\alpha = 0.05$) permiten una transición suave del fluido, mientras que un aumento en la pendiente ($\alpha = 0.3$) genera zonas de recirculación inmediatamente después de la estenosis. Este fenómeno se ilustra en la \cref{fig:flujo_bajo}, donde el perfil de velocidades se estabiliza rápidamente tras superar la obstrucción.
+
+\begin{figure}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_bajo_slope_bajo.tiff} \\
+  \vspace{0.5cm}
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_bajo_slope_alto.tiff}
+  \caption{Campos de velocidad para severidad baja ($\eta=0.25$): pendiente baja ($\alpha=0.05$, arriba) y pendiente alta ($\alpha=0.3$, abajo).}
+  \label{fig:flujo_bajo}
+\end{figure}
+
+Por el contrario, en los escenarios de severidad alta ($\eta = 0.75$), el desarrollo del flujo es altamente inestable, inicialmente. Independientemente de la pendiente, durante los primeros instantes de la simulación se observa una perturbación que se propaga axialmente como una onda. Esta estructura presenta un núcleo central de flujo laminar, con unos vórtices que viajan junto a la onda a lo largo de la arteria (\cref{fig:flujo_alto_transiente}).
+
+\begin{figure}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_slope_bajo.tiff} \\
+  \vspace{0.5cm}
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_slope_alto.tiff}
+  \caption{Campos de velocidad en $T=0.07 \, \mathrm{s}$ para severidad alta ($\eta=0.75$): pendiente baja ($\alpha=0.05$, arriba) y pendiente alta ($\alpha=0.3$, abajo).}
+  \label{fig:flujo_alto_transiente}
+\end{figure}
+
+Una vez alcanzado el estado estacionario en los casos de severidad severa, el flujo exhibe una asimetría marcada en la región post-estenótica. El chorro de fluido, tras ser acelerado por el estrechamiento, tiende a pegarse lateralmente a una de las paredes de la arteria, provocando una zona de recirculación de gran tamaño en la pared opuesta. Posteriormente, la línea de flujo principal cambia de pared, induciendo una segunda zona de recirculación opuesta a la anterior. Finalmente, la energía se disipa y el flujo recupera gradualmente un perfil parabólico completamente laminar hacia el extremo distal de la arteria (\cref{fig:flujo_alto_estacionario}).
+
+\begin{figure}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_estado_estacionario.tiff}
+  \caption{Estado estacionario para severidad alta ($\eta=0.75$). Se observa el efecto de adhesión a las paredes y la formación de zonas de recirculación alternas antes de la recuperación del perfil laminar distal.}
+  \label{fig:flujo_alto_estacionario}
+\end{figure}
+
+
+
+Respecto al comportamiendo de la presión, en la \cref{fig:presion_dist} se presenta el campo de presión para un escenario de severidad baja ($\eta=0.25$) y pendiente baja ($\alpha=0.05$). Se observa un gradiente de presión uniforme desde la entrada hasta la salida del dominio, consistente con el valor de FFR obtenido (donde la pérdida de presión global está determinada por la morfología, como se analiza en la \cref{sec:morfologia_estenosis}). No obstante, existe una caída de presión localizada en el centro de la estenosis; en este punto, la presión disminuye de forma más pronunciada que el gradiente general para luego recuperarse parcialmente y continuar con la tendencia del gradiente hacia la salida. Este descenso puntual es tanto más abrupto como de mayor magnitud a medida que aumentan la pendiente y la severidad de la lesión, comportamiento que contrasta con el del índice FFR, el cual presenta una relación inversa con el parámetro de pendiente.
+
+\begin{figure}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \includegraphics[width=0.9\textwidth]{figures/presion_dist.tiff}
+  \caption{Campo de presión para severidad baja ($\eta=0.25$) y pendiente baja ($\alpha=0.05$). }
+  \label{fig:presion_dist}
+\end{figure}
+
+- visual de la wss
 
 un analiss descriptivo de las variables tanto en stenosis y en arbol:
 
@@ -901,6 +958,10 @@ en stenosis:
 
 
 en arbol:
+- visual de las zonas de recirculacion del arbol micro /velocidad
+-visual de presion
+- visual de wss
+
 - simetria
 y sobre un path:
 - velocidad
@@ -909,9 +970,14 @@ y sobre un path:
 -streamlines
 - vorticidad
 
+
+\subsubsection{Geometría del árbol microvascular}
+
+En la porción correspondiente al árbol microvascular explícito, el flujo se caracteriza por una distribución simétrica que sigue la jerarquía de bifurcaciones. Sin embargo, en las regiones de unión (axilas de las bifurcaciones), se observa la generación de pequeños vórtices locales debido a la deflexión del flujo hacia las ramas hijas. Este fenómeno es proporcional al número de Reynolds local, tendiendo a desaparecer en las generaciones más distales donde el régimen es puramente viscoso.
+
 \subsubsection{Impacto de la ubicación axial de la estenosis}
 
-\subsection{Impacto de la morfología de la estenosis}
+\subsection{Impacto de la morfología de la estenosis} \label{sec:morfologia_estenosis}
 
 Para investigar cómo la forma geométrica de la lesión afecta el comportamiento del flujo, se calculó el FFR para los nueve escenarios planteados y se modeló la relación entre la severidad ($\eta$), la pendiente ($\alpha$) como variables independientes y el FFR como variable dependiente. Inicialmente, se observó que un modelo de regresión lineal multivariante simple no lograba capturar adecuadamente la física del problema, especialmente en regímenes de baja severidad donde el efecto de la pendiente no es tan relevante.
 
