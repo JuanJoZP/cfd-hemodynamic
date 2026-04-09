@@ -17,6 +17,7 @@
 \usepackage{parskip}
 \usepackage{booktabs}
 \usepackage{tabularx}
+\usepackage{multirow}
 \usepackage{epstopdf}
 \epstopdfDeclareGraphicsRule{.tiff}{pdf}{.pdf}{tiff2pdf #1 -o \OutputFile}
 \AppendGraphicsExtensions{.tiff}
@@ -941,41 +942,115 @@ Respecto al comportamiendo de la presión, en la \cref{fig:presion_dist} se pres
   \centering
   \captionsetup{justification=centering}
   \includegraphics[width=0.9\textwidth]{figures/presion_dist.tiff}
-  \caption{Campo de presión para severidad baja ($\eta=0.25$) y pendiente baja ($\alpha=0.05$). }
+  \caption{Campo de presión para severidad baja ($\eta=0.25$) y pendiente baja ($\alpha=0.05$).}
   \label{fig:presion_dist}
 \end{figure}
 
-- visual de la wss
 
-un analiss descriptivo de las variables tanto en stenosis y en arbol:
+En cuanto a la magnitud de la velocidad, se cuantificó el efecto de la estenosis comparando la velocidad en el centro de la lesión con la velocidad al inicio de la arteria. En el \cref{tab:incremento_velocidad} se presentan los incrementos porcentuales para distintos escenarios representativos. Se observa que la severidad es el factor predominante en la aceleración del flujo, con incrementos que superan el $300\%$ en los casos de severidad alta ($\eta=0.75$). Además, para una misma severidad, se aprecia que las pendientes bajas inducen incrementos ligeramente mayores que las pendientes abruptas, lo que indica una dependencia secundaria de la velocidad respecto a la extensión axial de la estenosis.
 
-en stenosis:
-- velocidad
-- presion
-- wss
--streamlines
-- vorticidad
+\begin{table}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \begin{tabular}{ccc}
+    \toprule
+    \textbf{Severidad ($\eta$)} & \textbf{Pendiente ($\alpha$)} & \textbf{Incremento (\%)} \\ \midrule
+    0.75 & 0.005 & 302.83 \\
+    0.75 & 0.300 & 297.82 \\
+    0.25 & 0.005 & 21.32 \\
+    0.25 & 0.300 & 13.37 \\ \bottomrule
+  \end{tabular}
+  \vspace{0.5em}
+  \caption{Incremento porcentual de la velocidad en el centro de la estenosis respecto a la velocidad de entrada.}
+  \label{tab:incremento_velocidad}
+\end{table}
 
+Se evaluó cómo la presencia de la estenosis compromete el suministro de flujo hacia el lecho distal. En el \cref{tab:reduccion_caudal} se presenta la reducción porcentual del caudal volumétrico respecto al escenario de referencia con mayor flujo. Se observa que los casos con menor FFR presentan las mayores disminuciones de caudal, alcanzando una pérdida superior al $20\%$ en la condición más crítica. Esto es consistente con la literatura clínica, que establece que un índice FFR por debajo del umbral crítico se asocia con la isquemia miocárdica \cite{manual_ffr08}.
 
-en arbol:
-- visual de las zonas de recirculacion del arbol micro /velocidad
--visual de presion
-- visual de wss
+\begin{table}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \begin{tabular}{ccc}
+    \toprule
+    \textbf{Severidad ($\eta$)} & \textbf{Pendiente ($\alpha$)} & \textbf{Reducción de Caudal (\%)} \\ \midrule
+    0.25 & 0.300 & 0.00 \\ 
+    0.25 & 0.005 & 0.20 \\
+    0.75 & 0.300 & 10.72 \\
+    0.75 & 0.005 & 21.67 \\ \bottomrule
+  \end{tabular}
+  \vspace{0.5em}
+  \caption{Reducción porcentual del caudal distal respecto al escenario de referencia ($\eta=0.25$, $\alpha=0.3$).}
+  \label{tab:reduccion_caudal}
+\end{table}
 
-- simetria
-y sobre un path:
-- velocidad
-- presion
-- wss
--streamlines
-- vorticidad
+% de presion no se incluye analisis cuantitativo porque se corresponde con el modelo de FFR indirectamente, es decir que ya esta incluido
 
+Finalmente, se analizó el esfuerzo cortante medio en la pared (TAWSS) debido a su relevancia en la predicción de la formación de placa. Según \cite{hemo_wss}, valores de TAWSS superiores a $15\,\text{dyn/cm}^2$ se consideran ateroprotectores, mientras que valores inferiores a $4\,\text{dyn/cm}^2$ son pro-aterogénicos. El cálculo se realizó promediando el esfuerzo en el intervalo de tiempo $[0,\,0.5]\,\text{s}$, correspondiente a la fase diastólica; se asume una velocidad inicial nula ya que, durante la sístole, la contracción miocárdica eleva la presión interna, reduciendo el gradiente de presión coronario y el flujo.
+
+En el \cref{tab:tawss_comparativa} se presentan los valores de TAWSS obtenidos en tres regiones críticas: el centro de la estenosis, la zona inmediatamente posterior y el extremo distal de la arteria. Los resultados demuestran que las zonas de mayor aceleración en la garganta de la lesión presentan niveles de TAWSS elevados, superando el umbral de protección especialmente en los casos severos. No obstante, en las regiones de recirculación post-estenótica, los niveles de esfuerzo caen drásticamente por debajo del límite aterogénico, evidenciando un alto riesgo de progresión de la enfermedad en dichas áreas.
+
+\begin{table}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \begin{tabular}{lllc}
+    \toprule
+    \textbf{Localización} & \textbf{Severidad ($\eta$)} & \textbf{Pendiente ($\alpha$)} & \textbf{TAWSS ($\text{dyn/cm}^2$)} \\ \midrule
+    \multirow{4}{*}{Distal} & 0.75 & 0.005 & 3.696 \\
+    & 0.75 & 0.300 & 4.242 \\
+    & 0.25 & 0.005 & 4.771 \\
+    & 0.25 & 0.300 & 4.781 \\ \midrule
+    \multirow{4}{*}{Estenosis} & 0.75 & 0.005 & 27.832 \\
+    & 0.75 & 0.300 & 35.753 \\
+    & 0.25 & 0.005 & 7.070 \\
+    & 0.25 & 0.300 & 9.408 \\ \midrule
+    \multirow{4}{*}{Post-estenosis} & 0.75 & 0.005 & 0.828 \\
+    & 0.75 & 0.300 & 2.216 \\
+    & 0.25 & 0.005 & 1.904 \\
+    & 0.25 & 0.300 & 0.829 \\ \bottomrule
+  \end{tabular}
+  \vspace{0.5em}
+  \caption{Comparativa de TAWSS en diferentes regiones de la arteria para los escenarios evaluados.}
+  \label{tab:tawss_comparativa}
+\end{table}
 
 \subsubsection{Geometría del árbol microvascular}
 
-En la porción correspondiente al árbol microvascular explícito, el flujo se caracteriza por una distribución simétrica que sigue la jerarquía de bifurcaciones. Sin embargo, en las regiones de unión (axilas de las bifurcaciones), se observa la generación de pequeños vórtices locales debido a la deflexión del flujo hacia las ramas hijas. Este fenómeno es proporcional al número de Reynolds local, tendiendo a desaparecer en las generaciones más distales donde el régimen es puramente viscoso.
 
-\subsubsection{Impacto de la ubicación axial de la estenosis}
+Cualitativamente, el campo de velocidades (\cref{fig:flujo_arbol}) en el árbol no presenta variaciones significativas ante cambios en la resistencia periférica o en la morfología de la estenosis. No obstante, se observan variaciones cuantitativas; el valor de la velocidad promedio oscila entre un mínimo de [...] y un máximo de [...]\,mm/s según el escenario. Por otro lado, el análisis de las líneas de corriente (\cref{fig:tree_streamlines}) revela la existencia de dos zonas de recirculación en las paredes de la primera bifurcación del árbol. Estas estructuras son persistentes, encontrándose en todos los casos evaluados. Es notable que, a pesar de que la velocidad disminuye en las paredes previas a la bifurcación de la misma forma para niveles inferiores, no se generan zonas de recirculación. Este comportamiento se debe probablemente a que, al reducirse las dimensiones de los vasos, las fuerzas viscosas se vuelven predominantes y disipan la tendencia a la separación del flujo. 
+
+\begin{figure}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \includegraphics[width=0.7\textwidth]{figures/tree_streamlines.tiff}
+  \caption{Líneas de corriente en el árbol microvascular.}
+  \label{fig:tree_streamlines}
+\end{figure}
+
+Respecto a la distribución del flujo y la simetría, se observa que ésta solo se mantiene en la primera bifurcación. Tras la separación inicial, el fluido sale con más velocidad por la pared interna (la más cercana al centro del árbol) de los vasos del segundo nivel. En consecuencia, al alcanzar la siguiente ramificación, el flujo no encuentra la bifurcación de forma frontal sino con un ligero desplazamiento hacia el centro, provocando que los vasos del tercer nivel no reciban el mismo caudal; los centrales reciben más que los periféricos. En niveles posteriores, siguiendo la misma lógica, el patrón se repetiría aunque con una magnitud decreciente, ya que el incremento de las fuerzas viscosas favorece una mayor disipación radial del flujo.
+
+\begin{figure}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \includegraphics[width=0.7\textwidth]{figures/flujo_arbol.tiff}
+  \caption{Campo de velocidad en el árbol microvascular.}
+  \label{fig:flujo_arbol}
+\end{figure}
+
+
+Por otro lado, la distribución de presiones en el árbol microvascular (\cref{fig:presion_arbol}) muestra un rango de variación muy reducido, con valores que oscilan apenas entre $43.41$ y $43.98\,\mathrm{mmHg}$. Se observan en cada bifurcación, incrementos localizados de presión en la pared que se enfrenta directamente al flujo del vaso precedente.
+
+\begin{figure}[htbp]
+  \centering
+  \captionsetup{justification=centering}
+  \includegraphics[width=0.7\textwidth]{figures/presion_arbol.tiff}
+  \caption{Campo de presión en el árbol microvascular.}
+  \label{fig:presion_arbol}
+\end{figure}
+
+
+Finalmente, el análisis del TAWSS en el árbol microvascular revela que existen zonas críticas en las bifurcaciones. En las paredes externas, al inicio de la bifurcación, se observan valores de TAWSS muy bajos, situándose por debajo del umbral de $4\,\mathrm{dyn/cm}^2$ \cite{hemo_wss}.
+
+\subsection{Impacto de la ubicación axial de la estenosis}
 
 \subsection{Impacto de la morfología de la estenosis} \label{sec:morfologia_estenosis}
 
@@ -1110,13 +1185,17 @@ Por otro lado, para evaluar el impacto de la disfunción microvascular, se adopt
 
 El espacio de muestreo de los parametros de este experimento es amplio, y además, correr cada escenario para calcular el FFR es computacionalmente costoso. Por lo anterior, se optó por un muestreo estratificado sobre el índice FFR, para tratar de que los datos se distribuyan uniformemente en el rango de FFR de interés. Debido a la rellación no lineal entre los parámetros morfológicos y el FFR, un muestreo uniforme en el espacio de parámetros morfológicos genera una distribución sesgada del índice diagnóstico. Por lo anterior, se definieron $N=15$ niveles de FFR equidistantes en el rango $[0.22, 0.98]$. Para cada nivel, se determinaron pares aleatorios de severidad ($\eta$) y pendiente ($\alpha$) que satisfacen la relación del modelo \eqref{eq:modelo_sem_final}. Finalmente, la resistencia vascular $R$ se muestreó de una distribución uniforme, asegurando que el diseño de experimentos cubra de forma sistemática tanto el espectro de isquemia como el compromiso microvascular.
 
+Después de haber seleccionado las 15 muestras de parámetros, se ejecutó la simulación y se obtuvo el dataset. Luego se llevó a cabo un análisis estadístico para determinar si la resistencia microvascular ($R$) presenta una correlación significativa con el índice FFR. Específicamente, se calcularon los coeficientes de correlación de Pearson ($r = -0.0082$, $p = 0.9777$) y de Spearman ($\rho = -0.1385$, $p = 0.6369$), encontrando en ambos casos p-valores muy altos. 
+
+Una regresión lineal simple basada únicamente en la resistencia explicó tan solo el $0.0068\%$ de la varianza del FFR ($R^2 = 0.000068$). Asimismo, la incorporación de la resistencia como variable predictora adicional en el modelo morfológico previo no supuso una mejora significativa en la capacidad explicativa del sistema ($\Delta R^2 = 0.029$, $p = 0.2511$ mediante la prueba F). Estas pruebas en conjunto, confirman que bajo las condiciones evaluadas, el índice FFR está dominado casi exclusivamente por las características geométricas de la estenosis, mientras que la variación en la resistencia microvascular tiene un impacto despreciable en la caída de presión.
+
 \section{Discusión}
 Análisis en relación con hipótesis y otros trabajos.
 
 \section*{Agradecimientos}
-Agradecemos a los docentes Diana Consuelo Rodríguez Burbano y Sebastián Jaramillo Isaza de la Facultad de Ciencias de la Salud por su disposición en las reuniones iniciales en las que se compartió el contexto y la problemática que dieron origen a este trabajo.
+A los docentes Diana Consuelo Rodríguez Burbano y Sebastián Jaramillo Isaza de la Facultad de Ciencias de la Salud por su disposición en las reuniones iniciales en las que se compartió el contexto y la problemática que dieron origen a este trabajo.
 
-Agradecemos a la Universidad del Rosario por proporcionar acceso a la infraestructura HPC a través del Laboratorio de Computación Avanzada – CALDAS.
+A la Universidad del Rosario por proporcionar acceso a la infraestructura HPC a través del Laboratorio de Computación Avanzada – CALDAS.
 
 \bibliographystyle{ieeetr} 
 \bibliography{bibliography}
