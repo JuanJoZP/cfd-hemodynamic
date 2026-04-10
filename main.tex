@@ -399,7 +399,6 @@ Este benchmark corresponde al caso 2D-1 del proyecto de benchmarking de la DFG/F
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.8\textwidth]{figures/dfg_geometry.png}
   \caption{Geometría del benchmark DFG 2D-1.}
   \label{fig:dfg2d1_geometry}
@@ -688,9 +687,9 @@ Específicamente para el escenario de la enfermedad coronaria, se combinan las g
 
 \begin{table}[htbp]
   \centering
-  \captionsetup{justification=centering}
-  \small
+  \caption{Parámetros de entrada para el sistema de modelado y simulación coronaria.}
   \label{tab:parametros_sistema}
+  \small
   \begin{tabularx}{\textwidth}{@{} l l c X @{}}
     \toprule
     \textbf{Categoría} & \textbf{Nombre} & \textbf{Rango} & \textbf{Descripción} \\ \midrule
@@ -721,8 +720,6 @@ Específicamente para el escenario de la enfermedad coronaria, se combinan las g
     & \texttt{early\_stop} & $\mathbb{R}^{+}$ & Tolerancia para alcanzar estado estacionario. \\
     \bottomrule
   \end{tabularx}
-  \vspace{0.5em}
-  \caption{Parámetros de entrada para el sistema de modelado y simulación coronaria.}
 \end{table}
 
 
@@ -832,7 +829,6 @@ Como paso previo a la comparación con los datos de referencia, se realizó un e
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.48\textwidth]{figures/norma_velocidad_lid_driven1000.png}
   \hfill
   \includegraphics[width=0.48\textwidth]{figures/norma_presion_lid_driven1000.png}
@@ -846,7 +842,6 @@ La \cref{fig:ldc_lineplot_re1000} muestra la comparación de la componente $x$ d
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.6\textwidth]{figures/ghia_comparison.png}
   \caption{Componente $x$ de la velocidad en la recta $x=0.5$ para el benchmark del \cref{sec:ldc} con $N=100$, frente a los datos de \cite{ghia_high-re_1982}.}
   \label{fig:ldc_lineplot_re1000}
@@ -858,7 +853,6 @@ Adicionalmente, en la \cref{fig:ldc_streamlines_re1000} se contrastan cualitativ
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.48\textwidth]{figures/streamlines_simulation.png}
   \hfill
   \includegraphics[width=0.465\textwidth]{figures/streamlines_ghia.png}
@@ -872,7 +866,6 @@ Como paso previo a la validación con los valores de referencia, se realizó un 
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.48\textwidth]{figures/norma_velocidad_dfg1.png}
   \hfill
   \includegraphics[width=0.48\textwidth]{figures/norma_presion_dfg1.png}
@@ -886,7 +879,6 @@ Posteriormente, se registraron los coeficientes de arrastre ($C_D$) y sustentaci
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.48\textwidth]{figures/dfg1_drag_convergence.png}
   \hfill
   \includegraphics[width=0.48\textwidth]{figures/dfg1_lift_convergence.png}
@@ -908,7 +900,6 @@ Para casos de severidad baja ($\eta = 0.25$), se observa un régimen predominant
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.9\textwidth]{figures/flujo_severity_bajo_slope_bajo.tiff} \\
   \vspace{0.5cm}
   \includegraphics[width=0.9\textwidth]{figures/flujo_severity_bajo_slope_alto.tiff}
@@ -920,7 +911,6 @@ Por el contrario, en los escenarios de severidad alta ($\eta = 0.75$), inicialme
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_slope_bajo.tiff} \\
   \vspace{0.5cm}
   \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_slope_alto.tiff}
@@ -932,7 +922,6 @@ Una vez alcanzado el estado estacionario en los casos de severidad severa, el fl
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_estado_estacionario.tiff}
   \caption{Estado estacionario para severidad alta ($\eta=0.75$). Se observa el efecto de adhesión a las paredes y la formación de zonas de recirculación alternas antes de la recuperación del perfil laminar distal.}
   \label{fig:flujo_alto_estacionario}
@@ -944,7 +933,6 @@ Respecto al comportamiento de la presión, en la \cref{fig:presion_dist} se pres
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.9\textwidth]{figures/presion_dist.tiff}
   \caption{Campo de presión para severidad baja ($\eta=0.25$) y pendiente baja ($\alpha=0.05$).}
   \label{fig:presion_dist}
@@ -955,7 +943,8 @@ En cuanto a la magnitud de la velocidad, se cuantificó el efecto de la estenosi
 
 \begin{table}[htbp]
   \centering
-  \captionsetup{justification=centering}
+  \caption{Incremento porcentual de la velocidad en el centro de la estenosis respecto a la velocidad de entrada.}
+  \label{tab:incremento_velocidad}
   \begin{tabular}{ccc}
     \toprule
     \textbf{Severidad ($\eta$)} & \textbf{Pendiente ($\alpha$)} & \textbf{Incremento (\%)} \\ \midrule
@@ -964,16 +953,14 @@ En cuanto a la magnitud de la velocidad, se cuantificó el efecto de la estenosi
     0.25 & 0.005 & 21.32 \\
     0.25 & 0.300 & 13.37 \\ \bottomrule
   \end{tabular}
-  \vspace{0.5em}
-  \caption{Incremento porcentual de la velocidad en el centro de la estenosis respecto a la velocidad de entrada.}
-  \label{tab:incremento_velocidad}
 \end{table}
 
 Se evaluó cómo la presencia de la estenosis compromete el suministro de flujo hacia el lecho distal. En el \cref{tab:reduccion_caudal} se presenta la reducción porcentual del caudal volumétrico respecto al escenario de referencia con mayor flujo. Se observa que los casos con menor FFR presentan las mayores disminuciones de caudal, alcanzando una pérdida superior al $20\%$ en la condición más crítica. Esto es consistente con la literatura clínica, que establece que un índice FFR por debajo del umbral crítico se asocia con la isquemia miocárdica \cite{manual_ffr08}.
 
 \begin{table}[htbp]
   \centering
-  \captionsetup{justification=centering}
+  \caption{Reducción porcentual del caudal distal respecto al escenario de referencia ($\eta=0.25$, $\alpha=0.3$).}
+  \label{tab:reduccion_caudal}
   \begin{tabular}{ccc}
     \toprule
     \textbf{Severidad ($\eta$)} & \textbf{Pendiente ($\alpha$)} & \textbf{Reducción de Caudal (\%)} \\ \midrule
@@ -982,9 +969,6 @@ Se evaluó cómo la presencia de la estenosis compromete el suministro de flujo 
     0.75 & 0.300 & 10.72 \\
     0.75 & 0.005 & 21.67 \\ \bottomrule
   \end{tabular}
-  \vspace{0.5em}
-  \caption{Reducción porcentual del caudal distal respecto al escenario de referencia ($\eta=0.25$, $\alpha=0.3$).}
-  \label{tab:reduccion_caudal}
 \end{table}
 
 % de presion no se incluye analisis cuantitativo porque se corresponde con el modelo de FFR indirectamente, es decir que ya esta incluido
@@ -995,7 +979,8 @@ En el \cref{tab:tawss_comparativa} se presentan los valores de TAWSS obtenidos e
 
 \begin{table}[htbp]
   \centering
-  \captionsetup{justification=centering}
+  \caption{Comparativa de TAWSS en diferentes regiones de la arteria para los escenarios evaluados.}
+  \label{tab:tawss_comparativa}
   \begin{tabular}{lllc}
     \toprule
     \textbf{Localización} & \textbf{Severidad ($\eta$)} & \textbf{Pendiente ($\alpha$)} & \textbf{TAWSS ($\text{dyn/cm}^2$)} \\ \midrule
@@ -1012,9 +997,6 @@ En el \cref{tab:tawss_comparativa} se presentan los valores de TAWSS obtenidos e
     & 0.25 & 0.005 & 1.904 \\
     & 0.25 & 0.300 & 0.829 \\ \bottomrule
   \end{tabular}
-  \vspace{0.5em}
-  \caption{Comparativa de TAWSS en diferentes regiones de la arteria para los escenarios evaluados.}
-  \label{tab:tawss_comparativa}
 \end{table}
 
 \subsubsection{Geometría del árbol microvascular}
@@ -1024,7 +1006,6 @@ Cualitativamente, el campo de velocidades (\cref{fig:flujo_arbol}) en el árbol 
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.7\textwidth]{figures/tree_streamlines.tiff}
   \caption{Líneas de corriente en el árbol microvascular.}
   \label{fig:tree_streamlines}
@@ -1034,7 +1015,6 @@ Respecto a la distribución del flujo y la simetría, se observa que ésta solo 
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.7\textwidth]{figures/flujo_arbol.tiff}
   \caption{Campo de velocidad en el árbol microvascular.}
   \label{fig:flujo_arbol}
@@ -1045,7 +1025,6 @@ Por otro lado, la distribución de presiones en el árbol microvascular (\cref{f
 
 \begin{figure}[htbp]
   \centering
-  \captionsetup{justification=centering}
   \includegraphics[width=0.7\textwidth]{figures/presion_arbol.tiff}
   \caption{Campo de presión en el árbol microvascular.}
   \label{fig:presion_arbol}
@@ -1124,7 +1103,8 @@ Se evaluaron diversos modelos estructurales para determinar la combinación de v
 \vspace{0.5cm}
 \begin{table}[htbp]
   \centering
-  \captionsetup{justification=centering}
+  \caption{Comparativa de modelos estadísticos para la predicción del FFR.}
+  \label{tab:modelo_sem_resultados}
   \begin{tabular}{lccc}
     \hline
     \textbf{Configuración del Modelo} & $R^2$ & \textbf{RMSE} & \textbf{MAE} \\ \hline
@@ -1135,9 +1115,6 @@ Se evaluaron diversos modelos estructurales para determinar la combinación de v
     $\eta / \alpha$ & 0.4247 & 0.0555 & 0.0465 \\
     $\eta \cdot \alpha$ & 0.0396 & 0.0717 & 0.0584 \\ \hline
   \end{tabular}
-  \vspace{0.5cm}
-  \caption{Comparativa de modelos estadísticos para la predicción del FFR.}
-  \label{tab:modelo_sem_resultados}
 \end{table}
 
 A continuación se presentan los coeficientes del mejor modelo:
@@ -1153,7 +1130,8 @@ En el \cref{tab:coeficientes_sem} se detallan los parámetros del modelo. Los re
 \vspace{0.5cm}
 \begin{table}[htbp]
   \centering
-  \captionsetup{justification=centering}
+  \caption{Significancia de los coeficientes para el mejor modelo ($\Delta A_{\text{rel}} + \eta$).}
+  \label{tab:coeficientes_sem}
   \begin{tabular}{lcccc}
     \hline
     \textbf{Variable} & \textbf{Coeficiente} & \textbf{Error Est.} & $t$ & $p\text{-valor}$ \\ \hline
@@ -1161,9 +1139,6 @@ En el \cref{tab:coeficientes_sem} se detallan los parámetros del modelo. Los re
     $\Delta A_{\text{rel}}$ & -0.8885 & 0.3136 & -2.833 & 0.0298 \\
     $\eta$ (Severidad) & -0.2004 & 0.0588 & -3.408 & 0.0144 \\ \hline
   \end{tabular}
-  \vspace{0.5cm}
-  \caption{Significancia de los coeficientes para el mejor modelo ($\Delta A_{\text{rel}} + \eta$).}
-  \label{tab:coeficientes_sem}
 \end{table}
 
 
