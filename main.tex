@@ -66,7 +66,7 @@ Simulación hemodinámica, reserva fraccional de flujo, enfermedad arterial coro
 This research developed a computational framework based on fluid dynamics for the hemodynamic analysis of coronary artery disease, characterizing the impact of stenosis morphology and microvascular physiology on diagnostic indices such as fractional flow reserve (FFR). A stabilized Navier-Stokes solver was implemented using equal-order finite elements with SUPG/PSPG/LSIC terms and backflow stabilization, employing FEniCSx and PETSc for parallel solving. The model was validated against standard benchmarks. Parameterized arterial geometries, with variable stenosis severity and slope, were coupled to synthetic microvascular trees generated according to Murray's law. Results showed that a structural equation model integrating relative area reduction and stenosis severity predicts FFR with $R^2=0.85$, while microvascular resistance explained less than 0.01\% of its variance ($p=0.98$). Low wall shear stress zones ($<4$ dyn/cm$^2$) were identified in post-stenotic regions and bifurcations, pro-atherogenic conditions. It is concluded that under the studied conditions FFR is dominated by stenosis geometry under maximal hyperemia, and that quantitative morphological characterization provides a basis for predictive models of functional diagnosis.
 
 \section*{Keywords}
-Hemodynamic simulation, fractional flow reserve, coronary artery disease, computer fluid dynamics.
+Hemodynamic simulation, fractional flow reserve, coronary artery disease, computational fluid dynamics.
 
 \newpage
 
@@ -125,9 +125,9 @@ Teniendo en cuenta estos supuestos, la velocidad y presión del fluido se descri
   \end{subequations}
 \end{center}
 
-Donde $u: \mathbb{R}^d \times \mathbb{R}_+ \rightarrow \mathbb{R}^d$, $p: \mathbb{R}^d \times \mathbb{R}_+ \rightarrow \mathbb{R}$ corresponden a velocidad y presión, respectivamente, como funciones de espacio y tiempo, $d \in \{2,3\}$ es la dimensión espacial, $\rho = 1055 \, \text{kg}/\text{m}^3$ es la densidad de la sangre, $\mu = 0.0035\, \text{Pa} \cdot \text{s}$ es la viscosidad dinámica y $f: \mathbb{R}^d \rightarrow \mathbb{R}^d$ es una fuerza externa aplicada al sistema.
+Donde $u: \mathbb{R}^d \times \mathbb{R}_+ \rightarrow \mathbb{R}^d$, $p: \mathbb{R}^d \times \mathbb{R}_+ \rightarrow \mathbb{R}$ corresponden a velocidad y presión, respectivamente, como funciones de espacio y tiempo, $d \in \{2,3\}$ es la dimensión espacial, $\rho = 1060 \, \text{kg}/\text{m}^3$ es la densidad de la sangre, $\mu = 0.0035\, \text{Pa} \cdot \text{s}$ es la viscosidad dinámica y $f: \mathbb{R}^d \rightarrow \mathbb{R}^d$ es una fuerza externa aplicada al sistema.
 
-Las ecuaciones (\ref{momentum}) y (\ref{continuity}), junto con unas condiciones de frontera Dirichlet $g(t)$, una condición inicial $u_0$, y un dominio geométrico $\Omega \in \mathbb{R}^d$ conforman la formulación del problema en su versión fuerte.
+Las ecuaciones (\ref{momentum}) y (\ref{continuity}), junto con unas condiciones de frontera Dirichlet $g(t)$, una condición inicial $u_0$, y un dominio geométrico $\Omega \subset \mathbb{R}^d$ conforman la formulación del problema en su versión fuerte.
 
 \begin{center}
   \begin{subequations}
@@ -731,7 +731,7 @@ Finalmente, con el objetivo de garantizar la trazabilidad, cada resultado se alm
 
 La geometría del segmento arterial se parametrizó con base en medidas morfométricas de la arteria descendente anterior izquierda (LAD) obtenidas mediante angiogramas coronarios y angiografía de rayos X. La longitud del segmento se fijó en $L = 138\,\text{mm}$, valor que cae dentro del rango de $72.46$--$144.78\,\text{mm}$ reportado en \cite{lad_length}. El radio de entrada se estableció en $R_{\mathrm{in}} = 1.57\,\text{mm}$, mientras que el radio de salida se fijó en $R_{\mathrm{out}} = 1.20\,\text{mm}$, de acuerdo a los valores reportados en \cite{lad_diameter}.
 
-La presión de entrada se fijó en $p_{\mathrm{in}} = 75\,\mathrm{mmHg}$, valor representativo de la presión diastólica normal \cite{blood_pressure_aha}. Para las propiedades del fluido se adoptaron valores estándar de la sangre: densidad $\rho = 1.060\times10^{-3}\,\mathrm{g/mm^3}$ y viscosidad dinámica $\mu = 3.5\times10^{-3}\,\mathrm{Pa\cdot s}$. Para el esquema numérico se seleccionó un paso de tiempo $\Delta t = 10^{-4}\,\mathrm{s}$, un parámetro de penalización de \textit{backflow} $\beta_b = 0.6$ y un parámetro de Nitsche $\beta_N = 100$.
+La presión de entrada se fijó en $p_{\mathrm{in}} = 70\,\mathrm{mmHg}$, valor representativo de la presión diastólica normal \cite{blood_pressure_aha}. Para las propiedades del fluido se adoptaron valores estándar de la sangre: densidad $\rho = 1.060\times10^{-3}\,\mathrm{g/mm^3}$ y viscosidad dinámica $\mu = 3.5\times10^{-3}\,\mathrm{Pa\cdot s}$. Para el esquema numérico se seleccionó un paso de tiempo $\Delta t = 10^{-4}\,\mathrm{s}$, un parámetro de penalización de \textit{backflow} $\beta_b = 0.6$ y un parámetro de Nitsche $\beta_N = 100$.
 
 Para el árbol microvascular, se decidió generar $3$ niveles. Esta elección se fundamenta en simulaciones preliminares que mostraron que, a partir de dicho nivel, el número de Reynolds es muy bajo ($Re < 5$) y el flujo entra en un régimen laminar y completamente desarrollado. En consecuencia, la dinámica de flujo en el resto del árbol vascular puede aproximarse adecuadamente de forma analítica.
 
@@ -759,11 +759,6 @@ Se realizó un estudio de convergencia de malla con el fin de determinar una res
 Se adoptó una estrategia de refinamiento hp, donde se reduce el tamaño de los elementos de la malla, al tiempo que se aumenta el orden de los polinomios de aproximación, hasta lograr convergencia de la solución. La convergencia se evaluó sobre el cambio en la norma $L^2$ tanto de la velocidad como de la presión entre dos simulaciones consecutivas.  
 
 Se analizó la geometría completa, estenosis y árbol microvascular con tres niveles; se consideraron tres escenarios: obstrucción leve (25\%), moderada (50\%) y severa (75\%). Se inició con polinomios de grado uno y elementos de tamaño $0.3$ mm y se obtuvo convergencia (cambio $< 1\%$) con polinomios de grado dos y elementos de tamaño $0.15$ mm. 
-
-
-\subsubsection{Impacto de la ubicación axial de la estenosis}
-
-Con el objetivo de evaluar si la ubicación de la estenosis a lo largo de la arteria tiene algún impacto sobre los índices diagnósticos o el flujo en el árbol vascular, se ejecutaron escenarios de simulación específicos. Se seleccionaron tres niveles de severidad de la estenosis ($25\%$, $50\%$ y $75\%$), cada uno evaluado en dos posiciones axiales distintas: una ubicación proximal al inicio de la arteria ($25\%$ de la longitud total) y una ubicación distal hacia el final de la misma ($75\%$ de la longitud).
 
 \subsubsection{Impacto de la forma de la estenosis}
 
@@ -1033,8 +1028,6 @@ Por otro lado, la distribución de presiones en el árbol microvascular (\cref{f
 
 Finalmente, el análisis del TAWSS en el árbol microvascular revela que existen zonas críticas en las bifurcaciones. En las paredes externas, al inicio de la bifurcación, se observan valores de TAWSS muy bajos, situándose por debajo del umbral de $4\,\mathrm{dyn/cm}^2$ \cite{hemo_wss}.
 
-\subsection{Impacto de la ubicación axial de la estenosis}
-
 \subsection{Impacto de la morfología de la estenosis} \label{sec:morfologia_estenosis}
 
 Para investigar cómo la forma geométrica de la lesión afecta el comportamiento del flujo, se calculó el FFR para los nueve escenarios planteados y se modeló la relación entre la severidad ($\eta$), la pendiente ($\alpha$) como variables independientes y el FFR como variable dependiente. Inicialmente, se observó que un modelo de regresión lineal multivariante simple no lograba capturar adecuadamente la física del problema, especialmente en regímenes de baja severidad donde el efecto de la pendiente no es tan relevante.
@@ -1175,9 +1168,7 @@ Fisiológicamente, la medición del FFR exige un estado de hiperemia máxima, t�
 
 Sin embargo, nuestros resultados estadísticos contradicen la noción de que el FFR es sensible a variaciones en la resistencia microvascular dentro de los rangos evaluados. En el diseño de experimentos realizado, la resistencia microvascular explicó menos del $0.01\%$ de la varianza del FFR ($R^2 = 0.000068$), lo que sugiere una independencia casi total del índice respecto a la carga distal. Este resultado contrasta con trabajos previos que utilizan mediciones in-vivo y otros modelos teóricos. Por ejemplo, Garcia et al. \cite{Garcia2019Relationship} y van de Hoef et al. \cite{VanDeHoef2014Impact} sostienen que la resistencia microvascular hiperémica (HMR) y la resistencia de la estenosis contribuyen de forma comparable al valor final del FFR en lesiones de severidad intermedia. Asimismo, modelos de vFFR basados en CFD han reportado que la fisiología microvascular puede representar hasta el $59\%$ de la varianza en la significancia funcional de una lesión \cite{Soto2017Fast}.
 
-% no estoy seguro de la otra idea, depronto sí pero no se miro que fuera que la resistencia interna de la estenosis opacara la de la condición de frontera, otra cosa importante ahí fue que la resistencia se acopló de forma explicita y no se sabe eso como afecte. 
-% la ultima idea hay que revisarla y si es cierta revisar porque podria ser que la resistencia interna esta varios ordenes de magnitud arriba
-Una posible explicación para la discrepancia entre nuestra observación y la sensibilidad reportada en la literatura es la dominancia de la impedancia geométrica en nuestro modelo. La resistencia hidráulica de la estenosis se vuelve predominante al aumentar la severidad, de modo que las fluctuaciones de la resistencia microvascular quedan enmascaradas. Una hipótesis explicativa es que, dado que la resistencia de la estenosis varía en varios órdenes de magnitud debido a la relación no lineal con la reducción del radio, la variación en la resistencia microvascular simulada resulta insuficiente para alterar significativamente la diferencia de presiones. Alternativamente, esta discrepancia podría atribuirse a las simplificaciones del modelo, que podrían ocultar efectos presentes en configuraciones más completas.
+Una posible explicación para la discrepancia entre nuestra observación y la sensibilidad reportada en la literatura es la dominancia de la impedancia geométrica en nuestro modelo. La resistencia hidráulica de la estenosis se vuelve predominante al aumentar la severidad, de modo que las fluctuaciones de la resistencia microvascular quedan enmascaradas. Adicionalmente, el acoplamiento explícito implementado —donde la presión de salida se calcula con el caudal del paso de tiempo anterior— podría introducir efectos de retardo que alteran la respuesta dinámica del sistema. Alternativamente, esta discrepancia podría atribuirse a las simplificaciones del modelo, que podrían ocultar efectos presentes en configuraciones más completas.
 
 En primer lugar, la suposición de paredes rígidas en la arteria y el árbol es una limitación. El trabajo de Konala et al. \cite{Konala2011Influence} muestra que omitir el movimiento de las paredes vasculares sobreestima la caída de presión entre un $27.7\%$ y un $37.6\%$ en estenosis severas. La falta de interacción fluido-estructura también distorsiona la distribución del estrés de corte en la pared, concentrándolo de forma artificial sobre la curvatura externa de los vasos \cite{Failer2021Impact, Kandangwa2022Influence}.
 
