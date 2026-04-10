@@ -56,10 +56,17 @@
 % --- 4. Resumen / Abstract [cite: 11] ---
 \selectlanguage{spanish}
 \section*{Resumen}
-(Máximo 250 palabras, tercera persona. Incluye objetivos, alcance, metodología, resultados y conclusiones).
+Esta investigación desarrolló un marco computacional basado en dinámica de fluidos para el análisis hemodinámico de la enfermedad arterial coronaria, caracterizando el impacto de la morfología de la estenosis y la fisiología microvascular sobre índices diagnósticos como la reserva fraccional de flujo (FFR). Se implementó un solver de Navier-Stokes estabilizado mediante elementos finitos de igual orden con términos SUPG/PSPG/LSIC y penalización de backflow, utilizando FEniCSx y PETSc para la resolución paralela. El modelo se validó con benchmarks estándar. Las geometrías arteriales parametrizadas, con estenosis de severidad y pendiente variables, se acoplaron a árboles microvasculares sintéticos generados según la ley de Murray. Los resultados mostraron que un modelo de ecuaciones estructurales que integra la reducción de área relativa y la severidad de la estenosis predice el FFR con $R^2=0.85$, mientras que la resistencia microvascular explicó menos del 0.01\% de su varianza ($p=0.98$). Se identificaron zonas de bajo esfuerzo cortante ($<4$ dyn/cm$^2$) en regiones post-estenóticas y bifurcaciones, condiciones pro-aterogénicas. Se concluye que bajo las condiciones evaluadas el FFR está dominado por la geometría de la estenosis, y que la caracterización morfológica cuantitativa proporciona una base para modelos predictivos del diagnóstico funcional.
 
 \section*{Palabras clave}
-Palabra1, Palabra2, Palabra3 (3 a 5 palabras).
+Simulación hemodinámica, reserva fraccional de flujo, enfermedad arterial coronaria, dinámica de fluidos computacional.
+
+\selectlanguage{english}
+\section*{Abstract}
+This research developed a computational framework based on fluid dynamics for the hemodynamic analysis of coronary artery disease, characterizing the impact of stenosis morphology and microvascular physiology on diagnostic indices such as fractional flow reserve (FFR). A stabilized Navier-Stokes solver was implemented using equal-order finite elements with SUPG/PSPG/LSIC terms and backflow stabilization, employing FEniCSx and PETSc for parallel solving. The model was validated against standard benchmarks. Parameterized arterial geometries, with variable stenosis severity and slope, were coupled to synthetic microvascular trees generated according to Murray's law. Results showed that a structural equation model integrating relative area reduction and stenosis severity predicts FFR with $R^2=0.85$, while microvascular resistance explained less than 0.01\% of its variance ($p=0.98$). Low wall shear stress zones ($<4$ dyn/cm$^2$) were identified in post-stenotic regions and bifurcations, pro-atherogenic conditions. It is concluded that under the studied conditions FFR is dominated by stenosis geometry under maximal hyperemia, and that quantitative morphological characterization provides a basis for predictive models of functional diagnosis.
+
+\section*{Keywords}
+Hemodynamic simulation, fractional flow reserve, coronary artery disease, computer fluid dynamics.
 
 \newpage
 
