@@ -32,6 +32,13 @@
 \epstopdfDeclareGraphicsRule{.tiff}{pdf}{.pdf}{tiff2pdf #1 -o \OutputFile}
 \AppendGraphicsExtensions{.tiff}
 
+% --- Configuración de Justificación y Partición de Palabras ---
+\usepackage{microtype} % Optimiza el espaciado para una justificación premium
+\hyphenpenalty=10000   % Evita que se partan las palabras al final del renglón
+\exhyphenpenalty=10000 % Evita que se partan palabras que ya contienen guiones
+\tolerance=2000        % Aumenta la tolerancia para evitar espacios excesivos entre palabras
+\emergencystretch=3em  % Proporciona flexibilidad adicional para mantener el justificado
+
 % --- Configuración de Leyendas (Tablas arriba, Figuras abajo)  ---
 \captionsetup[table]{position=top, justification=raggedright, singlelinecheck=false}
 \captionsetup[figure]{position=bottom, justification=raggedright, singlelinecheck=false}
