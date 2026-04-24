@@ -1,4 +1,4 @@
-FROM dolfinx/dolfinx:stable
+FROM dolfinx/dolfinx:v0.9.0
 
 # Install uv
 RUN pip install uv
