@@ -301,7 +301,8 @@ Este término penaliza de forma suave desviaciones de la condición de incompres
 El sistema no lineal que resulta de la discretización de la formulación débil puede representarse como $F(u,p)=0$, donde
 
 \begin{center}
-  \begin{equation*}
+  \begin{equation}
+    \label{eq:nonlinear_system}
     F(u, p) =
     \begin{bmatrix}
       A(u) \\
@@ -310,10 +311,10 @@ El sistema no lineal que resulta de la discretización de la formulación débil
     \quad \text{con }
     \quad
     \begin{aligned}
-      A_i(u) &:= a(u,p, v_i) + f_{\mathrm{SUPG}}(u,p,v_i) + f_{\mathrm{LSIC}}(u, v_i),\\
-      B_i(p) &:= b(p, q_i) + f_{\mathrm{PSPG}}(u, p, q_i).
+      A_i(u,p) &:= a(u,p, v_i) + f_{\mathrm{SUPG}}(u,p,v_i) + f_{\mathrm{LSIC}}(u, v_i),\\
+      B_i(u,p) &:= b(u, q_i) + f_{\mathrm{PSPG}}(u, p, q_i).
     \end{aligned}
-  \end{equation*}
+  \end{equation}
 \end{center}
 
 \noindent siendo $\{v_i\}_{i=1}^n$ y $\{q_i\}_{i=1}^n$ bases de los espacios discretos de prueba de velocidad y presión, $V_h$ y $Q_h$, respectivamente. El sistema se resuelve entonces mediante el método de Newton-Raphson:
@@ -324,9 +325,9 @@ El sistema no lineal que resulta de la discretización de la formulación débil
   \end{equation}
 \end{center}
 
-\noindent donde $J(x) = F'(x)$ es el Jacobiano del residuo, $x_k = [u_k \;\; p_k]^T$ es el vector que contiene los coeficientes de expansión de la solución en la iteración $k$, y $x_0$ es la aproximación inicial (en este trabajo, se toma $x_0=0$).
+\noindent donde $J(x) = F'(x)$ es el Jacobiano del residuo, $x_k = [u_k \;\; p_k]^T$ es el vector que contiene los coeficientes de expansión de la solución en la iteración $k$, y $x_0$ es la aproximación inicial.
 
-El sistema lineal para la actualización de Newton-Raphson $J(x_k)\,\Delta x_k = -F(x_k)$ presenta la estructura de punto de silla típica de Stokes/Navier-Stokes. En particular, la restricción de incompresibilidad hace que el bloque asociado a la presión sea nulo o muy pequeño (en el caso estabilizado), lo que hace a la matriz global indefinida y con autovalores tanto positivos como negativos. Esta propiedad descarta el uso de solucionadores para matrices definidas positivas (por ejemplo, Gradiente Conjugado) y puede deteriorar la convergencia de métodos de Krylov si no se emplea un precondicionamiento adecuado; por ello, se recurre a estrategias basadas en el complemento de Schur para desacoplar los campos de velocidad y presión dentro del solver iterativo.
+El sistema lineal para la actualización de Newton-Raphson $J(x_k)\,\Delta x_k = -F(x_k)$ presenta la estructura de punto de silla típica de Stokes/Navier-Stokes \cite{iterative_solvers}. En particular, la restricción de incompresibilidad hace que el bloque asociado a la presión sea nulo o muy pequeño (en el caso estabilizado), lo que hace a la matriz global indefinida y con autovalores tanto positivos como negativos \cite{precond}. Esta propiedad descarta el uso de solucionadores para matrices definidas positivas como el método del Gradiente Conjugado \cite{iterative_solvers} y puede deteriorar la convergencia de métodos de Krylov si no se emplea un precondicionamiento adecuado \cite{donea_finite_2003}; por ello, se recurre a estrategias basadas en el complemento de Schur para desacoplar los campos de velocidad y presión dentro del solver iterativo \cite{iterative_solvers, precond}.
 
 En forma de bloques, el sistema linealizado puede escribirse como
 
@@ -347,9 +348,18 @@ En forma de bloques, el sistema linealizado puede escribirse como
   \end{bmatrix},
 \end{equation}
 
-\noindent donde $A$ corresponde al bloque de momento (incluyendo la contribución viscosa y convectiva linealizada), $B$ es el operador discreto de divergencia y $B^T$ el de gradiente. El bloque $C$ proviene de la estabilización de la presión (PSPG) y, en general, es nulo o pequeño en comparación con $A$.
+\noindent donde los sub-bloques de la matriz del sistema corresponden a las derivadas parciales de los residuos \eqref{eq:nonlinear_system} respecto a las variables de estado evaluadas en la iteración $k$:
 
-Para resolver la \cref{eq:saddle_point} de forma eficiente, se emplea un precondicionador basado en el complemento de Schur. El complemento de Schur asociado al bloque de presión se define como
+\begin{itemize}
+    \item $A_{ij} = \dfrac{\partial A_i}{\partial u_j}$ corresponde a la conservación de momento.
+    \item $(B^T)_{ij} = \dfrac{\partial A_i}{\partial p_j}$ corresponde al gradiente de presión.
+    \item $B_{ij} = \dfrac{\partial B_i}{\partial u_j}$ corresponde al operador de divergencia de velocidad.
+    \item $C_{ij} = -\dfrac{\partial B_i}{\partial p_j}$ corresponde al término de estabilización de presión PSPG.
+\end{itemize}
+
+Los vectores del lado derecho, $(R_u)_i = -A_i(u_k, p_k)$ y $(R_p)_i = -B_i(u_k, p_k)$, representan los residuos del sistema en la iteración actual. 
+
+Para resolver la \cref{eq:saddle_point} de forma eficiente, se emplea un precondicionador basado en el complemento de Schur \cite{iterative_solvers}. El complemento de Schur asociado al bloque de presión se define como
 
 \begin{equation}
   \label{eq:schur_exact}
@@ -365,11 +375,11 @@ Una manera equivalente de ver el desacoplamiento es mediante la eliminación de 
   S\,\Delta p &= R_p - B\,A^{-1}R_u.
 \end{align}
 
-En la implementación, el sistema se resuelve con un método de Krylov global (FGMRES) y una descomposición por campos (FieldSplit) con factorización de tipo Schur. En particular, se utiliza una factorización triangular inferior (\textit{LOWER}) y una aproximación interna de Schur de PETSc de tipo \textit{selfp}.
+En la implementación, el sistema se resuelve con un método de Krylov global (FGMRES) \cite{fgmres} y una descomposición por campos (FieldSplit) con factorización de tipo Schur \cite{iterative_solvers}. En particular, se utiliza una factorización triangular inferior y una aproximación interna de Schur de PETSc de tipo \textit{selfp} \cite{precond}.
 
-Cada aplicación del precondicionador requiere resolver aproximadamente el bloque de velocidad $A$ y el bloque de presión (aproximación de $S$). Para ello, se emplean métodos iterativos con precondicionamiento aditivo de Schwarz (ASM): GMRES+ASM para el bloque de velocidad y un solver tipo ASM para el bloque de presión.
+Cada aplicación del precondicionador requiere resolver aproximadamente el bloque de velocidad $A$ y el bloque de presión (aproximación de $S$). Para ello, se emplean métodos iterativos con precondicionamiento aditivo de Schwarz (ASM): GMRES+ASM para el bloque de velocidad y un solver tipo ASM para el bloque de presión \cite{parallel_solve}.
 
-Finalmente, cuando no se prescribe presión mediante condiciones de Dirichlet, el sistema presenta un espacio nulo asociado a presiones constantes. Para garantizar la convergencia del método de Krylov, este espacio nulo se construye y se incorpora explícitamente en el solver.
+Finalmente, cuando no se prescribe presión mediante condiciones de Dirichlet, el sistema presenta un espacio nulo asociado a presiones constantes. Para garantizar la convergencia del método de Krylov, este espacio nulo se construye y se incorpora explícitamente en el solver \cite{iterative_solvers}.
 
 % Nota: Los parámetros de LSIC (incluyendo la definición de $\tau_{\mathrm{LSIC}}$ y $z$) y la forma exacta de $\tau_{\mathrm{SUPG}}$ se documentarán con sus referencias correspondientes.
 % Nota: En el cálculo de $\tau$ se utiliza $\|u^n\|$ (velocidad del paso previo) para simplificar la derivación automática.
@@ -380,7 +390,9 @@ Antes de proceder con las simulaciones orientadas al estudio de la hemodinámica
 
 \subsubsection{Flujo 2D en Cavidad Inducida por Tapa (Lid-Driven Cavity)} \label{sec:ldc}
 
-Este benchmark se define sobre un cuadrado unitario
+Este benchmark se define tal como se describe en \cite{ghia_high-re_1982}, posteriormente se comparan los resultados contra los reportados en ese mismo estudio.
+
+El dominio se define sobre un cuadrado unitario
 \begin{equation}
   \Omega = (0,1)\times(0,1),
   \qquad \partial\Omega = \Gamma_{\mathrm{lid}}\cup \Gamma_{\mathrm{walls}},
@@ -408,7 +420,7 @@ El número de Reynolds del problema se define (en variables adimensionales) como
 \end{equation}
 \noindent donde $U$ es la velocidad de la tapa y $\nu$ la viscosidad cinemática.
 
-El benchmark se resolvió para $Re=1000$ y se comparó con los resultados de la literatura. Se escogió este número de Reynolds porque de los disponibles en el benchmark era el más cercano a los números de Reynolds típicos del flujo coronario.
+El benchmark se resolvió para $Re=1000$. Se escogió este número de Reynolds porque de los disponibles en el benchmark era el más cercano a los valores típicos del flujo coronario \cite{ku_blood_1997}.
 
 Los resultados obtenidos para este escenario se presentan detalladamente en la Sección \ref{sec:resultados_validacion}.
 
@@ -489,7 +501,7 @@ Para el caso $Re=20$, el flujo alcanza un estado estacionario. La simulación tr
 
 Para estudiar de forma controlada el efecto de la Enfermedad Arterial Coronaria (EAC) en las variables hemodinámicas, se construyen geometrías arteriales bidimensionales con una estenosis simétrica parametrizada. Se usa un parámetro continuo que permite recorrer desde un vaso sano hasta estenosis severas.
 
-Se considera un canal bidimensional de longitud $L$ a lo largo del eje $x$, donde la posición axial está dada por $x \in [0, L]$. El eje central del canal se ubica en $y = R_{\mathrm{in}}$. Para permitir vasos con perfil variable, se fijan dos radios base $R_{\mathrm{in}}$ y $R_{\mathrm{out}}$ en la entrada y la salida. La función que describe el radio de una transición lineal (vaso sano sin estenosis) es
+Se considera un canal bidimensional de longitud $L$ a lo largo del eje $x$, donde la posición axial está dada por $x \in [0, L]$. El eje central del canal se ubica en $y = R_{\mathrm{in}}$. Para permitir vasos con perfil variable, se fijan dos radios base $R_{\mathrm{in}}$ y $R_{\mathrm{out}}$ en la entrada y la salida. Se describe el radio a lo largo del vaso como
 \begin{equation}
   \label{eq:eac_linear_taper}
   R_{\mathrm{taper}}(x)
@@ -513,7 +525,7 @@ El contorno del dominio de flujo está determinado por la pared superior en $y_{
   \qquad x\in[0,\,x_m-d]\cup[x_m+d,\,L].
 \end{equation}
 
-En la región afectada por la estenosis $x\in[x_m-d,\,x_m+d]$, el perfil se genera mediante curvas de Bézier cúbicas. Para asegurar la continuidad y suavidad de la geometría, la interpolación se establece mediante las siguientes condiciones en los extremos de la región y en el punto de estenosis crítico:
+En la región afectada por la estenosis $x\in[x_m-d,\,x_m+d]$, el perfil se genera mediante curvas de Bézier cúbicas. Para asegurar la continuidad y suavidad de la geometría, la interpolación se establece mediante las siguientes condiciones en los extremos de la región y en el punto central de la estenosis:
 \begin{align*}
   r(x_m-d)=R_{\mathrm{taper}}(x_m-d),
   \qquad
@@ -539,7 +551,7 @@ Para implementar este perfil se define la reducción del radio respecto a $R_{\m
   h(t) = (1-t)^3 h_0 + 3(1-t)^2 t h_1 + 3(1-t) t^2 h_2 + t^3 h_3 = h_{\mathrm{sten}}(3t^2 - 2t^3).
 \end{equation}
 
-Para la coordenada axial $x(t)$, se emplea otra curva de Bézier que permite controlar la distribución de los elementos de malla mediante un parámetro de tensión $\tau \in [0, 1]$. Los puntos de control axiales son $x_0 = x_m - d$, $x_1 = x_0 + \tau d$, $x_2 = x_m - \tau d$ y $x_3 = x_m$, definiendo el mapeo:
+Para la coordenada axial $x(t)$, se emplea otra curva de Bézier que permite controlar la distribución de los elementos de malla mediante un parámetro de tensión $\tau \in [0, 1]$. Los puntos de control axiales son $x_0 = x_m - d$, $x_1 = x_0 + \tau d$, $x_2 = x_m - \tau d$ y $x_3 = x_m$:
 \begin{equation}
   \label{eq:eac_bezier_x}
   x(t) = (1-t)^3 x_0 + 3(1-t)^2 t x_1 + 3(1-t) t^2 x_2 + t^3 x_3.
@@ -566,12 +578,10 @@ El descenso del radio entre las ramas de cada nivel vascular sigue la ley de Mur
     r_{p}^{3} = 2 r_{h}^{3} \qquad \implies \qquad r_{h} = r_{p} \, 2^{-1/3}.
 \end{equation}
 
-La longitud $L$ de los segmentos en red es directamente proporcional a su radio particular mediante la constante de proporción $\alpha$:
+La longitud $L$ de los segmentos en red es directamente proporcional a su radio particular mediante una constante de proporción $\alpha$:
 \begin{equation} \label{eq:tree_alpha}
     L = \alpha r.
 \end{equation}
-
-De igual forma, cada bifurcación establece un mismo ángulo de salida para las ramas hijas, originando finalmente una geometría simétrica consistente con las leyes que rigen el flujo sanguíneo en la microvasculatura.
 
 \begin{figure}[htbp]
   \centering
@@ -644,7 +654,7 @@ Para el escenario acoplado de la estenosis con el árbol microvascular explícit
   R_{\mathrm{out}} = R_{\mathrm{target}} - R_{\mathrm{arbol}}.
 \end{equation}
 
-El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que se conoce el radio de los vasos en cada nivel gracias a la ley de Murray. Para este desarrollo, el perfil de flujo de Poiseuille entre 2 placas tiene varias limitaciones, por lo que se asume el perfil de flujo de Poiseuille para conductos cilíndricos. Bajo estas condiciones, la resistencia hidráulica de un vaso de radio $r$ y longitud $L$ viene dada por:
+El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que se conoce el radio de los vasos en cada nivel gracias a la ley de Murray (\cref{eq:ley_murray}). Para este desarrollo, el perfil de flujo de Poiseuille entre 2 placas tiene varias limitaciones, por lo que se asume el perfil de flujo de Poiseuille para conductos cilíndricos. Bajo estas condiciones, la resistencia hidráulica de un vaso de radio $r$ y longitud $L$ viene dada por:
 \begin{equation} \label{eq:resistencia_vaso}
   R = \frac{8 \mu L}{\pi r^4}
 \end{equation}
@@ -658,7 +668,7 @@ Luego, la ley de Murray especifica que para una bifurcación simétrica se cumpl
 \begin{align}
   r_{\mathrm{j}} &= r_{\mathrm{j-1}} \, 2^{-1/3} \nonumber \\
   r_j &= r_0 \prod_{i=1}^{j} 2^{-1/3} \nonumber \\
-  r_j &= r_0 \, 2^{-j/3}
+  r_j &= r_0 \, 2^{-j/3} \label{eq:radio_generacion}
 \end{align}
 
 Con esto, la resistencia local de un vaso en el nivel $j$ es:
@@ -761,7 +771,7 @@ La geometría del segmento arterial se parametrizó con base en medidas morfomé
 
 La presión de entrada se fijó en $p_{\mathrm{in}} = 70\,\mathrm{mmHg}$, valor representativo de la presión diastólica normal \cite{blood_pressure_aha}. Para las propiedades del fluido se adoptaron valores estándar de la sangre: densidad $\rho = 1.060\times10^{-3}\,\mathrm{g/mm^3}$ y viscosidad dinámica $\mu = 3.5\times10^{-3}\,\mathrm{Pa\cdot s}$ \cite{ku_blood_1997}. Para el esquema numérico se seleccionó un paso de tiempo $\Delta t = 10^{-4}\,\mathrm{s}$, un parámetro de penalización de \textit{backflow} $\beta_b = 0.6$ y un parámetro de Nitsche $\beta_N = 100$.
 
-Para el árbol microvascular, se decidió generar $3$ niveles. Esta elección se fundamenta en simulaciones preliminares que mostraron que, a partir de dicho nivel, el número de Reynolds es muy bajo ($Re < 5$) y el flujo entra en un régimen laminar y completamente desarrollado. En consecuencia, la dinámica de flujo en el resto del árbol vascular puede aproximarse adecuadamente de forma analítica.
+Para el árbol microvascular, se decidió generar $3$ niveles. Esta elección se fundamenta en simulaciones preliminares que mostraron que, a partir de dicho nivel, el número de Reynolds es muy bajo ($Re < 5$), por lo que el flujo entra en un régimen laminar y completamente desarrollado, en consecuencia, la dinámica de flujo en el resto del árbol vascular puede aproximarse adecuadamente de forma analítica \cite{mcdonalds_fisiology, outflow_resistance}.
 
 Por otro lado, el valor de la resistencia de salida $R$ se estimó a partir de mediciones promedio de presión y flujo en pacientes sanos. Según \cite{velocity_lad}, la velocidad de flujo media en la LAD a nivel distal es de $v_{\mathrm{media}} = 280\,\mathrm{mm/s}$. La velocidad media sobre un diámetro transversal de altura $h$ se expresa como:
 \begin{equation*}
@@ -784,7 +794,7 @@ Teniendo en cuenta la presión diastólica normal previamente seleccionada ($p =
 
 Se realizó un estudio de convergencia de malla con el fin de determinar una resolución suficientemente refinada para las simulaciones posteriores. 
 
-Se adoptó una estrategia de refinamiento hp, donde se reduce el tamaño de los elementos de la malla, al tiempo que se aumenta el orden de los polinomios de aproximación, hasta lograr convergencia de la solución. La convergencia se evaluó sobre el cambio en la norma $L^2$ tanto de la velocidad como de la presión entre dos simulaciones consecutivas.  
+Se adoptó una estrategia de refinamiento hp, donde se reduce el tamaño de los elementos de la malla, al tiempo que se aumenta el orden de los polinomios de aproximación, hasta lograr convergencia de la solución \cite{ref_hp}. La convergencia se evaluó sobre el cambio en la norma $L^2$ tanto de la velocidad como de la presión entre dos simulaciones consecutivas.  
 
 Se analizó la geometría completa, estenosis y árbol microvascular con tres niveles; se consideraron tres escenarios: obstrucción leve (25\%), moderada (50\%) y severa (75\%). Se inició con polinomios de grado uno y elementos de tamaño $0.3$ mm y se obtuvo convergencia (cambio $< 1\%$) con polinomios de grado dos y elementos de tamaño $0.15$ mm. 
 
@@ -807,11 +817,11 @@ Con este propósito, se plantearon $9$ escenarios de simulación correspondiente
 
 Para evaluar el impacto hemodinámico de la disfunción microvascular (DMV), se planteó un análisis variando la resistencia periférica desde un estado sano hasta uno patológico. Esta transición simula las dos alteraciones principales de la DMV: la rarefacción capilar (pérdida de capilares) y el engrosamiento de pared (reducción uniforme de radios) \cite{concenso_minoca_arg}. 
 
-En primer lugar, se asume un árbol microvascular de referencia (sano). Para establecer su profundidad, se determinó el número de generaciones necesarias para que los vasos terminales alcancen dimensiones capilares (diámetro entre $5$ y $10\,\mu\mathrm{m}$) \cite{circulacion_capilar}. Evaluando la ley de Murray $r_j = r_0 \, 2^{-j/3} \le 0.0025\,\mathrm{mm}$ desde el vaso principal $r_0 = 1.2\,\mathrm{mm}$, se alcanzan las capilares en la generación $27$ ($r_{27} \approx 2.34\,\mu\mathrm{m}$). Estableciendo entonces $N_{\mathrm{gen}} = 27$, la resistencia de este árbol sano ($R_{\mathrm{geom}}^{\mathrm{sano}}$) se evalúa usando \eqref{eq:resistencia_arbol} y es igual a $27 R_0$.
+En primer lugar, se asume un árbol microvascular de referencia sano. Para establecer su profundidad, se determinó el número de generaciones necesarias para que los vasos terminales alcancen dimensiones capilares (diámetro entre $5$ y $10\,\mu\mathrm{m}$) \cite{circulacion_capilar}. Evaluando la ley de Murray ($r_j = r_0 \, 2^{-j/3}$, \eqref{eq:radio_generacion}) con $r_j \le 0.0025\,\mathrm{mm}$ desde el vaso principal $r_0 = 1.2\,\mathrm{mm}$, se alcanzan las capilares en la generación $27$ ($r_{27} \approx 2.34\,\mu\mathrm{m}$). Estableciendo entonces $N_{\mathrm{gen}} = 27$, la resistencia de este árbol sano ($R_{\mathrm{geom}}^{\mathrm{sano}}$) se evalúa usando \eqref{eq:resistencia_arbol} y es igual a $27 R_0$.
 
 Posteriormente, se simulan las dos alteraciones patológicas en la topología para obtener la resistencia enferma ($R_{\mathrm{geom}}^{\mathrm{enfermo}}$):
 
-Primero se modela el engrosamiento de pared utilizando el porcentaje de área transversal ocupada por la pared respecto al área total del vaso. En un estudio de arteriolas coronarias intramiocárdicas \cite{dmv_remodelation_lumen}, los pacientes con presión arterial normal presentaban en promedio un $66\%$, mientras que los pacientes hipertensos presentaban un $69.9\%$. Definiendo el área luminal como el complemento ($100\% - \text{área de pared}$), el área de flujo en sujetos sanos es del $34\%$, mientras que en hipertensos se reduce al $30.1\%$. El estudio muestra que el radio externo se mantiene constante, por lo que el factor por el que se reduce el radio interno en pacientes enfermos es: $\beta = \sqrt{\frac{0.301}{0.340}} \approx 0.9409$. 
+Primero se modela el engrosamiento de pared utilizando el porcentaje de área transversal ocupada por la pared respecto al área total del vaso. En un estudio de arteriolas coronarias intramiocárdicas \cite{dmv_remodelation_lumen}, los pacientes con presión arterial normal presentaban en promedio un $66\%$, mientras que los pacientes hipertensos presentaban un $69.9\%$. Definiendo el área luminal como el complemento ($100\% - \text{área de pared}$), el área de flujo en sujetos sanos es del $34\%$, mientras que en hipertensos se reduce al $30.1\%$. El estudio muestra que el radio externo se mantiene constante, por lo que el factor por el que se reduce el radio interno en pacientes enfermos es $\beta = \sqrt{\frac{0.301}{0.340}} \approx 0.9409$. 
   
 Luego se modela la rarefacción, los valores normales de densidad capilar varían entre $2500$ y $3000\,\mathrm{capilares/mm^2}$. Bajo ciertas patologías, la densidad disminuye a unos $1500 - 2000\,\mathrm{capilares/mm^2}$ \cite{rarefaction}, lo que equivale a una reducción de capilares ($\xi$) de entre un $20\%$ y $40\%$. Para reproducirlo matemáticamente, el número de ramas se reduce multiplicando el número de vasos en paralelo por el factor $(1-\xi)$. Esta disminución se aplica exclusivamente sobre las generaciones correspondientes a la microcirculación (niveles $j \ge N_{\mathrm{micro}}$).
 
@@ -825,11 +835,9 @@ Con estas ecuaciones, el factor de aumento resistivo ($k_R$) se evalúa como:
   k_R = \frac{R_{\mathrm{geom}}^{\mathrm{enfermo}}}{R_{\mathrm{geom}}^{\mathrm{sano}}}
 \end{equation}
 
-Para evaluar la severidad máxima, se determinó el inicio de la red capilar ($N_{\mathrm{micro}}$) como el nivel donde el radio luminal es $\leq 10\,\mu\mathrm{m}$ \cite{circulacion_capilar}. Evaluando $r_0 \, 2^{-j/3} \le 0.01\,\mathrm{mm}$ con $r_0 = 1.2\,\mathrm{mm}$, se obtiene que la rarefacción inicia en $N_{\mathrm{micro}} = 21$.
+Para evaluar la severidad máxima, se determinó el inicio de la red capilar ($N_{\mathrm{micro}}$) como el nivel donde el radio luminal es $\leq 10\,\mu\mathrm{m}$ \cite{circulacion_capilar}. Evaluando la \cref{eq:radio_generacion} con $r_j \le 0.01\,\mathrm{mm}$ y $r_0 = 1.2\,\mathrm{mm}$, se obtiene que la rarefacción inicia en $N_{\mathrm{micro}} = 21$.
 
-Se adoptaron los parámetros extremos para establecer la cota patológica máxima: un factor de contracción luminal $\beta = 0.9409$ (incrementando la resistencia tubular por el factor $1/\beta^4 \approx 1.275$) y una pérdida de densidad capilar del $40\%$ ($\xi = 0.40$, con una vascularidad remanente del $60\%$).
-
-Sustituyendo estos parámetros para las $N_{\mathrm{gen}} = 27$ generaciones y $N_{\mathrm{micro}} = 21$:
+Sustituyendo los parametros calculados para el árbol enfermo $N_{\mathrm{gen}} = 27$, $N_{\mathrm{micro}} = 21$, $\beta = 0.9409$ y $\xi = 0.40$ en la \cref{eq:resistencia_arbol}:
 \begin{equation}
   k_R = \frac{\frac{R_0}{\beta^4} \left[ 21 + \frac{27-21}{0.6} \right]}{27 R_0} \approx \frac{1.275 \left[ 21 + 10 \right]}{27} \approx 1.464
 \end{equation}
@@ -1061,7 +1069,7 @@ Para investigar cómo la forma geométrica de la lesión afecta el comportamient
 
 Con el fin de capturar esta interdependencia, se propuso un enfoque basado en Modelos de Ecuaciones Estructurales (SEM) introduciendo una variable latente de reducción de área relativa del canal ($\Delta A_{\text{rel}}$). Esta variable integra de forma no lineal tanto la severidad como la pendiente, basándose en la diferencia entre el perfil de radio luminal de la arteria sana ($R_{\mathrm{taper}}(x)$), que sigue una transición lineal desde el radio de entrada $R_{\mathrm{in}}$ hasta el radio de salida ($R_{\mathrm{out}}$), y el perfil luminal con estenosis $R_{\mathrm{sten}}(x)$, que es una curva de Bézier cúbica que se ajusta a la geometría de la lesión en torno al centro axial de la lesión ($x_m$):
 
-La estenosis reduce el radio luminal en una profundidad $h_{\mathrm{sten}}$ y se extiende en una longitud axial $2d$, definidos por la severidad ($\eta$) y la pendiente ($\alpha$) según:
+La estenosis reduce el radio luminal en $h_{\mathrm{sten}}$ y se extiende en una longitud axial $2d$, definidos por la severidad ($\eta$) y la pendiente ($\alpha$) según las \cref{eq:eac_severity,eq:eac_d_alpha}:
 \begin{align*}
   h_{\mathrm{sten}} &= R_{\mathrm{taper}}(x_m) - R_{\min} = \eta R_{\mathrm{taper}}(x_m) \\
   d &= \frac{h_{\mathrm{sten}}}{\alpha} = \frac{\eta R_{\mathrm{taper}}(x_m)}{\alpha}
@@ -1164,7 +1172,7 @@ En la \Cref{tab:coeficientes_sem} se detallan los parámetros del modelo. Los re
 
 \subsection{Impacto de la resistencia microvascular}
 
-Se seleccionó para el FFR un rango objetivo de 0.2 a 1.0, que abarca desde una oclusión muy severa hasta un vaso completamente sano. Para referencia, los manuales de cardiología de la sociedad europea de cardiología consideran que un FFR menor a 0.80 indica una estenosis hemodinámicamente significativa que debe ser intervenida \cite{manual_ffr08}. 
+Se seleccionó para el FFR un rango objetivo de 0.2 a 1.0, que abarca desde una oclusión muy severa hasta un vaso completamente sano \cite{manual_ffr08}. Para referencia, los manuales de cardiología de la sociedad europea de cardiología consideran que un FFR menor a 0.80 indica una estenosis hemodinámicamente significativa que debe ser intervenida \cite{manual_ffr08}. 
 
 Para cubrir este rango, es necesario definir el dominio de los parámetros de severidad ($\eta$) y pendiente ($\alpha$). Asumiendo una estenosis centrada en la arteria ($x_m = L/2$), el radio base del vaso sano corresponde a $\bar{R} = (R_{\mathrm{in}} + R_{\mathrm{out}})/2$. 
 
