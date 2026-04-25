@@ -1063,9 +1063,9 @@ Por otro lado, la distribución de presiones en el árbol microvascular (\Cref{f
 
 Finalmente, el análisis del TAWSS en el árbol microvascular revela que existen zonas críticas en las bifurcaciones. En las paredes externas, al inicio de la bifurcación, se observan valores de TAWSS muy bajos, situándose por debajo del umbral de $4\,\mathrm{dyn/cm}^2$ \cite{hemo_wss}.
 
-\subsection{Impacto de la morfología de la estenosis} \label{sec:morfologia_estenosis}
+\subsection{Impacto de la morfología de la estenosis} \label{sec:impacto_morfologia_estenosis}
 
-Para investigar cómo la forma geométrica de la lesión afecta el comportamiento del flujo, se calculó el FFR para los nueve escenarios planteados y se modeló la relación entre la severidad ($\eta$), la pendiente ($\alpha$) como variables independientes y el FFR como variable dependiente. Inicialmente, se observó que un modelo de regresión lineal multivariante simple no lograba capturar adecuadamente la física del problema, especialmente en regímenes de baja severidad donde el efecto de la pendiente no es tan relevante.
+Para investigar cómo la forma geométrica de la lesión afecta el comportamiento del flujo, se calculó el FFR para los nueve escenarios planteados y se modeló la relación entre la severidad ($\eta$), la pendiente ($\alpha$) como variables independientes y el FFR como variable dependiente (ver \cref{app:morfologia_dataset}). Inicialmente, se observó que un modelo de regresión lineal multivariante simple no lograba capturar adecuadamente la física del problema, especialmente en regímenes de baja severidad donde el efecto de la pendiente no es tan relevante.
 
 Con el fin de capturar esta interdependencia, se propuso un enfoque basado en Modelos de Ecuaciones Estructurales (SEM) introduciendo una variable latente de reducción de área relativa del canal ($\Delta A_{\text{rel}}$). Esta variable integra de forma no lineal tanto la severidad como la pendiente, basándose en la diferencia entre el perfil de radio luminal de la arteria sana ($R_{\mathrm{taper}}(x)$), que sigue una transición lineal desde el radio de entrada $R_{\mathrm{in}}$ hasta el radio de salida ($R_{\mathrm{out}}$), y el perfil luminal con estenosis $R_{\mathrm{sten}}(x)$, que es una curva de Bézier cúbica que se ajusta a la geometría de la lesión en torno al centro axial de la lesión ($x_m$):
 
@@ -1170,7 +1170,7 @@ En la \Cref{tab:coeficientes_sem} se detallan los parámetros del modelo. Los re
 \end{table}
 
 
-\subsection{Impacto de la resistencia microvascular}
+\subsection{Impacto de la resistencia microvascular} \label{sec:impacto_resistencia_microvascular}
 
 Se seleccionó para el FFR un rango objetivo de 0.2 a 1.0, que abarca desde una oclusión muy severa hasta un vaso completamente sano \cite{manual_ffr08}. Para referencia, los manuales de cardiología de la sociedad europea de cardiología consideran que un FFR menor a 0.80 indica una estenosis hemodinámicamente significativa que debe ser intervenida \cite{manual_ffr08}. 
 
@@ -1192,7 +1192,7 @@ Por otro lado, para evaluar el impacto de la disfunción microvascular, se adopt
 
 El espacio de muestreo de los parámetros de este experimento es amplio, y además, correr cada escenario para calcular el FFR es computacionalmente costoso. Por lo anterior, se optó por un muestreo estratificado sobre el índice FFR, para tratar de que los datos se distribuyan uniformemente en el rango de FFR de interés. Debido a la relación no lineal entre los parámetros morfológicos y el FFR, un muestreo uniforme en el espacio de parámetros morfológicos genera una distribución sesgada del índice diagnóstico. Por lo anterior, se definieron $N=15$ niveles de FFR equidistantes en el rango $[0.22, 0.98]$. Para cada nivel, se determinaron pares aleatorios de severidad ($\eta$) y pendiente ($\alpha$) que satisfacen la relación del modelo \eqref{eq:modelo_sem_final}. Finalmente, la resistencia vascular $R$ se muestreó de una distribución uniforme, asegurando que el diseño de experimentos cubra de forma sistemática tanto el espectro de isquemia como el compromiso microvascular.
 
-Después de haber seleccionado las 15 muestras de parámetros, se ejecutó la simulación y se obtuvo el dataset. Luego se llevó a cabo un análisis estadístico para determinar si la resistencia microvascular ($R$) presenta una correlación significativa con el índice FFR. Específicamente, se calcularon los coeficientes de correlación de Pearson ($r = -0.0082$, $p = 0.9777$) y de Spearman ($\rho = -0.1385$, $p = 0.6369$), encontrando en ambos casos p-valores muy altos. 
+Después de haber seleccionado las 15 muestras de parámetros, se ejecutó la simulación y se obtuvo el dataset (ver \cref{app:resistencia_dataset}). Luego se llevó a cabo un análisis estadístico para determinar si la resistencia microvascular ($R$) presenta una correlación significativa con el índice FFR. Específicamente, se calcularon los coeficientes de correlación de Pearson ($r = -0.0082$, $p = 0.9777$) y de Spearman ($\rho = -0.1385$, $p = 0.6369$), encontrando en ambos casos p-valores muy altos. 
 
 Una regresión lineal simple basada únicamente en la resistencia explicó tan solo el $0.0068\%$ de la varianza del FFR ($R^2 = 0.000068$). Asimismo, la incorporación de la resistencia como variable predictora adicional en el modelo morfológico previo \eqref{eq:modelo_sem_final} no supuso una mejora significativa en la capacidad explicativa del sistema ($\Delta R^2 = 0.029$, $p = 0.2511$ mediante la prueba F). Estas pruebas en conjunto confirman que bajo las condiciones evaluadas, el índice FFR está dominado casi exclusivamente por las características geométricas de la estenosis, mientras que la variación en la resistencia microvascular tiene un impacto despreciable en la caída de presión.
 
@@ -1230,5 +1230,62 @@ A la Universidad del Rosario por proporcionar acceso a la infraestructura HPC a 
 
 \bibliographystyle{ieeetr} 
 \bibliography{bibliography}
+
+\appendix
+\section{Resultados de las simulaciones computacionales}
+\label{app:resultados_simulaciones}
+
+\subsection{Dataset del impacto de la morfología de la estenosis}
+\label{app:morfologia_dataset}
+
+En esta sección se presentan los resultados de las simulaciones para el estudio de la sensibilidad del FFR ante variaciones en la morfología de la estenosis.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Escenarios de simulación evaluados para el análisis de morfología de la estenosis.}
+  \label{tab:ffr_morphology_dataset}
+  \begin{tabular}{ccc}
+    \toprule
+    \textbf{Severidad ($\eta$)} & \textbf{Pendiente ($\alpha$)} & \textbf{FFR} \\ \midrule
+    0.25 & 0.30 & 0.948972 \\
+    0.25 & 0.15 & 0.948758 \\
+    0.25 & 0.05 & 0.947467 \\
+    0.50 & 0.30 & 0.940283 \\
+    0.50 & 0.15 & 0.938325 \\
+    0.50 & 0.05 & 0.928025 \\
+    0.75 & 0.30 & 0.844959 \\
+    0.75 & 0.15 & 0.804668 \\
+    0.75 & 0.05 & 0.740223 \\ \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Dataset del impacto de la resistencia microvascular}
+\label{app:resistencia_dataset}
+
+En esta sección se presentan los resultados de las simulaciones para el estudio de sensibilidad del FFR ante variaciones en la resistencia microvascular distal.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Conjunto de datos de simulación para el estudio de resistencia microvascular.}
+  \label{tab:ffr_resistance_dataset}
+  \begin{tabular}{cccc}
+    \toprule
+    \textbf{Severidad ($\eta$)} & \textbf{Pendiente ($\alpha$)} & \textbf{Resistencia ($R$)} & \textbf{FFR} \\ \midrule
+    0.21 & 0.3505 & 15.62 & 0.9548 \\
+    0.41 & 0.1005 & 17.90 & 0.9570 \\
+    0.56 & 0.0697 & 17.45 & 0.9387 \\
+    0.61 & 0.0112 & 14.25 & 0.8124 \\
+    0.64 & 0.0477 & 16.08 & 0.8939 \\
+    0.71 & 0.0134 & 19.28 & 0.7431 \\
+    0.72 & 0.0267 & 13.79 & 0.7501 \\
+    0.77 & 0.0108 & 20.19 & 0.7367 \\
+    0.78 & 0.0257 & 19.73 & 0.6674 \\
+    0.81 & 0.0111 & 18.82 & 0.4481 \\
+    0.81 & 0.0600 & 18.36 & 0.5449 \\
+    0.83 & 0.0104 & 16.99 & 0.4978 \\
+    0.83 & 0.0146 & 16.53 & 0.3580 \\
+    0.84 & 0.0173 & 14.70 & 0.2803 \\ \bottomrule
+  \end{tabular}
+\end{table}
 
 \end{document}
