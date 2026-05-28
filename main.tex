@@ -31,6 +31,12 @@
 \usepackage{epstopdf}
 \epstopdfDeclareGraphicsRule{.tiff}{pdf}{.pdf}{tiff2pdf #1 -o \OutputFile}
 \AppendGraphicsExtensions{.tiff}
+\usepackage[titletoc]{appendix}
+\addto\captionsspanish{%
+  \renewcommand{\appendixname}{Anexo}%
+  \renewcommand{\appendixpagename}{Anexos}%
+  \renewcommand{\appendixtocname}{Anexos}%
+}
 
 % --- Configuración de Justificación y Partición de Palabras ---
 \usepackage{microtype} % Optimiza el espaciado para una justificación premium
@@ -73,14 +79,14 @@
 % --- 4. Resumen / Abstract [cite: 11] ---
 \selectlanguage{spanish}
 \section*{Resumen}
-Esta investigación desarrolló un modelo computacional basado en dinámica de fluidos para el análisis hemodinámico de la enfermedad arterial coronaria, caracterizando el impacto de la morfología de la estenosis y la fisiología microvascular sobre índices diagnósticos como la reserva fraccional de flujo (FFR). Se implementó un solver para las ecuaciones de Navier-Stokes, mediante elementos finitos de igual orden, estabilizado con términos SUPG/PSPG/LSIC y penalización de backflow, utilizando FEniCSx y PETSc para la resolución paralela. El modelo se validó con benchmarks estándar. Las geometrías arteriales parametrizadas, con estenosis de severidad y pendiente variables, se acoplaron a árboles microvasculares sintéticos generados según la ley de Murray. Los resultados mostraron que un modelo de ecuaciones estructurales que integra la reducción de área relativa y la severidad de la estenosis predice el FFR con $R^2=0.85$, mientras que la resistencia microvascular explicó menos del 0.01\% de su varianza ($p=0.98$). Se identificaron zonas de bajo esfuerzo cortante ($<4$ dyn/cm$^2$) en regiones post-estenóticas y bifurcaciones, condiciones pro-aterogénicas. Se concluye que bajo las condiciones evaluadas el FFR está dominado por la geometría de la estenosis, y que la caracterización morfológica cuantitativa proporciona una base para modelos predictivos del diagnóstico funcional.
+Esta investigación desarrolló un modelo computacional basado en dinámica de fluidos para el análisis hemodinámico de la enfermedad arterial coronaria, caracterizando el impacto de la morfología de la estenosis y la fisiología microvascular sobre índices diagnósticos como la reserva fraccional de flujo (FFR). Se implementó un solver para las ecuaciones de Navier-Stokes, mediante elementos finitos de igual orden, estabilizado con términos SUPG/PSPG/LSIC y penalización de backflow, utilizando FEniCSx y PETSc para la resolución paralela. El modelo se validó con benchmarks estándar. Las geometrías arteriales parametrizadas, con estenosis de severidad y pendiente variables, se acoplaron a árboles microvasculares sintéticos generados según la ley de Murray. Los resultados mostraron que un modelo de ecuaciones estructurales que integra la reducción de área relativa y la severidad de la estenosis predice el FFR con $R^2=0.85$, mientras que la resistencia microvascular no mostró una correlación significativa ($p=0.98$), explicando menos del 0.01\% de su varianza. Se identificaron zonas de bajo esfuerzo cortante ($<4$ dyn/cm$^2$) en regiones post-estenóticas y bifurcaciones, condiciones pro-aterogénicas. Se concluye que bajo las condiciones evaluadas el FFR está dominado por la geometría de la estenosis, y que la caracterización morfológica cuantitativa proporciona una base para modelos predictivos del diagnóstico funcional.
 
 \section*{Palabras clave}
 Simulación hemodinámica, reserva fraccional de flujo, enfermedad arterial coronaria, dinámica de fluidos computacional.
 
 \selectlanguage{english}
 \section*{Abstract}
-This research developed a computational model based on fluid dynamics for the hemodynamic analysis of coronary artery disease, characterizing the impact of stenosis morphology and microvascular physiology on diagnostic indices such as fractional flow reserve (FFR). A solver for the Navier-Stokes equations was implemented using equal-order finite elements, stabilized with SUPG/PSPG/LSIC terms and backflow penalization, employing FEniCSx and PETSc for parallel solving. The model was validated against standard benchmarks. Parameterized arterial geometries, with variable stenosis severity and slope, were coupled to synthetic microvascular trees generated according to Murray's law. Results showed that a structural equation model integrating relative area reduction and stenosis severity predicts FFR with $R^2=0.85$, while microvascular resistance explained less than 0.01\% of its variance ($p=0.98$). Low wall shear stress zones ($<4$ dyn/cm$^2$) were identified in post-stenotic regions and bifurcations, pro-atherogenic conditions. It is concluded that under the studied conditions FFR is dominated by stenosis geometry under maximal hyperemia, and that quantitative morphological characterization provides a basis for predictive models of functional diagnosis.
+This research developed a computational model based on fluid dynamics for the hemodynamic analysis of coronary artery disease, characterizing the impact of stenosis morphology and microvascular physiology on diagnostic indices such as fractional flow reserve (FFR). A solver for the Navier-Stokes equations was implemented using equal-order finite elements, stabilized with SUPG/PSPG/LSIC terms and backflow penalization, employing FEniCSx and PETSc for parallel solving. The model was validated against standard benchmarks. Parameterized arterial geometries, with variable stenosis severity and slope, were coupled to synthetic microvascular trees generated according to Murray's law. Results showed that a structural equation model integrating relative area reduction and stenosis severity predicts FFR with $R^2=0.85$, while microvascular resistance showed no significant correlation ($p=0.98$), explaining less than 0.01\% of its variance. Low wall shear stress zones ($<4$ dyn/cm$^2$) were identified in post-stenotic regions and bifurcations, pro-atherogenic conditions. It is concluded that under the studied conditions FFR is dominated by stenosis geometry under maximal hyperemia, and that quantitative morphological characterization provides a basis for predictive models of functional diagnosis.
 
 \section*{Keywords}
 Hemodynamic simulation, fractional flow reserve, coronary artery disease, computational fluid dynamics.
@@ -94,17 +100,17 @@ Hemodynamic simulation, fractional flow reserve, coronary artery disease, comput
 \section{Introducción}
 La enfermedad arterial coronaria (EAC) constituye uno de los desafíos de salud pública más importantes a nivel global y es una de las principales causas de mortalidad \cite{world_health_organization_cardiovascular_2021}. Esta patología se caracteriza por la estenosis progresiva o el estrechamiento de las arterias coronarias, un proceso fundamentalmente impulsado por la aterosclerosis \cite{knuuti_2019_2020}. A nivel hemodinámico, este estrechamiento altera drásticamente el flujo sanguíneo, provocando un aumento de la velocidad a través de las regiones restringidas y la formación de zonas de recirculación; además, en las zonas de recirculación se genera un bajo esfuerzo de corte en las paredes, lo que activa las células endoteliales y promueve la acumulación de placa \cite{malek_hemodynamic_1999,ku_blood_1997}.
 
-Tradicionalmente, el diagnóstico se ha apoyado en técnicas anatómicas como la Angiografía Coronaria Invasiva (ICA) y la Angiografía Coronaria por Tomografía Computarizada (CTCA) \cite{knuuti_2019_2020}. Si bien estas ofrecen un detalle anatómico sin igual, han evidenciado una brecha fundamental: la severidad anatómica de una lesión no siempre se correlaciona con su impacto fisiológico real en el flujo sanguíneo \cite{tonino_fractional_2009,knuuti_2019_2020}. Esta limitación cobra aún más relevancia ante la Isquemia con Arterias Coronarias no Obstructivas (INOCA), una condición donde los pacientes presentan síntomas de angina/isquemia pero sin estenosis obstructivas significativas en las arterias epicárdicas, un fenómeno estrechamente ligado a la Disfunción Microvascular Coronaria (DMV) \cite{kunadian_eapci_2021}.
+Tradicionalmente, el diagnóstico se ha apoyado en técnicas anatómicas como la Angiografía Coronaria Invasiva (ICA) y la Angiografía Coronaria por Tomografía Computarizada (CTCA) \cite{knuuti_2019_2020}. Si bien estas ofrecen un detalle anatómico sin igual, la severidad anatómica de una lesión no siempre se correlaciona con su impacto fisiológico en el flujo sanguíneo \cite{tonino_fractional_2009,knuuti_2019_2020}. Esta limitación cobra aún más relevancia ante la Isquemia con Arterias Coronarias no Obstructivas (INOCA), una condición donde los pacientes presentan síntomas de angina o isquemia pero sin estenosis obstructivas significativas en las arterias epicárdicas, un fenómeno estrechamente ligado a la Disfunción Microvascular Coronaria (DMV) \cite{kunadian_eapci_2021}.
 
 Para superar el enfoque puramente anatómico, se introdujo la evaluación funcional mediante la Reserva Fraccional de Flujo (FFR), que mide la relación de presiones distal y proximal a una estenosis bajo condiciones de hiperemia (flujo máximo) \cite{tonino_fractional_2009,knuuti_2019_2020}. Aunque la FFR ha transformado el manejo clínico al guiar la intervención coronaria percutánea (PCI) de forma más precisa, sigue siendo un procedimiento invasivo y, al igual que sus predecesores, no ofrece una visión directa ni detallada de la microvasculatura \cite{kunadian_eapci_2021}.
 
-En este contexto, la Dinámica de Fluidos Computacional (CFD) y el Método de los Elementos Finitos (FEM) emergen como un paradigma innovador y no invasivo para el análisis hemodinámico. La CFD permite simular el flujo sanguíneo en geometrías arteriales reconstruidas a partir de imágenes médicas, permitiendo el cálculo detallado de campos de presión, velocidad y parámetros biomecánicos cruciales como el esfuerzo de corte de pared (WSS) \cite{taylor_computational_2013}. Esta aproximación ha llevado al desarrollo de índices como la FFR virtual (vFFR), que busca estimar la FFR a partir de modelos computacionales basados en imágenes médicas \cite{taylor_computational_2013,morris_virtual_2013,nannini_automated_2024}. Este enfoque permite una evaluación de la estenosis de forma no invasiva o mínimamente invasiva, a partir de datos de tomografía computarizada (TC) o angiografía \cite{taylor_computational_2013,morris_virtual_2013}. 
+En este contexto, la Dinámica de Fluidos Computacional (CFD) y el Método de los Elementos Finitos (FEM) emergen como un paradigma innovador y no invasivo para el análisis hemodinámico. La CFD permite simular el flujo sanguíneo en geometrías arteriales reconstruidas a partir de imágenes médicas, permitiendo el cálculo detallado de campos de presión, velocidad y variables cruciales como el esfuerzo de corte de pared (WSS) \cite{taylor_computational_2013}. Esta aproximación ha llevado al desarrollo de índices como la FFR virtual (vFFR), que busca estimar la FFR a partir de modelos computacionales basados en imágenes médicas \cite{taylor_computational_2013,morris_virtual_2013,nannini_automated_2024}. Este enfoque permite una evaluación de la estenosis de forma no invasiva o mínimamente invasiva, a partir de datos de tomografía computarizada (TC) o angiografía \cite{taylor_computational_2013,morris_virtual_2013}. 
 
-Estudios pioneros como DeFACTO y HeartFlow NXT validaron la viabilidad de la vFFR/FFR-CT, demostrando niveles de precisión diagnóstica significativos en comparación con la FFR invasiva \cite{min_diagnostic_2012,norgaard_diagnostic_2014}. Sin embargo, los enfoques actuales de vFFR no están exentos de limitaciones. Una de las críticas más importantes es su dependencia de las condiciones de contorno, ya que son modelos matemáticos simplificados para representar la microcirculación distal. Además, las simulaciones transitorias completas, que capturan la naturaleza pulsátil del flujo sanguíneo a lo largo de todo el ciclo cardíaco, tienen un costo computacional muy elevado. Esto ha impulsado el desarrollo de métodos alternativos basados en estado estacionario, que son mucho más rápidos pero sacrifican parte de la fidelidad fisiológica \cite{nannini_automated_2024}.
+Estudios pioneros como DeFACTO y HeartFlow NXT validaron la viabilidad de la vFFR/FFR-CT, demostrando niveles de precisión diagnóstica significativos en comparación con la FFR invasiva \cite{min_diagnostic_2012,norgaard_diagnostic_2014}. Sin embargo, los enfoques actuales de vFFR no están exentos de limitaciones. Una de las críticas más importantes es su dependencia de las condiciones de contorno, ya que son modelos matemáticos simplificados para representar la microcirculación distal \cite{critica_ffr}. Además, las simulaciones transitorias completas, que capturan la naturaleza pulsátil del flujo sanguíneo a lo largo de todo el ciclo cardíaco, tienen un costo computacional muy elevado. Esto ha impulsado el desarrollo de métodos alternativos basados en estado estacionario, que son mucho más rápidos pero sacrifican parte de la fidelidad fisiológica \cite{nannini_automated_2024}.
 
-La necesidad de refinar estos modelos, especialmente en la representación de la microvasculatura, es crucial para extender su aplicabilidad a patologías como la DMV, donde la disfunción reside precisamente en la dinámica que los modelos actuales simplifican \cite{kunadian_eapci_2021}. El enfoque predominante ha sido el uso de modelos de parámetros concentrados (lumped-parameter models), como los modelos tipo Windkessel para representar la resistencia y la compliancia del lecho distal y acoplarlos a una simulación 3D \cite{duanmu_patient-specific_2018,nannini_automated_2024}, o el acoplamiento multi-escala 3D-0D/1D para buscar condiciones más fisiológicas y específicas del paciente \cite{duanmu_patient-specific_2018,nannini_automated_2024}. En paralelo, el desarrollo de redes microvasculares sintéticas ha emergido como una vía para representar de forma explícita la microcirculación distal, permitiendo reducir la incertidumbre asociada a la simplificación en las condiciones de contorno \cite{nannini_automated_2024}.
+La necesidad de refinar estos modelos, especialmente en la representación de la microvasculatura, es crucial para extender su aplicabilidad a patologías como la DMV, donde la disfunción reside precisamente en la dinámica que los modelos actuales simplifican \cite{kunadian_eapci_2021}. El enfoque predominante ha sido el uso de modelos de parámetros concentrados, como los modelos tipo Windkessel para representar la resistencia y la compliancia del lecho distal y acoplarlos a una simulación 3D \cite{duanmu_patient-specific_2018,nannini_automated_2024}, o el acoplamiento multi-escala 3D-0D/1D para buscar condiciones más fisiológicas y específicas del paciente \cite{duanmu_patient-specific_2018,nannini_automated_2024}. En paralelo, el desarrollo de redes microvasculares sintéticas ha emergido como una vía para representar de forma explícita la microcirculación distal, permitiendo reducir la incertidumbre asociada a la simplificación en las condiciones de contorno \cite{nannini_automated_2024}.
 
-Aprovechando este enfoque, la presente investigación desarrolla un modelo que integra la arteria principal con redes microvasculares sintéticas para investigar la interacción hemodinámica entre la EAC y la DMV. Al explorar esta relación, el estudio se propone caracterizar la sensibilidad del índice FFR ante variaciones tanto en la morfología de la estenosis como en la resistencia del lecho distal, proporcionando una base para el desarrollo de herramientas diagnósticas que integren la fisiología completa y mejoren la interpretación de la condición clínica del paciente.
+Aprovechando este enfoque, la presente investigación desarrolla un modelo que integra la arteria principal con una red microvasculares sintética para investigar la interacción hemodinámica entre la EAC y la DMV. Al explorar esta relación, el estudio se propone caracterizar la sensibilidad del índice FFR ante variaciones tanto en la morfología de la estenosis como en la resistencia del lecho distal, proporcionando una base para el desarrollo de herramientas diagnósticas que integren la fisiología completa y mejoren la interpretación de la condición clínica del paciente.
 
 Con esto en cuenta, el trabajo se centra inicialmente en la implementación y validación de un solver de CFD en dos dimensiones que garantice la estabilidad numérica en el régimen de flujo coronario. A continuación, se procede a la generación de redes microvasculares sintéticas cuya morfología se rige por leyes de escalamiento biológico. Estas herramientas se integran en un marco de simulación que permite la evaluación sistemática de diversos escenarios mediante la parametrización de la severidad de la estenosis arterial y el grado de disfunción microvascular. Finalmente, el análisis de estos resultados busca caracterizar la interacción entre ambas patologías e identificar patrones hemodinámicos que contribuyan a mejorar los criterios del diagnóstico funcional no invasivo.
 
@@ -249,7 +255,7 @@ Para garantizar estabilidad numérica con pares de interpolación de igual orden
 \noindent A partir de $R(u,p)$ se incorporan, de manera separada, los siguientes términos:
 
 \paragraph{(i) SUPG (Streamline-Upwind Petrov--Galerkin).}
-Este término introduce difusión numérica \,\textit{en la dirección de las líneas de corriente} para suprimir oscilaciones no físicas en el campo de velocidad cuando el transporte convectivo domina \cite{supg}.
+Este término introduce difusión numérica en la dirección de las líneas de corriente para suprimir oscilaciones no físicas en el campo de velocidad cuando el transporte convectivo domina \cite{supg}.
 
 \begin{equation}
   \label{eq:supg_term}
@@ -264,7 +270,7 @@ Este término introduce difusión numérica \,\textit{en la dirección de las l�
   = \left[ \left( \frac{2\|u\|}{h} \right)^2 + \left( \frac{2}{\Delta t} \right)^2 + \left( \frac{4\nu}{h^2} \right)^2 \right]^{-1/2}.
 \end{equation}
 
-Antes de introducir el término de estabilización para la presión, es importante notar que la discretización mixta de Navier--Stokes exige que los espacios discretos de velocidad y presión satisfagan la condición de Ladyzhenskaya--Babuška--Brezzi (LBB), también conocida como condición \textit{inf-sup} \cite{leborgne_inf-sup_2023}. En este trabajo se utiliza interpolación de igual orden (en particular, $P_1/P_1$) para reducir el costo computacional; sin embargo, este par viola la condición LBB, lo que se manifiesta como oscilaciones espurias (\textit{ruido}) en el campo de presión y, en casos extremos, como sistemas lineales mal condicionados.
+Antes de introducir el término de estabilización para la presión, es importante notar que la discretización mixta de Navier--Stokes exige que los espacios discretos de velocidad y presión satisfagan la condición de Ladyzhenskaya--Babuška--Brezzi (LBB), también conocida como condición \textit{inf-sup} \cite{leborgne_inf-sup_2023}. En este trabajo se utiliza interpolación de igual orden ($P_1/P_1$) para reducir el costo computacional; sin embargo, este par viola la condición LBB, lo que se manifiesta como oscilaciones espurias (\textit{ruido}) en el campo de presión y, en general, como sistemas lineales mal condicionados.
 
 \paragraph{(ii) PSPG (Pressure-Stabilizing Petrov--Galerkin).}
 Este término estabiliza el campo de presión y permite el uso de pares de igual orden evitando el “ruido” espurio asociado a la violación de la condición LBB \cite{pspg}.
@@ -277,7 +283,7 @@ Este término estabiliza el campo de presión y permite el uso de pares de igual
 \end{equation}
 
 \paragraph{(iii) LSIC (Least-Squares Incompressibility Constraint).}
-Este término penaliza de forma suave desviaciones de la condición de incompresibilidad en el problema discreto, mejorando la robustez del esquema en mallas complejas \cite{lsic}.
+Este término penaliza desviaciones de la condición de incompresibilidad en el problema discreto, mejorando la robustez del esquema en mallas complejas \cite{lsic}.
 
 \begin{equation}
   \label{eq:lsic_term}
@@ -348,7 +354,7 @@ En forma de bloques, el sistema linealizado puede escribirse como
   \end{bmatrix},
 \end{equation}
 
-\noindent donde los sub-bloques de la matriz del sistema corresponden a las derivadas parciales de los residuos \eqref{eq:nonlinear_system} respecto a las variables de estado evaluadas en la iteración $k$:
+\noindent donde los sub-bloques de la matriz del sistema corresponden a las derivadas parciales de los residuos \eqref{eq:nonlinear_system} respecto a las variables evaluadas en la iteración $k$:
 
 \begin{itemize}
     \item $A_{ij} = \dfrac{\partial A_i}{\partial u_j}$ corresponde a la conservación de momento.
@@ -573,7 +579,7 @@ La discretización espacial se realiza con una malla de elementos triangulares. 
 
 Para representar la red microvascular, se genera un árbol arterial. La geometría se construye mediante bifurcaciones simétricas progresivas.
 
-El descenso del radio entre las ramas de cada nivel vascular sigue la ley de Murray \cite{ley_murray}. Asumiendo una bifurcación simétrica y un exponente cúbico estándar $\gamma = 3$, el radio de las ramas hijas $r_{h}$ se relaciona con el radio de la rama padre $r_{p}$ mediante:
+El descenso del radio entre las ramas de cada nivel vascular sigue la ley de Murray \cite{ley_murray}. Asumiendo una bifurcación simétrica y un exponente estándar $\gamma = 3$, el radio de las ramas hijas $r_{h}$ se relaciona con el radio de la rama padre $r_{p}$ mediante:
 \begin{equation} \label{eq:ley_murray}
     r_{p}^{3} = 2 r_{h}^{3} \qquad \implies \qquad r_{h} = r_{p} \, 2^{-1/3}.
 \end{equation}
@@ -593,7 +599,7 @@ La longitud $L$ de los segmentos en red es directamente proporcional a su radio 
 
 \subsection{Condiciones de frontera}
 
-La presión de entrada $p_\mathrm{in}$ se impone de forma \emph{débil} siguiendo \cite{pressurebc}, lo que permite prescribir simultáneamente condiciones de presión y de velocidad sobre la misma frontera $\Gamma_\mathrm{in}$.
+La presión de entrada $p_\mathrm{in}$ se impone de forma débil tal como se describe en \cite{pressurebc}, lo que permite prescribir simultáneamente condiciones de presión y de velocidad sobre la misma frontera $\Gamma_\mathrm{in}$.
 
 Siguiendo la formulación de \cite{pressurebc}, el término de frontera del tensor de esfuerzos sobre $\Gamma_\mathrm{in}$ en \eqref{momentum_weak} se reemplaza por:
 
@@ -602,7 +608,7 @@ Siguiendo la formulación de \cite{pressurebc}, el término de frontera del tens
   \int_{\Gamma_\mathrm{in}} p_\mathrm{in} \, (v \cdot n) \, ds.
 \end{equation}
 
-Adicionalmente, para mejorar la estabilidad numérica, se decidió prescribir que la componente tangencial de la velocidad en el inlet sea nula, es decir, $u_T = u - (u \cdot n)\,n = 0$ sobre $\Gamma_\mathrm{in}$. Puesto que la frontera de entrada es tratada de forma débil, esta condición no puede imponerse como una restricción de Dirichlet estándar. Por ello, se emplea el \emph{método de Nitsche} \cite{nitsche_original}, que permite imponer de forma consistente y estable condiciones de contorno de tipo Dirichlet de forma débil.
+Adicionalmente, para mejorar la estabilidad numérica, se decidió prescribir que la componente tangencial de la velocidad en el inlet sea nula, es decir, $u_T := u - (u \cdot n)\,n = 0$ sobre $\Gamma_\mathrm{in}$. Puesto que la frontera de entrada es tratada de forma débil, esta condición no puede imponerse como una restricción de Dirichlet. Por ello, se emplea el método de Nitsche \cite{nitsche_original}, que permite imponer de forma consistente y estable condiciones de contorno de tipo Dirichlet de forma débil.
 
 El método de Nitsche para la condición $u_T = 0$ introduce en el residuo los tres términos siguientes \cite{nitsche_ns}:
 
@@ -615,13 +621,13 @@ El método de Nitsche para la condición $u_T = 0$ introduce en el residuo los t
 
 \noindent donde $v_T = v - (v \cdot n)\,n$ es la componente tangencial de la función de prueba, $h$ es la longitud característica local del elemento, y $\beta_N > 0$ es el parámetro de penalización de Nitsche. El primer término es la consistencia adjunta de la condición, el segundo garantiza la simetría de la formulación, y el tercero es el término de penalización que asegura la coercividad del problema y el cumplimiento de la condición $u_T = 0$. La formulación resultante es consistente (la solución exacta satisface la forma débil), simétrica e incondicionalmente estable para valores suficientemente grandes de $\beta_N$.
 
-En el \textit{outlet} $\Gamma_\mathrm{out}$, la condición de salida se impone de forma débil prescribiendo una presión $p_{\mathrm{out}}^n$ sobre la frontera. Esto se logra de la misma forma que con la presión en la frontera de entrada, añadiendo el término que reemplaza al término de tracción natural del tensor de esfuerzos sobre $\Gamma_\mathrm{out}$:
+En el outlet $\Gamma_\mathrm{out}$, la condición de salida se impone de forma débil prescribiendo una presión $p_{\mathrm{out}}^n$ sobre la frontera. Esto se logra de la misma forma que con la presión en la frontera de entrada, añadiendo el término que reemplaza al término de tracción natural del tensor de esfuerzos sobre $\Gamma_\mathrm{out}$:
 \begin{equation}
   \label{eq:outlet_pressure_weak}
   \int_{\Gamma_\mathrm{out}} p_{\mathrm{out}}^n \, (v \cdot n) \; ds.
 \end{equation}
 
-No obstante, la condición de presión impuesta débilmente en el \textit{outlet} puede inducir inestabilidades numéricas cuando el flujo local se invierte, por ejemplo, al paso de vórtices o en régimen pulsátil. En esos instantes, el flujo que retrocede introduce energía cinética al sistema, lo que puede llevar a la divergencia del método \cite{bc_backflow_hemo,modified_bc_hemo}. Para suprimir este fenómeno, se añade el término de penalización de \textit{backflow} propuesto en \cite{bc_backflow_hemo}:
+No obstante, la condición de presión impuesta débilmente en el outlet puede inducir inestabilidades numéricas cuando el flujo local se invierte, por ejemplo, al paso de vórtices o en régimen pulsátil. En esos instantes, el flujo que retrocede introduce energía cinética al sistema, lo que puede llevar a la divergencia del método \cite{bc_backflow_hemo,modified_bc_hemo}. Para suprimir este fenómeno, se añade el término de penalización de backflow propuesto en \cite{bc_backflow_hemo}:
 \begin{equation}
   \label{eq:backflow_term}
   -\int_{\Gamma_\mathrm{out}} \beta_b \, \rho \, (u^{n-1} \cdot n)_- \; (u \cdot v) \; ds,
@@ -632,29 +638,29 @@ No obstante, la condición de presión impuesta débilmente en el \textit{outlet
 \end{equation*}
 es la parte negativa de la velocidad normal evaluada en el paso anterior, de modo que el término solo penaliza donde el flujo retrocede.
 
-La elección de $p_{\mathrm{out}}^n$ requiere especial atención. La presión en la salida del dominio no es independiente de la geometría simulada: a mayor severidad de la estenosis, mayor es el gradiente de presión a través del vaso, y la presión en el \textit{outlet} también depende de la resistencia hidráulica del territorio distal (el árbol microvascular) que no se simula explícitamente por completo. En consecuencia, la presión de salida no puede prescribirse directamente a partir de datos conocidos a priori.
+La elección de $p_{\mathrm{out}}^n$ requiere especial atención. La presión en la salida del dominio no es independiente de la geometría simulada, ya que a mayor severidad de la estenosis, mayor es el gradiente de presión a través del vaso, y la presión en el outlet también depende de la resistencia hidráulica en la microvasculatura distal que no se simula explícitamente por completo. En consecuencia, la presión de salida no puede prescribirse directamente a partir de datos conocidos a priori.
 
-Una elección consistente con la fisiología es suponer una relación lineal entre el flujo volumétrico $Q$ y la presión en el \textit{outlet}:
+Una elección consistente con la fisiología es suponer una relación lineal entre el flujo volumétrico $Q$ y la presión en el outlet:
 \begin{equation}
   \label{eq:resistance_bc}
   p_{\mathrm{out}} = R \cdot Q,
 \end{equation}
-\noindent donde $R$ es la resistencia vascular periférica del lecho distal. Esta condición modela el dominio no simulado aguas abajo del \textit{outlet} y es independiente de la geometría interna del dominio principal. La relación \eqref{eq:resistance_bc} es consistente con un flujo de Poiseuille completamente desarrollado \cite{mcdonalds_fisiology}, donde la caída de presión es proporcional al caudal. Esta suposición es pertinente en la microvasculatura, dado que los radios de los vasos capilares son muy pequeños, el número de Reynolds local es bajo y el flujo es efectivamente laminar y completamente desarrollado \cite{outflow_resistance}.
+\noindent donde $R$ es la resistencia vascular periférica del lecho distal. Esta condición modela el dominio no simulado aguas abajo del outlet y es independiente de la geometría interna del dominio principal. La relación \eqref{eq:resistance_bc} es consistente con un flujo de Poiseuille completamente desarrollado \cite{mcdonalds_fisiology}, donde la caída de presión es proporcional al caudal. Esta suposición es pertinente en la microvasculatura, dado que los radios de los vasos capilares son muy pequeños, el número de Reynolds local es bajo y el flujo es efectivamente laminar y completamente desarrollado \cite{outflow_resistance}.
 
 En la implementación se adopta un acoplamiento explícito: la presión de salida en el paso $n$ se calcula con el caudal del paso anterior,
 \begin{equation}
   \label{eq:resistance_explicit}
-  p_c^n = R \cdot Q^{n-1}, \qquad Q^{n-1} = \int_{\Gamma_\mathrm{out}} u^{n-1} \cdot n \; ds.
+  p_{\mathrm{out}}^n = R \cdot Q^{n-1}, \qquad Q^{n-1} = \int_{\Gamma_\mathrm{out}} u^{n-1} \cdot n \; ds.
 \end{equation}
 
 \subsubsection{Resistencia para el árbol microvascular}
 
-Para el escenario acoplado de la estenosis con el árbol microvascular explícito, la condición de frontera de resistencia prescrita en los terminales del árbol debe reflejar la resistencia periférica total ($R_{\mathrm{target}}$) descontando la resistencia propia de la parte de la red microvascular que sí es simulada de forma explícita ($R_{\mathrm{arbol}}$). Por lo tanto, el valor de resistencia a prescribir en las fronteras terminales del árbol es:
+Para el escenario acoplado de la estenosis con el árbol microvascular explícito, la condición de frontera de resistencia prescrita en los terminales del árbol debe reflejar la resistencia total del lecho microvascular ($R_{\mathrm{target}}$), descontando la resistencia propia de la parte de la red microvascular que sí es simulada de forma explícita ($R_{\mathrm{arbol}}$). Por lo tanto, el valor de resistencia a prescribir en las fronteras terminales del árbol es:
 \begin{equation}
   R_{\mathrm{out}} = R_{\mathrm{target}} - R_{\mathrm{arbol}}.
 \end{equation}
 
-El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que se conoce el radio de los vasos en cada nivel gracias a la ley de Murray (\cref{eq:ley_murray}). Para este desarrollo, el perfil de flujo de Poiseuille entre 2 placas tiene varias limitaciones, por lo que se asume el perfil de flujo de Poiseuille para conductos cilíndricos. Bajo estas condiciones, la resistencia hidráulica de un vaso de radio $r$ y longitud $L$ viene dada por:
+El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que se conoce el radio de los vasos en cada nivel gracias a la ley de Murray (\cref{eq:ley_murray}). Para este desarrollo se asume el perfil de flujo de Poiseuille para conductos cilíndricos. Bajo estas condiciones, la resistencia hidráulica de un vaso de radio $r$ y longitud $L$ viene dada por:
 \begin{equation} \label{eq:resistencia_vaso}
   R = \frac{8 \mu L}{\pi r^4}
 \end{equation}
@@ -712,16 +718,15 @@ El desarrollo se basa en la integración de dos librerías principales que permi
 
 El sistema ha sido diseñado bajo una arquitectura modular de tres capas que separa la física del problema, el método numérico y la orquestación del experimento:
 
-\paragraph{Scenario:} Define la física del problema, incluyendo la geometría del dominio, las propiedades del fluido y las condiciones iniciales y de frontera. Toda nueva configuración física se implementa heredando de esta clase abstracta, lo que garantiza una interfaz consistente y permite extender el sistema a nuevas geometrías únicamente implementando los métodos esenciales como \texttt{mesh}, \texttt{bcu} o \texttt{initial\_velocity}.
+\paragraph{Scenario:} Define la física del problema, incluyendo la geometría del dominio, las propiedades del fluido y las condiciones iniciales y de frontera. Toda nueva configuración física se implementa heredando de esta clase abstracta, lo que garantiza una interfaz consistente y permite extender el sistema a nuevas geometrías únicamente implementando los métodos esenciales.
 
-\paragraph{Solver:} Contiene el esquema numérico para la resolución de las ecuaciones de Navier--Stokes incompresibles. Este componente gestiona la definición de las formas variacionales, la integración temporal y la aplicación de condiciones de contorno. Debido a su diseño modular, distintos esquemas de solución (como \textit{estabilizado por bloques}, \textit{Schur} o \textit{LSC}) pueden intercambiarse de forma transparente sin alterar la definición del escenario físico.
+\paragraph{Solver:} Contiene el esquema numérico para la resolución de las ecuaciones de Navier--Stokes incompresibles. Este componente gestiona la definición de las formas variacionales, la integración temporal y la aplicación de condiciones de contorno. Debido a su diseño modular, distintos esquemas de solución pueden intercambiarse de forma transparente sin alterar la definición del escenario físico.
 
-\paragraph{Simulation:} Actúa como el orquestador global del experimento. Recibe instancias de \textit{Scenario} y \textit{Solver} para gestionar el bucle temporal, la persistencia de resultados y la trazabilidad de parámetros. Al desacoplar la lógica de ejecución de la física y el esquema numérico, permite realizar estudios paramétricos complejos combinando cualquier par de componentes sin necesidad de reescribir código.
+\paragraph{Simulation:} Actúa como el orquestador del experimento. Recibe instancias de \textit{Scenario} y \textit{Solver} para gestionar el bucle temporal, la persistencia de resultados y la trazabilidad de parámetros. Al desacoplar la lógica de ejecución de la física y el esquema numérico, permite realizar estudios paramétricos combinando cualquier par de componentes sin necesidad de reescribir código.
 
 Esta separación en capas permite, por ejemplo, evaluar distintos esquemas numéricos sobre una misma geometría, o probar diferentes condiciones de frontera sin modificar el solver. Para incorporar un nuevo escenario basta con implementar una subclase de \texttt{Scenario}; para añadir un nuevo esquema numérico, una subclase de \texttt{Solver}.
 
-
-Específicamente para el escenario de la enfermedad coronaria, se combinan las geometrías de la arteria y de la microvasculatura. Estas simulaciones se parametrizan mediante un sistema integrado de configuración que abarca desde la morfología vascular hasta los esquemas de estabilización numérica. Los parámetros disponibles se consolidan en la \Cref{tab:parametros_sistema}.
+Específicamente para el escenario de la enfermedad coronaria, se combinan las geometrías de la arteria y de la microvasculatura. Estas simulaciones se parametrizan mediante un sistema de configuración que abarca desde la morfología vascular hasta los esquemas de estabilización numérica. Los parámetros disponibles están consolidados en la \Cref{tab:parametros_sistema}.
 
 \begin{table}[htbp]
   \centering
@@ -785,7 +790,7 @@ Asumiendo que el flujo es laminar y, por lo tanto, la velocidad es normal a la s
 
 Entonces, al considerar un diámetro $h = 2.41\,\mathrm{mm}$, el flujo resulta en $Q = 280\,\mathrm{mm/s} \cdot 2.41\,\mathrm{mm} = 674.8\,\mathrm{mm^2/s}$.
 
-Teniendo en cuenta la presión diastólica normal previamente seleccionada ($p = 75\,\mathrm{mmHg}$), la cual se puede expresar en el sistema de unidades empleado en la simulación asumiendo que $1\,\mathrm{mmHg} \approx 133\,\mathrm{Pa}$, se obtiene una presión efectiva de $p \approx 9310\,\mathrm{Pa}$, lo que equivale a $9310\,\mathrm{g/(mm \cdot s^2)}$. Con base en la relación general $p = R \cdot Q$, la resistencia a nivel distal de la arteria se estima como:
+Teniendo en cuenta la presión diastólica normal previamente seleccionada, la cual se puede expresar en el sistema de unidades empleado en la simulación asumiendo que $1\,\mathrm{mmHg} \approx 133\,\mathrm{Pa}$, se obtiene una presión efectiva de $p \approx 9310\,\mathrm{Pa}$, lo que equivale a $9310\,\mathrm{g/(mm \cdot s^2)}$. Con base en la relación $p = R \cdot Q$, la resistencia a nivel distal de la arteria se estima como:
 \begin{equation}
   R = \frac{p}{Q} = \frac{9310\,\mathrm{g/(mm \cdot s^2)}}{674.8\,\mathrm{mm^2/s}} \approx 13.79\,\mathrm{g \cdot s/mm}.
 \end{equation}
@@ -1065,7 +1070,7 @@ Finalmente, el análisis del TAWSS en el árbol microvascular revela que existen
 
 \subsection{Impacto de la morfología de la estenosis} \label{sec:impacto_morfologia_estenosis}
 
-Para investigar cómo la forma geométrica de la lesión afecta el comportamiento del flujo, se calculó el FFR para los nueve escenarios planteados y se modeló la relación entre la severidad ($\eta$), la pendiente ($\alpha$) como variables independientes y el FFR como variable dependiente (ver \cref{app:morfologia_dataset}). Inicialmente, se observó que un modelo de regresión lineal multivariante simple no lograba capturar adecuadamente la física del problema, especialmente en regímenes de baja severidad donde el efecto de la pendiente no es tan relevante.
+Para investigar cómo la forma geométrica de la lesión afecta el comportamiento del flujo, se calculó el FFR para los nueve escenarios planteados y se modeló la relación entre la severidad ($\eta$), la pendiente ($\alpha$) como variables independientes y el FFR como variable dependiente (ver \cref{app:morfologia_dataset}). Inicialmente, se observó que un modelo de regresión lineal multivariable simple no lograba capturar adecuadamente la física del problema, especialmente en escenarios de baja severidad donde el efecto de la pendiente no es tan relevante.
 
 Con el fin de capturar esta interdependencia, se propuso un enfoque basado en Modelos de Ecuaciones Estructurales (SEM) introduciendo una variable latente de reducción de área relativa del canal ($\Delta A_{\text{rel}}$). Esta variable integra de forma no lineal tanto la severidad como la pendiente, basándose en la diferencia entre el perfil de radio luminal de la arteria sana ($R_{\mathrm{taper}}(x)$), que sigue una transición lineal desde el radio de entrada $R_{\mathrm{in}}$ hasta el radio de salida ($R_{\mathrm{out}}$), y el perfil luminal con estenosis $R_{\mathrm{sten}}(x)$, que es una curva de Bézier cúbica que se ajusta a la geometría de la lesión en torno al centro axial de la lesión ($x_m$):
 
@@ -1124,7 +1129,7 @@ Para obtener la reducción de área relativa, se normaliza por el área total de
   \Delta A_{\text{rel}} = \frac{\Delta A_{\text{abs}}}{A_{\text{canal}}} = \frac{2 R_{\mathrm{taper}}(x_m)^2}{L(R_{\mathrm{in}} + R_{\mathrm{out}})} \frac{\eta^2}{\alpha}
 \end{equation}
 
-Utilizando los valores nominales de la arteria LAD ensayada ($L=138, R_{\mathrm{in}}=1.57, R_{\mathrm{out}}=1.2, x_m=30$), la constante geométrica de normalización resulta en aproximadamente $0.01161$, permitiendo evaluar el impacto relativo para cualquier combinación de severidad y pendiente.
+Utilizando los valores de la arteria LAD ensayada ($L=138, R_{\mathrm{in}}=1.57, R_{\mathrm{out}}=1.2, x_m=30$), la constante resulta en aproximadamente $0.01161$, permitiendo evaluar el impacto relativo para cualquier combinación de severidad y pendiente.
 
 Se evaluaron diversos modelos estructurales para determinar la combinación de variables que mejor predice el FFR (ver \Cref{tab:modelo_sem_resultados}). El análisis demuestra que el modelo que incorpora la reducción de área relativa junto con la severidad axial ($\Delta A_{\text{rel}} + \eta$) es el que mejor predice el FFR, obteniendo un coeficiente de determinación de $R^2 = 0.8506$.
 
@@ -1181,7 +1186,7 @@ Con esto, la reducción de área relativa $\Delta A_{\text{rel}}$ es:
   \Delta A_{\text{rel}} = \frac{2 \eta^2 \bar{R}^2 / \alpha}{2 L \bar{R}} = \frac{R_{\mathrm{in}} + R_{\mathrm{out}}}{2 L} \frac{\eta^2}{\alpha}
 \end{equation}
 
-Sustituyendo los valores de la arteria LAD ($L=138, R_{\mathrm{in}}=1.57, R_{\mathrm{out}}=1.2$), queda un factor de $\approx 0.010036$. Al integrar esta relación en el modelo SEM seleccionado \eqref{eq:modelo_sem_final}, se puede despejar para el parámetro de pendiente $\alpha$ en función de la severidad $\eta$ y el FFR objetivo:
+Sustituyendo los valores de la arteria LAD ($L=138, R_{\mathrm{in}}=1.57, R_{\mathrm{out}}=1.2$), queda un factor de $\approx 0.010036$. Al integrar esta relación en el modelo seleccionado \eqref{eq:modelo_sem_final}, se puede despejar para el parámetro de pendiente $\alpha$ en función de la severidad $\eta$ y el FFR objetivo:
 \begin{equation}
   \alpha(\eta, \text{FFR}) = \frac{0.8885 \cdot 0.010036 \cdot \eta^2}{1.0238 - 0.2004\,\eta - \text{FFR}} \approx \frac{0.008917\,\eta^2}{1.0238 - 0.2004\,\eta - \text{FFR}}
 \end{equation}
@@ -1231,7 +1236,9 @@ A la Universidad del Rosario por proporcionar acceso a la infraestructura HPC a 
 \bibliographystyle{ieeetr} 
 \bibliography{bibliography}
 
-\appendix
+\newpage
+\begin{appendices}
+\section*{Anexos}
 \section{Resultados de las simulaciones computacionales}
 \label{app:resultados_simulaciones}
 
@@ -1287,5 +1294,7 @@ En esta sección se presentan los resultados de las simulaciones para el estudio
     0.84 & 0.0173 & 14.70 & 0.2803 \\ \bottomrule
   \end{tabular}
 \end{table}
+
+\end{appendices}
 
 \end{document}
