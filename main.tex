@@ -2,7 +2,7 @@
 
 % --- Paquetes Básicos ---
 \usepackage[utf8]{inputenc}
-\usepackage[spanish, es-tabla, english]{babel} % Soporte para ambos idiomas [cite: 6]
+\usepackage[spanish, es-tabla, es-nodecimaldot, english]{babel} % Soporte para ambos idiomas
 \usepackage{times} % Fuente Times New Roman
 \usepackage[margin=2.5cm]{geometry} % Márgenes de 2.5cm
 \usepackage{setspace} \setstretch{1.5} % Interlineado 1.5
@@ -176,7 +176,7 @@ Para resolver este problema usando CFD, se debe transformar a su forma variacion
 
 En términos prácticos, esto se consigue al multiplicar las ecuaciones por funciones de prueba pertenecientes a espacios funcionales adecuados e integrando sobre el dominio $\Omega$. Para el campo de velocidades, se emplean funciones del espacio de Sobolev $V = [H^1(\Omega)]^d$, que garantiza la integrabilidad de las derivadas primeras, mientras que para la presión se utiliza el espacio $Q = L^2(\Omega)$, correspondiente a funciones de cuadrado integrable \cite{teoria-ns}. Al aplicar integración por partes sobre el término del tensor de esfuerzos, se obtiene un sistema de ecuaciones donde las derivadas son de un orden menor que en la formulación fuerte. A continuación se ejemplifica el proceso.
 
-Primero, se multiplica la \cref{momentum} por una función de prueba $v$,
+Primero, se multiplica la \cref{momentum} por una función de prueba $v$, y se integra sobre el dominio $\Omega$,
 
 \begin{center}
   \begin{equation*}
@@ -210,7 +210,10 @@ Se reorganiza la \cref{momentum_weak} y la \cref{continuity_weak} para definir l
 \begin{center}
   \begin{align}
     \label{bilinear_mom}
-    a(u, p, v) &= \int_{\Omega}\rho\frac{\partial u}{\partial t}\cdot v \; dx + \int_{\Omega} \rho u \cdot \nabla u \cdot v \; dx + \int_{\Omega}\sigma(u,p) \cdot \nabla v \; dx - \int_{\partial \Omega}(\sigma(u,p) \cdot n) \cdot v \; ds - \int_{\Omega}f \cdot v \; dx,\\
+    \begin{split}
+      a(u, p, v) &= \int_{\Omega}\rho\frac{\partial u}{\partial t}\cdot v \; dx + \int_{\Omega} \rho u \cdot \nabla u \cdot v \; dx + \int_{\Omega}\sigma(u,p) \cdot \nabla v \; dx \\
+      &- \int_{\partial \Omega}(\sigma(u,p) \cdot n) \cdot v \; ds - \int_{\Omega}f \cdot v \; dx,
+    \end{split}\\
     \label{bilinear_con}
     b(u, q) &= \int_{\Omega}\nabla \cdot u \cdot q \; dx.
   \end{align}
@@ -219,7 +222,7 @@ Se reorganiza la \cref{momentum_weak} y la \cref{continuity_weak} para definir l
 
 Finalmente, para que el problema sea computable, el dominio se discretiza en una malla de elementos finitos. Esta etapa permite aproximar los espacios funcionales de dimensión infinita mediante espacios de dimensión finita compuestos por polinomios por partes.
 
-Entonces, la formulación débil del problema es: encontrar $u \in V$ y $p \in Q$ tales que $a(u,p,v)=0$ y $b(u,q) = 0$ para todo $v \in V$ y $q \in Q$. Donde $V = [H^1(\Omega)]^d$ y $Q = L^2(\Omega)$.
+La formulación débil del problema es: encontrar $u \in V$ y $p \in Q$ tales que $a(u,p,v)=0$ y $b(u,q) = 0$ para todo $v \in V$ y $q \in Q$. Donde $V = [H^1(\Omega)]^d$ y $Q = L^2(\Omega)$.
 
 \subsection{Esquema numérico}
 
@@ -227,7 +230,7 @@ La resolución de las ecuaciones de Navier-Stokes en geometrías complejas, como
 
 El primero es el término convectivo $\mathbf{u} \cdot \nabla \mathbf{u}$, que introduce una no linealidad inherente a las ecuaciones de Navier-Stokes, lo que impide la resolución directa del problema en un solo paso algebraico. En consecuencia, la solución numérica requiere un esquema que trate adecuadamente esta no linealidad.
 
-Por otra parte, la integración temporal impone restricciones adicionales de estabilidad y costo computacional. En una etapa inicial se exploraron estrategias explícitas y semi-implícitas para aproximar el término convectivo con valores de pasos de tiempo anteriores y así evitar resolver un sistema no lineal en cada paso. Sin embargo, estos métodos quedan fuertemente restringidos por la condición de Courant–Friedrichs–Lewy (CFL), lo que obliga a utilizar pasos de tiempo muy pequeños para mantener la estabilidad y evitar la divergencia numérica \cite{hirsch_numerical_2007}.
+Por otra parte, la integración temporal impone restricciones adicionales de estabilidad y costo computacional. En una etapa inicial se exploraron estrategias explícitas como el método de Euler y aproximaciones semi-implícitas con los métodos de Adams-Bashforth, que aproximan el término convectivo evaluando $\mathbf{u}$ en pasos de tiempo anteriores ya conocidos ($\mathbf{u}^n, \mathbf{u}^{n-1}, \dots$) en lugar de la incógnita $\mathbf{u}^{n+1}$. Esto linealiza el término, evitando resolver un sistema no lineal en cada paso. Sin embargo, al tratar el término convectivo de forma no implícita, estos métodos quedan restringidos por la condición de Courant–Friedrichs–Lewy (CFL), que obliga a utilizar pasos de tiempo muy pequeños para mantener la estabilidad y evitar la divergencia numérica \cite{hirsch_numerical_2007}.
 
 Dada la rigidez del problema hemodinámico y la necesidad de utilizar pasos de tiempo mayores, en este trabajo se adopta finalmente el método del punto medio implícito \cite{burden2016}. En particular, la derivada temporal se aproxima como
 
@@ -267,10 +270,18 @@ Este término introduce difusión numérica en la dirección de las líneas de c
 \begin{equation}
   \label{eq:tau_supg}
   \tau_{\mathrm{SUPG}}
-  = \left[ \left( \frac{2\|u\|}{h} \right)^2 + \left( \frac{2}{\Delta t} \right)^2 + \left( \frac{4\nu}{h^2} \right)^2 \right]^{-1/2}.
+  = \left[ \left( \frac{2\|u\|_2}{h} \right)^2 + \left( \frac{2}{\Delta t} \right)^2 + \left( \frac{4\nu}{h^2} \right)^2 \right]^{-1/2}.
 \end{equation}
 
-Antes de introducir el término de estabilización para la presión, es importante notar que la discretización mixta de Navier--Stokes exige que los espacios discretos de velocidad y presión satisfagan la condición de Ladyzhenskaya--Babuška--Brezzi (LBB), también conocida como condición \textit{inf-sup} \cite{leborgne_inf-sup_2023}. En este trabajo se utiliza interpolación de igual orden ($P_1/P_1$) para reducir el costo computacional; sin embargo, este par viola la condición LBB, lo que se manifiesta como oscilaciones espurias (\textit{ruido}) en el campo de presión y, en general, como sistemas lineales mal condicionados.
+\noindent donde $h$ es el tamaño local de la celda.
+
+Antes de introducir el término de estabilización para la presión, es importante notar que la discretización mixta de Navier-Stokes mediante elementos finitos requiere que los espacios de aproximación de velocidad $V_h$ y presión $Q_h$ satisfagan la condición de Ladyzhenskaya-Babuška-Brezzi (LBB) o condición \textit{inf-sup} \cite{leborgne_inf-sup_2023}. Esta condición exige que exista una constante $\beta > 0$, independiente del tamaño de malla $h$, tal que
+\[
+\inf_{q_h \in Q_h \setminus \{0\}} \sup_{v_h \in V_h \setminus \{0\}} \frac{\int_\Omega q_h \,\nabla \cdot v_h \, dx}{\|v_h\|_{H^1} \|q_h\|_{L^2}} \ge \beta,
+\]
+lo que asegura la estabilidad del problema discreto y la existencia y unicidad de la solución.
+
+En este trabajo se utiliza interpolación de igual orden $P_1/P_1$, es decir, funciones continuas lineales a trozos (polinomios de grado 1 en cada elemento) tanto para la velocidad como para la presión. Este par reduce el costo computacional pero no satisface la condición LBB, lo que se manifiesta como oscilaciones no físicas en el campo de presión y sistemas lineales mal condicionados. El término de estabilización PSPG que se introduce a continuación está diseñado para corregir esta deficiencia, suprimiendo las oscilaciones al añadir difusión numérica controlada por el residuo $R(u,p)$ de la ecuación de momento (\ref{eq:strong_residual}).
 
 \paragraph{(ii) PSPG (Pressure-Stabilizing Petrov--Galerkin).}
 Este término estabiliza el campo de presión y permite el uso de pares de igual orden evitando el “ruido” espurio asociado a la violación de la condición LBB \cite{pspg}.
@@ -282,6 +293,8 @@ Este término estabiliza el campo de presión y permite el uso de pares de igual
   \qquad \tau_{\mathrm{PSPG}} := \tau_{\mathrm{SUPG}}.
 \end{equation}
 
+\noindent donde se emplea el mismo $\tau$ para ambos términos, como es habitual en las formulaciones estabilizadas residuales SUPG/PSPG \cite{pspg,supg}.
+
 \paragraph{(iii) LSIC (Least-Squares Incompressibility Constraint).}
 Este término penaliza desviaciones de la condición de incompresibilidad en el problema discreto, mejorando la robustez del esquema en mallas complejas \cite{lsic}.
 
@@ -289,10 +302,10 @@ Este término penaliza desviaciones de la condición de incompresibilidad en el 
   \label{eq:lsic_term}
   f_{\mathrm{LSIC}}(u,v)
   = \nu_{\mathrm{LSIC}}\, (\nabla \cdot v)\, \rho\,(\nabla \cdot u),
-  \qquad \nu_{\mathrm{LSIC}} := \frac{h}{2}\,\|u\|\,z.
+  \qquad \nu_{\mathrm{LSIC}} := \frac{h}{2}\,\|u\|_2\,z.
 \end{equation}
 
-\noindent En las expresiones anteriores, $h$ es una longitud característica de la celda, $\Delta t$ el paso de tiempo y $\nu = \mu/\rho$ la viscosidad cinemática. El factor $z$ depende del número de Reynolds local $Re$ y se define como:
+\noindent $\Delta t$ es el paso de tiempo y $\nu = \mu/\rho$ la viscosidad cinemática. El factor $z$ depende del número de Reynolds local $Re$ y se define como:
 
 \begin{center}
   \begin{equation}
@@ -331,30 +344,27 @@ El sistema no lineal que resulta de la discretización de la formulación débil
   \end{equation}
 \end{center}
 
-\noindent donde $J(x) = F'(x)$ es el Jacobiano del residuo, $x_k = [u_k \;\; p_k]^T$ es el vector que contiene los coeficientes de expansión de la solución en la iteración $k$, y $x_0$ es la aproximación inicial.
+\noindent donde $J(x)$ es la matriz Jacobiana del residuo, definida por $J_{ij}(x) := \partial F_i / \partial x_j$, y $x_k = [u_k \;\; p_k]^T$ es el vector que contiene los coeficientes de expansión de la solución en la iteración $k$, y $x_0$ es la aproximación inicial.
 
-El sistema lineal para la actualización de Newton-Raphson $J(x_k)\,\Delta x_k = -F(x_k)$ presenta la estructura de punto de silla típica de Stokes/Navier-Stokes \cite{iterative_solvers}. En particular, la restricción de incompresibilidad hace que el bloque asociado a la presión sea nulo o muy pequeño (en el caso estabilizado), lo que hace a la matriz global indefinida y con autovalores tanto positivos como negativos \cite{precond}. Esta propiedad descarta el uso de solucionadores para matrices definidas positivas como el método del Gradiente Conjugado \cite{iterative_solvers} y puede deteriorar la convergencia de métodos de Krylov si no se emplea un precondicionamiento adecuado \cite{donea_finite_2003}; por ello, se recurre a estrategias basadas en el complemento de Schur para desacoplar los campos de velocidad y presión dentro del solver iterativo \cite{iterative_solvers, precond}.
+El sistema lineal para la actualización de Newton-Raphson $J(x_k)\,\Delta x_k = -F(x_k)$ presenta una estructura de punto de silla típica de problemas de Stokes y Navier-Stokes \cite{iterative_solvers}. Esta estructura surge porque la presión actúa como un multiplicador de Lagrange que impone la restricción de incompresibilidad $\nabla \cdot u = 0$, dando lugar a una matriz de bloques $2\times 2$ de la forma
+\[
+\begin{bmatrix}
+A & B^T \\
+B & -C
+\end{bmatrix}
+\begin{bmatrix}
+\Delta u \\ \Delta p
+\end{bmatrix}
+=
+\begin{bmatrix}
+R_u \\ R_p
+\end{bmatrix},
+\label{eq:saddle_point}\]
+donde $A$ discretiza el operador de momento, $B$ y $B^T$ corresponden a la divergencia y al gradiente de presión, y $C$ es nulo o muy pequeño en el caso estabilizado. La presencia del bloque $C$ pequeño o nulo hace que la matriz sea indefinida, con autovalores tanto positivos como negativos \cite{precond}.
 
-En forma de bloques, el sistema linealizado puede escribirse como
+Esto descarta el uso de solucionadores para matrices definidas positivas como el método del Gradiente Conjugado \cite{iterative_solvers} y puede deteriorar la convergencia de métodos de Krylov si no se emplea un precondicionamiento adecuado \cite{donea_finite_2003}. Para abordarlo, se recurre a estrategias basadas en el complemento de Schur que desacoplan los campos de velocidad y presión dentro del solver iterativo \cite{iterative_solvers, precond}.
 
-\begin{equation}
-  \label{eq:saddle_point}
-  \begin{bmatrix}
-    A & B^T \\
-    B & -C
-  \end{bmatrix}
-  \begin{bmatrix}
-    \Delta u \\
-    \Delta p
-  \end{bmatrix}
-  =
-  \begin{bmatrix}
-    R_u \\
-    R_p
-  \end{bmatrix},
-\end{equation}
-
-\noindent donde los sub-bloques de la matriz del sistema corresponden a las derivadas parciales de los residuos \eqref{eq:nonlinear_system} respecto a las variables evaluadas en la iteración $k$:
+Los bloques de esta matriz corresponden a las derivadas parciales de los residuos \eqref{eq:nonlinear_system} respecto a las variables evaluadas en la iteración $k$:
 
 \begin{itemize}
     \item $A_{ij} = \dfrac{\partial A_i}{\partial u_j}$ corresponde a la conservación de momento.
@@ -416,7 +426,7 @@ Se consideran las ecuaciones de Navier--Stokes incompresibles en $\Omega$ con co
 \noindent y una condición inicial en reposo,
 \begin{equation}
   \label{eq:ldc_ic}
-  (u,v)(x,y,0) = (0,0) \qquad \forall (x,y)\in\Omega.
+  (u,v)(x,y,0) = (0,0) \qquad \forall (x,y)\in\Omega\setminus\Gamma_{\mathrm{lid}}.
 \end{equation}
 
 El número de Reynolds del problema se define (en variables adimensionales) como
@@ -462,7 +472,7 @@ En las paredes superior e inferior del canal y sobre la frontera del disco se pr
 \end{equation}
 \noindent donde $\Gamma_{\mathrm{walls}} = ([0,2.2]\times\{0\})\cup([0,2.2]\times\{0.41\})$ y $\Gamma_{\mathrm{disk}}=\partial B_r(c)$.
 
-En la entrada $\Gamma_{\mathrm{in}}=\{0\}\times[0,0.41]$ se prescribe un perfil parabólico constante,
+En la entrada $\Gamma_{\mathrm{in}}=\{0\}\times[0,0.41]$ se prescribe un perfil parabólico constante en el tiempo,
 \begin{equation}
   \label{eq:dfg1_inflow}
   u(0,y)=\left(\frac{4\,U\,y\,(0.41-y)}{0.41^2},\;0\right),
@@ -471,10 +481,10 @@ En la entrada $\Gamma_{\mathrm{in}}=\{0\}\times[0,0.41]$ se prescribe un perfil 
 \noindent mientras que en la salida $\Gamma_{\mathrm{out}}=\{2.2\}\times[0,0.41]$ se emplea una condición de tipo Neumann (\textit{do-nothing}),
 \begin{equation}
   \label{eq:dfg1_outflow}
-  \nu\,\partial_{\eta}u - p\,\eta = 0.
+  \nu\,\partial_{\vec{n}}u - p\,\vec{n} = 0.
 \end{equation}
 
-El número de Reynolds se define usando la velocidad media asociada al perfil de entrada. Dado $U=0.3$, se tiene $U_{\mathrm{mean}}=\tfrac{2}{3}\,0.3=0.2$, y tomando como longitud característica el diámetro del cilindro $L=2r=0.1$ se obtiene
+El número de Reynolds se define usando la velocidad media asociada al perfil de entrada. Dado $U=0.3$, se tiene $U_{\mathrm{mean}}=0.2$, y tomando como longitud característica el diámetro del cilindro $L=2r=0.1$ se obtiene
 \begin{equation}
   \label{eq:dfg1_re}
   Re = \frac{U_{\mathrm{mean}}\,L}{\nu} = \frac{0.2\cdot 0.1}{0.001}=20.
@@ -483,14 +493,14 @@ El número de Reynolds se define usando la velocidad media asociada al perfil de
 Para la comparación de resultados se miden las fuerzas de arrastre y sustentación sobre el cilindro. Definiendo el tensor de esfuerzos como
 \begin{equation}
   \label{eq:dfg1_stress}
-  \sigma := \nu\,\nabla u - pI,
+  \sigma := \nu\left(\nabla u + (\nabla u)^T\right) - pI,
 \end{equation}
 \noindent las fuerzas se obtienen mediante
 \begin{equation}
   \label{eq:dfg1_forces}
   \begin{pmatrix}F_D\\F_L
   \end{pmatrix}
-  =\int_{\Gamma_{\mathrm{disk}}}\sigma\,\eta\,ds,
+  =\int_{\Gamma_{\mathrm{disk}}}\sigma\,\vec{n}\,ds,
 \end{equation}
 \noindent donde $\eta$ es el vector normal exterior al círculo (apuntando hacia el fluido). Los coeficientes adimensionales correspondientes se definen como
 \begin{equation}
@@ -522,7 +532,7 @@ Sobre este perfil base sano, se parametriza el grado de estenosis con una severi
   \qquad
   R_{\min}(\eta)= (1-\eta)\,R_{\mathrm{taper}}(x_m),
 \end{equation}
-\noindent donde $x_m \in (0,L)$ es la posición axial (centro) de la estenosis y $R_{\min}$ indica el radio interior efectivo en ese punto. De este modo, $\eta=0$ representa un modelo sin alteración de luz y $\eta\to 1$ refleja una constricción de severidad extrema.
+\noindent donde $x_m \in (0,L)$ es la posición axial (centro) de la estenosis y $R_{\min}$ indica el radio interior efectivo en ese punto. De este modo, $\eta=0$ representa un modelo completamente sano y $\eta\to 1$ refleja una constricción de severidad extrema.
 
 El contorno del dominio de flujo está determinado por la pared superior en $y_{\mathrm{top}}(x) = R_{\mathrm{in}} + r(x)$ y la inferior en $y_{\mathrm{bot}}(x) = R_{\mathrm{in}} - r(x)$. El perfil del radio local $r(x)$ se define por tramos continuos. Fuera de la región de estenosis, el canal mantiene su estrechamiento fisiológico natural:
 \begin{equation}
@@ -565,7 +575,7 @@ Para la coordenada axial $x(t)$, se emplea otra curva de Bézier que permite con
 
 Este esquema paramétrico se aplica de forma simétrica para la mitad distal del vaso ($x \in [x_m, x_m+d]$), completando la geometría de la estenosis.
 
-La discretización espacial se realiza con una malla de elementos triangulares. El tamaño local de elemento se adapta según la curvatura de la geometría, refinando alrededor de la estenosis y usando elementos más grandes en las zonas anchas.
+La discretización espacial se realiza con elementos triangulares. Fue generada con GMSH con el algoritmo MeshAdapt \cite{gmsh} sobre la geometría descrita por las curvas paramétricas definidas anteriormente.
 \vspace{10pt}
 
 \begin{figure}[htbp]
@@ -589,6 +599,8 @@ La longitud $L$ de los segmentos en red es directamente proporcional a su radio 
     L = \alpha r.
 \end{equation}
 
+En cuanto a la orientación de las ramas, cada bifurcación desvía las ramas hijas respecto a la dirección de la rama padre en $35^\circ$.
+
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.35\textwidth, angle=-90]{figures/geom_arbol.png}
@@ -605,36 +617,36 @@ Siguiendo la formulación de \cite{pressurebc}, el término de frontera del tens
 
 \begin{equation}
   \label{eq:inlet_pressure_bc}
-  \int_{\Gamma_\mathrm{in}} p_\mathrm{in} \, (v \cdot n) \, ds.
+  \int_{\Gamma_\mathrm{in}} p_\mathrm{in} \, (v \cdot \vec{n}) \, ds.
 \end{equation}
 
-Adicionalmente, para mejorar la estabilidad numérica, se decidió prescribir que la componente tangencial de la velocidad en el inlet sea nula, es decir, $u_T := u - (u \cdot n)\,n = 0$ sobre $\Gamma_\mathrm{in}$. Puesto que la frontera de entrada es tratada de forma débil, esta condición no puede imponerse como una restricción de Dirichlet. Por ello, se emplea el método de Nitsche \cite{nitsche_original}, que permite imponer de forma consistente y estable condiciones de contorno de tipo Dirichlet de forma débil.
+Adicionalmente, para mejorar la estabilidad numérica, se decidió prescribir que la componente tangencial de la velocidad en el inlet sea nula, es decir, $u_T := u - (u \cdot \vec{n})\,\vec{n} = 0$ sobre $\Gamma_\mathrm{in}$. Puesto que la frontera de entrada es tratada de forma débil, esta condición no puede imponerse como una restricción de Dirichlet. Por ello, se emplea el método de Nitsche \cite{nitsche_original}, que permite imponer de forma consistente y estable condiciones de contorno de tipo Dirichlet de forma débil.
 
 El método de Nitsche para la condición $u_T = 0$ introduce en el residuo los tres términos siguientes \cite{nitsche_ns}:
 
 \begin{equation}
   \label{eq:nitsche_inlet}
-  -\int_{\Gamma_\mathrm{in}} \bigl(2\mu\,\varepsilon(u)\cdot n\bigr) \cdot v_T \, ds
-  -\int_{\Gamma_\mathrm{in}} \bigl(2\mu\,\varepsilon(v)\cdot n\bigr) \cdot u_T \, ds
+  -\int_{\Gamma_\mathrm{in}} \bigl(2\mu\,\varepsilon(u)\cdot \vec{n}\bigr) \cdot v_T \, ds
+  -\int_{\Gamma_\mathrm{in}} \bigl(2\mu\,\varepsilon(v)\cdot \vec{n}\bigr) \cdot u_T \, ds
   +\frac{\beta_N \mu}{h} \int_{\Gamma_\mathrm{in}} u_T \cdot v_T \, ds,
 \end{equation}
 
-\noindent donde $v_T = v - (v \cdot n)\,n$ es la componente tangencial de la función de prueba, $h$ es la longitud característica local del elemento, y $\beta_N > 0$ es el parámetro de penalización de Nitsche. El primer término es la consistencia adjunta de la condición, el segundo garantiza la simetría de la formulación, y el tercero es el término de penalización que asegura la coercividad del problema y el cumplimiento de la condición $u_T = 0$. La formulación resultante es consistente (la solución exacta satisface la forma débil), simétrica e incondicionalmente estable para valores suficientemente grandes de $\beta_N$.
+\noindent donde $v_T = v - (v \cdot \vec{n})\,\vec{n}$ es la componente tangencial de la función de prueba, $h$ es la longitud característica local del elemento, y $\beta_N > 0$ es el parámetro de penalización de Nitsche. El primer término es la consistencia adjunta de la condición, el segundo garantiza la simetría de la formulación, y el tercero es el término de penalización que asegura la coercividad del problema y el cumplimiento de la condición $u_T = 0$. La formulación resultante es consistente (la solución exacta satisface la forma débil), simétrica e incondicionalmente estable para valores suficientemente grandes de $\beta_N$.
 
 En el outlet $\Gamma_\mathrm{out}$, la condición de salida se impone de forma débil prescribiendo una presión $p_{\mathrm{out}}^n$ sobre la frontera. Esto se logra de la misma forma que con la presión en la frontera de entrada, añadiendo el término que reemplaza al término de tracción natural del tensor de esfuerzos sobre $\Gamma_\mathrm{out}$:
 \begin{equation}
   \label{eq:outlet_pressure_weak}
-  \int_{\Gamma_\mathrm{out}} p_{\mathrm{out}}^n \, (v \cdot n) \; ds.
+  \int_{\Gamma_\mathrm{out}} p_{\mathrm{out}}^n \, (v \cdot \vec{n}) \; ds.
 \end{equation}
 
 No obstante, la condición de presión impuesta débilmente en el outlet puede inducir inestabilidades numéricas cuando el flujo local se invierte, por ejemplo, al paso de vórtices o en régimen pulsátil. En esos instantes, el flujo que retrocede introduce energía cinética al sistema, lo que puede llevar a la divergencia del método \cite{bc_backflow_hemo,modified_bc_hemo}. Para suprimir este fenómeno, se añade el término de penalización de backflow propuesto en \cite{bc_backflow_hemo}:
 \begin{equation}
   \label{eq:backflow_term}
-  -\int_{\Gamma_\mathrm{out}} \beta_b \, \rho \, (u^{n-1} \cdot n)_- \; (u \cdot v) \; ds,
+  -\int_{\Gamma_\mathrm{out}} \beta_b \, \rho \, (u^{n-1} \cdot \vec{n})_- \; (u \cdot v) \; ds,
 \end{equation}
 \noindent donde $\beta_b > 0$ es el parámetro de penalización y
 \begin{equation*}
-  (u^{n-1} \cdot n)_- \;=\; \tfrac{1}{2}\bigl(u^{n-1}\cdot n \;-\; |u^{n-1}\cdot n|\bigr)
+  (u^{n-1} \cdot \vec{n})_- \;=\; \tfrac{1}{2}\bigl(u^{n-1}\cdot \vec{n} \;-\; |u^{n-1}\cdot \vec{n}|\bigr)
 \end{equation*}
 es la parte negativa de la velocidad normal evaluada en el paso anterior, de modo que el término solo penaliza donde el flujo retrocede.
 
@@ -650,7 +662,7 @@ Una elección consistente con la fisiología es suponer una relación lineal ent
 En la implementación se adopta un acoplamiento explícito: la presión de salida en el paso $n$ se calcula con el caudal del paso anterior,
 \begin{equation}
   \label{eq:resistance_explicit}
-  p_{\mathrm{out}}^n = R \cdot Q^{n-1}, \qquad Q^{n-1} = \int_{\Gamma_\mathrm{out}} u^{n-1} \cdot n \; ds.
+  p_{\mathrm{out}}^n = R \cdot Q^{n-1}, \qquad Q^{n-1} = \int_{\Gamma_\mathrm{out}} u^{n-1} \cdot \vec{n} \; ds.
 \end{equation}
 
 \subsubsection{Resistencia para el árbol microvascular}
@@ -799,7 +811,7 @@ Teniendo en cuenta la presión diastólica normal previamente seleccionada, la c
 
 Se realizó un estudio de convergencia de malla con el fin de determinar una resolución suficientemente refinada para las simulaciones posteriores. 
 
-Se adoptó una estrategia de refinamiento hp, donde se reduce el tamaño de los elementos de la malla, al tiempo que se aumenta el orden de los polinomios de aproximación, hasta lograr convergencia de la solución \cite{ref_hp}. La convergencia se evaluó sobre el cambio en la norma $L^2$ tanto de la velocidad como de la presión entre dos simulaciones consecutivas.  
+Se adoptó una estrategia de refinamiento hp, donde se reduce el tamaño de los elementos de la malla, al tiempo que se aumenta el orden de los polinomios de aproximación, hasta lograr convergencia de la solución \cite{ref_hp}. La convergencia se evaluó una vez alcanzado el estado estacionario, mediante el cambio en la norma $L^2$ en el ultimo paso de tiempo, tanto de la velocidad como de la presión entre dos simulaciones consecutivas.  
 
 Se analizó la geometría completa, estenosis y árbol microvascular con tres niveles; se consideraron tres escenarios: obstrucción leve (25\%), moderada (50\%) y severa (75\%). Se inició con polinomios de grado uno y elementos de tamaño $0.3$ mm y se obtuvo convergencia (cambio $< 1\%$) con polinomios de grado dos y elementos de tamaño $0.15$ mm. 
 
@@ -811,9 +823,9 @@ Con este propósito, se plantearon $9$ escenarios de simulación correspondiente
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.9\textwidth]{figures/stenosis_severity75_slope005.png} \\
+  \includegraphics[width=1\textwidth]{figures/stenosis_severity75_slope005.pdf} \\
   \vspace{1cm}
-  \includegraphics[width=0.9\textwidth]{figures/stenosis_severity75_slope03.png}
+  \includegraphics[width=1\textwidth]{figures/stenosis_severity75_slope03.pdf}
   \caption{Comparación de formas de estenosis: gradual con severidad del 75\% y pendiente de 0.05 (arriba) y abrupta con severidad del 75\% y pendiente de 0.3 (abajo).}
   \label{fig:comparacion_forma_estenosis}
 \end{figure}
@@ -861,7 +873,7 @@ De esta manera, el rango de resistencias a explorar para determinar el impacto d
 
 \subsubsection{Flujo en cavidad inducida por tapa (Lid-Driven Cavity)}
 
-Como paso previo a la comparación con los datos de referencia, se realizó un estudio de convergencia de malla con el fin de determinar una resolución suficientemente refinada. Se simuló hasta llegar al estado estacionario con mallas uniformes de $N \times N$ elementos, con $N \in \{20, 30, \dots, 90, 100\}$, y se registró la norma $L^2$ de la velocidad y de la presión en cada caso. Los resultados se muestran en la \Cref{fig:ldc_convergencia_re1000}.
+Como paso previo a la comparación con los datos de referencia, se realizó un estudio de convergencia de malla con el fin de determinar una resolución suficientemente refinada. Se simuló hasta llegar al estado estacionario con mallas uniformes de $N \times N$ elementos, con $N \in \{20, 30, \dots, 90, 100\}$, y se registró la norma $L^2$ de la velocidad y de la presión en el último paso de tiempo en cada caso. Los resultados se muestran en la \Cref{fig:ldc_convergencia_re1000}.
 
 \begin{figure}[htbp]
   \centering
@@ -874,7 +886,7 @@ Como paso previo a la comparación con los datos de referencia, se realizó un e
 
 Ambas normas decrecen monótonamente al refinar la malla y se estabilizan a partir de $N=90$. En particular, la variación relativa entre las dos últimas mallas consecutivas ($N=90$ y $N=100$) fue inferior al $1\%$ en ambas variables: $0{,}11\%$ para la velocidad y $0{,}5\%$ para la presión. Este criterio confirma la convergencia de la solución y justifica el uso de $N=100$ como malla de referencia para las comparaciones posteriores.
 
-La \Cref{fig:ldc_lineplot_re1000} muestra la comparación de la componente $x$ de la velocidad a lo largo de la recta $\{(x,y) : x=0.5; 0 \le y \le 1\}$ frente a los datos de referencia reportados por Ghia et al. \cite{ghia_high-re_1982} para $Re=1000$, utilizando la malla de $N=100$.
+La \Cref{fig:ldc_lineplot_re1000} muestra la comparación de la componente $x$ de la velocidad en el último paso de tiempo a lo largo de la recta $\{(x,y) : x=0.5; 0 \le y \le 1\}$ frente a los datos de referencia reportados por Ghia et al. \cite{ghia_high-re_1982} para $Re=1000$, utilizando la malla de $N=100$.
 
 \begin{figure}[htbp]
   \centering
@@ -895,6 +907,8 @@ Adicionalmente, en la \Cref{fig:ldc_streamlines_re1000} se contrastan cualitativ
   \caption{Líneas de corriente para el benchmark del \cref{sec:ldc}: simulación con $N=100$ (izquierda) y referencia de \cite{ghia_high-re_1982} (derecha).}
   \label{fig:ldc_streamlines_re1000}
 \end{figure}
+
+\noindent Las líneas de corriente representan la trayectoria que seguiría una partícula en el campo de velocidad. Se obtuvieron visualmente en ParaView mediante el filtro \textit{Surface LIC} (Line Integral Convolution).
 
 \subsubsection{Flujo alrededor de un cilindro (Benchmark DFG 2D-1)} \label{sec:dfg_results}
 
@@ -932,7 +946,7 @@ En esta sección se presenta un análisis descriptivo de las variables hemodiná
 
 El comportamiento del flujo en la arteria estenosada varía drásticamente según el nivel de severidad ($\eta$) y, en menor medida, según la pendiente de la lesión ($\alpha$).
 
-Para casos de severidad baja ($\eta = 0.25$), se observa un régimen predominantemente laminar que alcanza el estado estacionario rápidamente. En estos escenarios, la pendiente de la estenosis juega un rol diferenciador, ya que las pendientes bajas ($\alpha = 0.05$) permiten una transición suave del fluido, mientras que un aumento en la pendiente ($\alpha = 0.3$) genera zonas de recirculación inmediatamente después de la estenosis. Este fenómeno se ilustra en la \Cref{fig:flujo_bajo}, donde el perfil de velocidades se estabiliza rápidamente tras superar la obstrucción.
+Para casos de severidad baja ($\eta = 0.25$), se observa un régimen predominantemente laminar que alcanza el estado estacionario rápidamente, independientemente de la pendiente de la estenosis. En ninguno de estos escenarios se generaron zonas de recirculación, y el perfil de velocidades se estabiliza rápidamente tras superar la obstrucción, como se ilustra en la \Cref{fig:flujo_bajo}.
 
 \begin{figure}[htbp]
   \centering
@@ -965,7 +979,7 @@ Una vez alcanzado el estado estacionario en los casos de severidad severa, el fl
 
 
 
-Respecto al comportamiento de la presión, en la \cref{fig:presion_dist} se presenta el campo de presión para un escenario de severidad baja ($\eta=0.25$) y pendiente baja ($\alpha=0.05$). Se observa un gradiente de presión uniforme desde la entrada hasta la salida del dominio, consistente con el valor de FFR obtenido (donde la pérdida de presión global está determinada por la morfología, como se analiza en la \cref{sec:morfologia_estenosis}). No obstante, existe una caída de presión localizada en el centro de la estenosis; en este punto, la presión disminuye de forma más pronunciada que el gradiente general para luego recuperarse parcialmente y continuar con la tendencia del gradiente hacia la salida. Este descenso puntual es tanto más abrupto como de mayor magnitud a medida que aumentan la pendiente y la severidad de la lesión, comportamiento que contrasta con el del índice FFR, el cual presenta una relación inversa con el parámetro de pendiente.
+Respecto al comportamiento de la presión, en la \cref{fig:presion_dist} se presenta el campo de presión para un escenario de severidad baja ($\eta=0.25$) y pendiente baja ($\alpha=0.05$). Se observa un gradiente de presión uniforme desde la entrada hasta la salida del dominio, consistente con el valor de FFR obtenido (donde la pérdida de presión global está determinada por la morfología, como se analiza en la \cref{sec:impacto_morfologia_estenosis}). No obstante, existe una caída de presión localizada en el centro de la estenosis; en este punto, la presión disminuye de forma más pronunciada que el gradiente general para luego recuperarse parcialmente y continuar con la tendencia del gradiente hacia la salida. Este descenso puntual es tanto más abrupto como de mayor magnitud a medida que aumentan la pendiente y la severidad de la lesión, comportamiento que contrasta con el del índice FFR, el cual presenta una relación inversa con el parámetro de pendiente.
 
 \begin{figure}[htbp]
   \centering
@@ -1038,7 +1052,7 @@ En la \Cref{tab:tawss_comparativa} se presentan los valores de TAWSS obtenidos e
 \subsubsection{Geometría del árbol microvascular}
 
 
-Cualitativamente, el campo de velocidades (\Cref{fig:flujo_arbol}) en el árbol no presenta variaciones significativas ante cambios en la resistencia periférica o en la morfología de la estenosis. Por otro lado, el análisis de las líneas de corriente (\Cref{fig:tree_streamlines}) revela la existencia de dos zonas de recirculación en las paredes de la primera bifurcación del árbol. Estas estructuras son persistentes, encontrándose en todos los casos evaluados. Es notable que, a pesar de que la velocidad disminuye en las paredes previas a la bifurcación de la misma forma para niveles inferiores, no se generan zonas de recirculación. Este comportamiento se debe probablemente a que, al reducirse las dimensiones de los vasos, las fuerzas viscosas se vuelven predominantes y disipan la tendencia a la separación del flujo. 
+Cualitativamente, el campo de velocidades (\Cref{fig:flujo_arbol}) en el árbol no presenta variaciones significativas ante cambios en la resistencia periférica o en la morfología de la estenosis. Por otro lado, el análisis de las líneas de corriente (\Cref{fig:tree_streamlines}) revela la existencia de dos zonas de recirculación en las paredes de la primera bifurcación del árbol. Estas estructuras son persistentes, encontrándose en todos los casos evaluados. Es notable que, a pesar de que en los niveles inferiores del árbol también se observa una disminución de velocidad en las paredes previas a la bifurcación, en dichos niveles no se generan zonas de recirculación. Este comportamiento se debe probablemente a que, al reducirse las dimensiones de los vasos, las fuerzas viscosas se vuelven predominantes y disipan la tendencia a la división del flujo. 
 
 \begin{figure}[htbp]
   \centering
@@ -1072,7 +1086,7 @@ Finalmente, el análisis del TAWSS en el árbol microvascular revela que existen
 
 Para investigar cómo la forma geométrica de la lesión afecta el comportamiento del flujo, se calculó el FFR para los nueve escenarios planteados y se modeló la relación entre la severidad ($\eta$), la pendiente ($\alpha$) como variables independientes y el FFR como variable dependiente (ver \cref{app:morfologia_dataset}). Inicialmente, se observó que un modelo de regresión lineal multivariable simple no lograba capturar adecuadamente la física del problema, especialmente en escenarios de baja severidad donde el efecto de la pendiente no es tan relevante.
 
-Con el fin de capturar esta interdependencia, se propuso un enfoque basado en Modelos de Ecuaciones Estructurales (SEM) introduciendo una variable latente de reducción de área relativa del canal ($\Delta A_{\text{rel}}$). Esta variable integra de forma no lineal tanto la severidad como la pendiente, basándose en la diferencia entre el perfil de radio luminal de la arteria sana ($R_{\mathrm{taper}}(x)$), que sigue una transición lineal desde el radio de entrada $R_{\mathrm{in}}$ hasta el radio de salida ($R_{\mathrm{out}}$), y el perfil luminal con estenosis $R_{\mathrm{sten}}(x)$, que es una curva de Bézier cúbica que se ajusta a la geometría de la lesión en torno al centro axial de la lesión ($x_m$):
+Con el fin de capturar esta interdependencia, se propuso un enfoque basado en Modelos de Ecuaciones Estructurales (SEM). Estos modelos permiten representar relaciones causales entre variables mediante ecuaciones, incluyendo variables latentes (no observadas directamente) que se infieren a partir de variables observadas \cite{sem}. En este caso, se introdujo una variable latente de reducción de área relativa del canal ($\Delta A_{\text{rel}}$). Esta variable integra de forma no lineal tanto la severidad como la pendiente, basándose en la diferencia entre el perfil de radio luminal de la arteria sana ($R_{\mathrm{taper}}(x)$), que sigue una transición lineal desde el radio de entrada $R_{\mathrm{in}}$ hasta el radio de salida ($R_{\mathrm{out}}$), y el perfil luminal con estenosis $R_{\mathrm{sten}}(x)$, que es una curva de Bézier cúbica que se ajusta a la geometría de la lesión en torno al centro axial de la lesión ($x_m$):
 
 La estenosis reduce el radio luminal en $h_{\mathrm{sten}}$ y se extiende en una longitud axial $2d$, definidos por la severidad ($\eta$) y la pendiente ($\alpha$) según las \cref{eq:eac_severity,eq:eac_d_alpha}:
 \begin{align*}
@@ -1129,7 +1143,7 @@ Para obtener la reducción de área relativa, se normaliza por el área total de
   \Delta A_{\text{rel}} = \frac{\Delta A_{\text{abs}}}{A_{\text{canal}}} = \frac{2 R_{\mathrm{taper}}(x_m)^2}{L(R_{\mathrm{in}} + R_{\mathrm{out}})} \frac{\eta^2}{\alpha}
 \end{equation}
 
-Utilizando los valores de la arteria LAD ensayada ($L=138, R_{\mathrm{in}}=1.57, R_{\mathrm{out}}=1.2, x_m=30$), la constante resulta en aproximadamente $0.01161$, permitiendo evaluar el impacto relativo para cualquier combinación de severidad y pendiente.
+Utilizando los valores de la arteria LAD ensayada ($L=138, R_{\mathrm{in}}=1.57, R_{\mathrm{out}}=1.2, x_m=30$), $\Delta A_{\text{rel}} = 0.01161 \frac{\eta^2}{\alpha}$, permitiendo evaluar el impacto relativo para cualquier combinación de severidad y pendiente.
 
 Se evaluaron diversos modelos estructurales para determinar la combinación de variables que mejor predice el FFR (ver \Cref{tab:modelo_sem_resultados}). El análisis demuestra que el modelo que incorpora la reducción de área relativa junto con la severidad axial ($\Delta A_{\text{rel}} + \eta$) es el que mejor predice el FFR, obteniendo un coeficiente de determinación de $R^2 = 0.8506$.
 
