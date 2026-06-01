@@ -106,9 +106,9 @@ Para superar el enfoque puramente anatómico, se introdujo la evaluación funcio
 
 En este contexto, la Dinámica de Fluidos Computacional (CFD) y el Método de los Elementos Finitos (FEM) emergen como un paradigma innovador y no invasivo para el análisis hemodinámico. La CFD permite simular el flujo sanguíneo en geometrías arteriales reconstruidas a partir de imágenes médicas, permitiendo el cálculo detallado de campos de presión, velocidad y variables cruciales como el esfuerzo de corte de pared (WSS) \cite{taylor_computational_2013}. Esta aproximación ha llevado al desarrollo de índices como la FFR virtual (vFFR), que busca estimar la FFR a partir de modelos computacionales basados en imágenes médicas \cite{taylor_computational_2013,morris_virtual_2013,nannini_automated_2024}. Este enfoque permite una evaluación de la estenosis de forma no invasiva o mínimamente invasiva, a partir de datos de tomografía computarizada (TC) o angiografía \cite{taylor_computational_2013,morris_virtual_2013}. 
 
-Estudios pioneros como DeFACTO y HeartFlow NXT validaron la viabilidad de la vFFR/FFR-CT, demostrando niveles de precisión diagnóstica significativos en comparación con la FFR invasiva \cite{min_diagnostic_2012,norgaard_diagnostic_2014}. Sin embargo, los enfoques actuales de vFFR no están exentos de limitaciones. Una de las críticas más importantes es su dependencia de las condiciones de contorno, ya que son modelos matemáticos simplificados para representar la microcirculación distal \cite{critica_ffr}. Además, las simulaciones transitorias completas, que capturan la naturaleza pulsátil del flujo sanguíneo a lo largo de todo el ciclo cardíaco, tienen un costo computacional muy elevado. Esto ha impulsado el desarrollo de métodos alternativos basados en estado estacionario, que son mucho más rápidos pero sacrifican parte de la fidelidad fisiológica \cite{nannini_automated_2024}.
+Estudios pioneros como DeFACTO y HeartFlow NXT validaron la viabilidad de la vFFR/FFR-CT, demostrando niveles de precisión diagnóstica significativos en comparación con la FFR invasiva \cite{min_diagnostic_2012,norgaard_diagnostic_2014}. Sin embargo, los enfoques actuales de vFFR no están exentos de limitaciones. Una de las críticas más importantes es su dependencia de las condiciones de frontera, ya que son modelos matemáticos simplificados para representar la microcirculación distal \cite{critica_ffr}. Además, las simulaciones transitorias completas, que capturan la naturaleza pulsátil del flujo sanguíneo a lo largo de todo el ciclo cardíaco, tienen un costo computacional muy elevado. Esto ha impulsado el desarrollo de métodos alternativos basados en estado estacionario, que son mucho más rápidos pero sacrifican parte de la fidelidad fisiológica \cite{nannini_automated_2024}.
 
-La necesidad de refinar estos modelos, especialmente en la representación de la microvasculatura, es crucial para extender su aplicabilidad a patologías como la DMV, donde la disfunción reside precisamente en la dinámica que los modelos actuales simplifican \cite{kunadian_eapci_2021}. El enfoque predominante ha sido el uso de modelos de parámetros concentrados, como los modelos tipo Windkessel para representar la resistencia y la compliancia del lecho distal y acoplarlos a una simulación 3D \cite{duanmu_patient-specific_2018,nannini_automated_2024}, o el acoplamiento multi-escala 3D-0D/1D para buscar condiciones más fisiológicas y específicas del paciente \cite{duanmu_patient-specific_2018,nannini_automated_2024}. En paralelo, el desarrollo de redes microvasculares sintéticas ha emergido como una vía para representar de forma explícita la microcirculación distal, permitiendo reducir la incertidumbre asociada a la simplificación en las condiciones de contorno \cite{nannini_automated_2024}.
+La necesidad de refinar estos modelos, especialmente en la representación de la microvasculatura, es crucial para extender su aplicabilidad a patologías como la DMV, donde la disfunción reside precisamente en la dinámica que los modelos actuales simplifican \cite{kunadian_eapci_2021}. El enfoque predominante ha sido el uso de modelos de parámetros concentrados, como los modelos tipo Windkessel para representar la resistencia y la compliancia del lecho distal y acoplarlos a una simulación 3D \cite{duanmu_patient-specific_2018,nannini_automated_2024}, o el acoplamiento multi-escala 3D-0D/1D para buscar condiciones más fisiológicas y específicas del paciente \cite{duanmu_patient-specific_2018,nannini_automated_2024}. En paralelo, el desarrollo de redes microvasculares sintéticas ha emergido como una vía para representar de forma explícita la microcirculación distal, permitiendo reducir la incertidumbre asociada a la simplificación en las condiciones de frontera \cite{nannini_automated_2024}.
 
 Aprovechando este enfoque, la presente investigación desarrolla un modelo que integra la arteria principal con una red microvasculares sintética para investigar la interacción hemodinámica entre la EAC y la DMV. Al explorar esta relación, el estudio se propone caracterizar la sensibilidad del índice FFR ante variaciones tanto en la morfología de la estenosis como en la resistencia del lecho distal, proporcionando una base para el desarrollo de herramientas diagnósticas que integren la fisiología completa y mejoren la interpretación de la condición clínica del paciente.
 
@@ -135,15 +135,15 @@ La simulación precisa de la hemodinámica coronaria exige una metodología robu
 
 En el contexto coronario, el CFD permite una resolución espacial y temporal de variables hemodinámicas difícil de obtener in vivo. Específicamente, permite cuantificar el impacto funcional de una estenosis y analizar fenómenos locales clave para la aterosclerosis, como las zonas de recirculación y las zonas de bajo esfuerzo de corte de pared (WSS) \cite{malek_hemodynamic_1999}.
 
-El flujo sanguíneo en las arterias coronarias presenta una naturaleza compleja debido a su composición celular. No obstante, en arterias de gran y mediano calibre, la velocidad de corte es lo suficientemente elevada como para que la viscosidad se mantenga prácticamente constante. En este sentido, estudios previos \cite{modelnonnewtonian} han demostrado que un modelo newtoniano para la sangre constituye una aproximación válida para el cálculo de variables hemodinámicas en estos vasos.
+El flujo sanguíneo en las arterias coronarias presenta una naturaleza compleja debido a su composición celular. No obstante, en arterias de gran y mediano calibre, la velocidad de corte es lo suficientemente elevada como para que la viscosidad se mantenga prácticamente constante. En este sentido, estudios previos \cite{modelnonnewtonian,johnston_non-newtonian_2004,cho_nonnewtonian_1991} han demostrado que un modelo newtoniano para la sangre constituye una aproximación válida para el cálculo de variables hemodinámicas en estos vasos. Para velocidades medias ($\approx 0,2\,\text{m/s}$), el esfuerzo de corte de pared (WSS) es virtualmente indistinguible entre modelos newtonianos y no-newtonianos \cite{johnston_non-newtonian_2004}.
 
 Bajo esta premisa, se adoptan dos supuestos fundamentales para el desarrollo del modelo:
 \begin{itemize}
   \item \textbf{Incompresibilidad:} La sangre se considera un fluido de densidad constante, una aproximación estándar en el estudio de grandes vasos donde las variaciones de presión no afectan el volumen del fluido \cite{ku_blood_1997}.
-  \item \textbf{Comportamiento Newtoniano:} Se asume una relación lineal entre el esfuerzo y la deformación con una viscosidad dinámica constante ($\mu \approx 0.0035 \, \text{Pa} \cdot \text{s}$) \cite{ku_blood_1997}.
+  \item \textbf{Comportamiento Newtoniano:} Se asume una relación lineal entre el esfuerzo y la deformación con una viscosidad dinámica constante ($\mu \approx 0.0035 \, \text{Pa} \cdot \text{s}$) \cite{ku_blood_1997}. No obstante, esta simplificación introduce imprecisiones locales en regiones de bajo esfuerzo de corte y zonas de recirculación o división de flujo, donde el modelo newtoniano subestima el WSS real \cite{cho_nonnewtonian_1991,johnston_non-newtonian_2004}. Asimismo, en escenarios de bajo número de Reynolds ($\le 100$), omitir la naturaleza no-newtoniana puede subestimar la caída de presión entre un $12\%$ y un $23\%$ \cite{cho_nonnewtonian_1991}. En este estudio se simula la arteria descendente anterior izquierda, cuyos parámetros (descritos en \cref{sec:param_lad}) determinan un flujo con un número de Reynolds mayor a ese umbral ($\text{Re} \approx \frac{(1.060 \times 10^{-3} \text{ g/mm}^3) \cdot (280 \text{ mm/s}) \cdot (2.41 \text{ mm})}{3.5 \times 10^{-3} \text{ g/(mm}\cdot\text{s)}} \approx 204$).
 \end{itemize}
 
-Teniendo en cuenta estos supuestos, la velocidad y presión del fluido se describen mediante las ecuaciones de Navier-Stokes para flujo incompresible, las cuales representan la conservación del momento lineal y de la masa:
+Teniendo en cuenta estos supuestos, la velocidad y presión del fluido se describen mediante las ecuaciones de Navier-Stokes para flujo incompresible en estado transitorio, las cuales representan la conservación del momento lineal y de la masa:
 
 \begin{center}
   \begin{subequations}
@@ -157,7 +157,15 @@ Teniendo en cuenta estos supuestos, la velocidad y presión del fluido se descri
   \end{subequations}
 \end{center}
 
-Donde $u: \mathbb{R}^d \times \mathbb{R}_+ \rightarrow \mathbb{R}^d$, $p: \mathbb{R}^d \times \mathbb{R}_+ \rightarrow \mathbb{R}$ corresponden a velocidad y presión, respectivamente, como funciones de espacio y tiempo, $d \in \{2,3\}$ es la dimensión espacial, $\rho = 1060 \, \text{kg}/\text{m}^3$ es la densidad de la sangre, $\mu = 0.0035\, \text{Pa} \cdot \text{s}$ es la viscosidad dinámica \cite{ku_blood_1997} y $f: \mathbb{R}^d \rightarrow \mathbb{R}^d$ es una fuerza externa aplicada al sistema.
+Donde $u: \mathbb{R}^d \times \mathbb{R}_+ \rightarrow \mathbb{R}^d$, $p: \mathbb{R}^d \times \mathbb{R}_+ \rightarrow \mathbb{R}$ corresponden a velocidad y presión, respectivamente, como funciones de espacio y tiempo, $d \in \{2,3\}$ es la dimensión espacial, $\rho = 1060 \, \text{kg}/\text{m}^3$ es la densidad de la sangre, $\mu = 0.0035\, \text{Pa} \cdot \text{s}$ es la viscosidad dinámica \cite{ku_blood_1997} y $f: \mathbb{R}^d \rightarrow \mathbb{R}^d$ es una fuerza externa aplicada al sistema. 
+
+A partir de $\sigma$, se define el esfuerzo cortante de pared (WSS) como la componente tangencial de la tracción en la frontera:
+\begin{equation}
+    \label{eq:wss_definition}
+    \vec{\tau}_w = \sigma \cdot \vec{n} - ((\sigma \cdot \vec{n}) \cdot \vec{n})\vec{n},
+\end{equation}
+
+
 
 Las ecuaciones (\ref{momentum}) y (\ref{continuity}), junto con unas condiciones de frontera Dirichlet $g(t)$, una condición inicial $u_0$, y un dominio geométrico $\Omega \subset \mathbb{R}^d$ conforman la formulación del problema en su versión fuerte.
 
@@ -205,7 +213,7 @@ Ahora se multiplica la \cref{continuity} por una función de prueba $q$,
 \end{center}
 \vspace{6pt}
 
-Se reorganiza la \cref{momentum_weak} y la \cref{continuity_weak} para definir las formas $a$ y $b$ que corresponden a las ecuaciones de momento y continuidad, respectivamente:
+Se reorganiza la \cref{momentum_weak} y la \cref{continuity_weak} para definir las formas $a$ y $b$ que corresponden a las ecuaciones de momento y conservación de masa, respectivamente:
 
 \begin{center}
   \begin{align}
@@ -246,6 +254,14 @@ y los términos espaciales (convectivo, viscoso y de presión) se evalúan en el
 \end{equation*}
 
 La discretización resultante conduce a un sistema no lineal en cada paso de tiempo, el cual se va a resolver mediante el algoritmo iterativo de Newton-Raphson \cite{burden2016}.
+
+Como criterio de convergencia hacia el estado estacionario, se evalúa el cambio relativo del campo de velocidades entre dos instantes de tiempo consecutivos. Se considera que el flujo ha convergido cuando la norma $L^\infty$ de la diferencia, normalizada por la norma de la solución actual y el tamaño del paso de tiempo, es inferior a una tolerancia predefinida $\epsilon$:
+\begin{equation}
+  \label{eq:steady_state_criterion}
+  \frac{\|u^{n+1}-u^n\|_{L^\infty}}{\|u^{n+1}\|_{L^\infty}\Delta t} < \epsilon,
+\end{equation}
+\noindent donde se emplea $\epsilon = 10^{-3}$ para todas las simulaciones de este estudio.
+
 
 Para garantizar estabilidad numérica con pares de interpolación de igual orden ($P_1/P_1$) y en regímenes con advección dominante, se añaden términos de estabilización a la formulación variacional \cite{pspg, supg, lsic, leborgne_inf-sup_2023}. En todos los casos, se construyen a partir del residuo fuerte de la ecuación de momento (\ref{momentum}). 
 
@@ -296,26 +312,33 @@ Este término estabiliza el campo de presión y permite el uso de pares de igual
 \noindent donde se emplea el mismo $\tau$ para ambos términos, como es habitual en las formulaciones estabilizadas residuales SUPG/PSPG \cite{pspg,supg}.
 
 \paragraph{(iii) LSIC (Least-Squares Incompressibility Constraint).}
-Este término penaliza desviaciones de la condición de incompresibilidad en el problema discreto, mejorando la robustez del esquema en mallas complejas \cite{lsic}.
+Este término penaliza desviaciones de la condición de incompresibilidad en el problema discreto, mejorando la estabilidad y robustez del esquema numérico, especialmente en mallas complejas o flujos dominados por la advección \cite{lsic}. Se define como:
 
 \begin{equation}
   \label{eq:lsic_term}
   f_{\mathrm{LSIC}}(u,v)
   = \nu_{\mathrm{LSIC}}\, (\nabla \cdot v)\, \rho\,(\nabla \cdot u),
-  \qquad \nu_{\mathrm{LSIC}} := \frac{h}{2}\,\|u\|_2\,z.
 \end{equation}
 
-\noindent $\Delta t$ es el paso de tiempo y $\nu = \mu/\rho$ la viscosidad cinemática. El factor $z$ depende del número de Reynolds local $Re$ y se define como:
+\noindent donde $\nu_{\mathrm{LSIC}}$ representa el parámetro de viscosidad artificial intrínseco de la estabilización, el cual se calcula localmente en cada elemento mediante:
 
-\begin{center}
-  \begin{equation}
-    z =
-    \begin{cases}
-      \left( \dfrac{Re}{3} \right), & \text{si } Re \leq 3, \\
-      1, &  \text{si } Re > 3.
-    \end{cases}
-  \end{equation}
-\end{center}
+\begin{equation}
+  \label{eq:nu_lsic}
+  \nu_{\mathrm{LSIC}} := \frac{h}{2}\,\|u\|_2\,z,
+\end{equation}
+
+\noindent donde $h$ es la longitud característica del elemento triangular, definida como el diámetro de su circunferencia circunscrita. 
+
+El factor adimensional $z$ actúa como una función de amortiguamiento basada en el número de Reynolds local del elemento ($Re$). Regula la magnitud de la estabilización introducida para evitar la sobre-estabilización en regímenes difusivos. Siguiendo el enfoque de Tezduyar \cite{tezduyar}, este parámetro se define como
+
+\begin{equation}
+  \label{eq:factor_z}
+  z =
+  \begin{cases}
+    \left( \dfrac{Re}{3} \right), & \text{si } Re \leq 3, \\
+    1, &  \text{si } Re > 3.
+  \end{cases}
+\end{equation}
 
 El sistema no lineal que resulta de la discretización de la formulación débil puede representarse como $F(u,p)=0$, donde
 
@@ -429,12 +452,12 @@ Se consideran las ecuaciones de Navier--Stokes incompresibles en $\Omega$ con co
   (u,v)(x,y,0) = (0,0) \qquad \forall (x,y)\in\Omega\setminus\Gamma_{\mathrm{lid}}.
 \end{equation}
 
-El número de Reynolds del problema se define (en variables adimensionales) como
+El número de Reynolds del problema se define como
 \begin{equation}
   \label{eq:ldc_re}
   Re = \frac{U\,L}{\nu}, \qquad L=1,
 \end{equation}
-\noindent donde $U$ es la velocidad de la tapa y $\nu$ la viscosidad cinemática.
+\noindent donde $U$ es la velocidad de la tapa, la longitud característica $L$ corresponde a la longitud de el lado del dominio y $\nu$ es la viscosidad cinemática.
 
 El benchmark se resolvió para $Re=1000$. Se escogió este número de Reynolds porque de los disponibles en el benchmark era el más cercano a los valores típicos del flujo coronario \cite{ku_blood_1997}.
 
@@ -505,13 +528,12 @@ Para la comparación de resultados se miden las fuerzas de arrastre y sustentaci
 \noindent donde $\eta$ es el vector normal exterior al círculo (apuntando hacia el fluido). Los coeficientes adimensionales correspondientes se definen como
 \begin{equation}
   \label{eq:dfg1_coeffs}
-  C_D = \frac{2}{U_{\mathrm{mean}}^2\,L}\,F_D,
+  C_D = \frac{2}{\rho, U_{\mathrm{mean}}^2\,L}\,F_D,
   \qquad
-  C_L = \frac{2}{U_{\mathrm{mean}}^2\,L}\,F_L.
+  C_L = \frac{2}{\rho, U_{\mathrm{mean}}^2\,L}\,F_L.
 \end{equation}
 
-Para el caso $Re=20$, el flujo alcanza un estado estacionario. La simulación transitoria se realiza hasta que se satisfaga el criterio de convergencia relativa $\|u^{n+1}-u^n\|_{L^\infty}/(\|u^{n+1}\|_{L^\infty}\Delta t) < 10^{-3}$.
-
+Para el caso $Re=20$, el flujo alcanza un estado estacionario. La simulación transitoria se realiza hasta que se satisfaga el criterio de convergencia relativa definido en la \cref{eq:steady_state_criterion}.
 
 \subsection{Geometría arterial, EAC parametrizable} \label{sec:geom_arterial}
 
@@ -534,14 +556,20 @@ Sobre este perfil base sano, se parametriza el grado de estenosis con una severi
 \end{equation}
 \noindent donde $x_m \in (0,L)$ es la posición axial (centro) de la estenosis y $R_{\min}$ indica el radio interior efectivo en ese punto. De este modo, $\eta=0$ representa un modelo completamente sano y $\eta\to 1$ refleja una constricción de severidad extrema.
 
-El contorno del dominio de flujo está determinado por la pared superior en $y_{\mathrm{top}}(x) = R_{\mathrm{in}} + r(x)$ y la inferior en $y_{\mathrm{bot}}(x) = R_{\mathrm{in}} - r(x)$. El perfil del radio local $r(x)$ se define por tramos continuos. Fuera de la región de estenosis, el canal mantiene su estrechamiento fisiológico natural:
+La frontera del dominio de flujo está determinado por la pared superior en $y_{\mathrm{top}}(x) = R_{\mathrm{in}} + r(x)$ y la inferior en $y_{\mathrm{bot}}(x) = R_{\mathrm{in}} - r(x)$. El perfil del radio local $r(x)$ se define por tramos continuos. Fuera de la región de estenosis, el canal mantiene su estrechamiento fisiológico natural:
 \begin{equation}
   \label{eq:eac_healthy_segments}
   r(x)=R_{\mathrm{taper}}(x),
   \qquad x\in[0,\,x_m-d]\cup[x_m+d,\,L].
 \end{equation}
 
-En la región afectada por la estenosis $x\in[x_m-d,\,x_m+d]$, el perfil se genera mediante curvas de Bézier cúbicas. Para asegurar la continuidad y suavidad de la geometría, la interpolación se establece mediante las siguientes condiciones en los extremos de la región y en el punto central de la estenosis:
+La distancia $d$ controla qué tan pronunciada es la transición y se define a partir de un parámetro de pendiente ajustable $\alpha>0$ como
+\begin{equation}
+  \label{eq:eac_d_alpha}
+  d = \frac{R_{\mathrm{taper}}(x_m)-R_{\min}}{\alpha}.
+\end{equation}
+
+Para asegurar la continuidad y suavidad de la geometría, la interpolación se establece mediante las siguientes condiciones en los extremos de la región y en el punto central de la estenosis:
 \begin{align*}
   r(x_m-d)=R_{\mathrm{taper}}(x_m-d),
   \qquad
@@ -555,13 +583,9 @@ En la región afectada por la estenosis $x\in[x_m-d,\,x_m+d]$, el perfil se gene
   r'(x_m+d)=R_{\mathrm{taper}}'(x_m+d).
 \end{align*}
 
-La distancia $d$ controla qué tan pronunciada es la transición y se define a partir de un parámetro de pendiente $\alpha>0$ como
-\begin{equation}
-  \label{eq:eac_d_alpha}
-  d = \frac{R_{\mathrm{taper}}(x_m)-R_{\min}}{\alpha}.
-\end{equation}
+Para cumplir estas condiciones, se usan curvas de Bézier cúbicas, una para $x\in[x_m-d,\,x_m]$ y otra para $x\in[x_m,\,x_m+d]$. Si bien cada una debe pasar solo por dos puntos de control, es necesario que la curva sea cubica porque no es posible que un polinomio cuadrático tenga la misma derivada en dos puntos ($R_{\mathrm{taper}}'$ es constante).
 
-Para implementar este perfil se define la reducción del radio respecto a $R_{\mathrm{taper}}$ como una curva de Bézier cúbica $h(t)$ para el intervalo axial $x \in [x_m - d, x_m]$, donde $t \in [0, 1]$ es el parámetro de la curva. Los puntos de control para la coordenada radial de esta reducción son $h_0 = 0$, $h_1 = 0$, $h_2 = h_{\mathrm{sten}}$ y $h_3 = h_{\mathrm{sten}}$ (siendo $h_{\mathrm{sten}} = R_{\mathrm{taper}}(x_m) - R_{\min}$). El polinomio resultante es:
+Se define la reducción del radio respecto a $R_{\mathrm{taper}}$ como una curva de Bézier cúbica $h(t)$ para el intervalo axial $x \in [x_m - d, x_m]$, donde $t \in [0, 1]$ es el parámetro de la curva. Los puntos de control para la coordenada radial de esta reducción son $h_0 = 0$, $h_1 = 0$, $h_2 = h_{\mathrm{sten}}$ y $h_3 = h_{\mathrm{sten}}$ (siendo $h_{\mathrm{sten}} = R_{\mathrm{taper}}(x_m) - R_{\min}$). El polinomio resultante es:
 \begin{equation}
   \label{eq:eac_bezier_h}
   h(t) = (1-t)^3 h_0 + 3(1-t)^2 t h_1 + 3(1-t) t^2 h_2 + t^3 h_3 = h_{\mathrm{sten}}(3t^2 - 2t^3).
@@ -594,9 +618,9 @@ El descenso del radio entre las ramas de cada nivel vascular sigue la ley de Mur
     r_{p}^{3} = 2 r_{h}^{3} \qquad \implies \qquad r_{h} = r_{p} \, 2^{-1/3}.
 \end{equation}
 
-La longitud $L$ de los segmentos en red es directamente proporcional a su radio particular mediante una constante de proporción $\alpha$:
+La longitud $L$ de los segmentos en red es directamente proporcional a su radio particular mediante una constante de proporción $\lambda$:
 \begin{equation} \label{eq:tree_alpha}
-    L = \alpha r.
+    L = \lambda r.
 \end{equation}
 
 En cuanto a la orientación de las ramas, cada bifurcación desvía las ramas hijas respecto a la dirección de la rama padre en $35^\circ$.
@@ -604,7 +628,7 @@ En cuanto a la orientación de las ramas, cada bifurcación desvía las ramas hi
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.35\textwidth, angle=-90]{figures/geom_arbol.png}
-  \caption{Geometría de ejemplo para un árbol microvascular con 3 generaciones y relación de aspecto $\alpha = 16$.}
+  \caption{Geometría de ejemplo para un árbol microvascular con 3 generaciones y relación de aspecto $\lambda = 16$.}
   \label{fig:geom_arbol_ejemplo}
 \end{figure}
 
@@ -620,7 +644,7 @@ Siguiendo la formulación de \cite{pressurebc}, el término de frontera del tens
   \int_{\Gamma_\mathrm{in}} p_\mathrm{in} \, (v \cdot \vec{n}) \, ds.
 \end{equation}
 
-Adicionalmente, para mejorar la estabilidad numérica, se decidió prescribir que la componente tangencial de la velocidad en el inlet sea nula, es decir, $u_T := u - (u \cdot \vec{n})\,\vec{n} = 0$ sobre $\Gamma_\mathrm{in}$. Puesto que la frontera de entrada es tratada de forma débil, esta condición no puede imponerse como una restricción de Dirichlet. Por ello, se emplea el método de Nitsche \cite{nitsche_original}, que permite imponer de forma consistente y estable condiciones de contorno de tipo Dirichlet de forma débil.
+Adicionalmente, para mejorar la estabilidad numérica, se decidió prescribir que la componente tangencial de la velocidad en el inlet sea nula, es decir, $u_T := u - (u \cdot \vec{n})\,\vec{n} = 0$ sobre $\Gamma_\mathrm{in}$. Puesto que la frontera de entrada es tratada de forma débil, esta condición no puede imponerse como una restricción de Dirichlet. Por ello, se emplea el método de Nitsche \cite{nitsche_original}, que permite imponer de forma consistente y estable condiciones de frontera de tipo Dirichlet de forma débil.
 
 El método de Nitsche para la condición $u_T = 0$ introduce en el residuo los tres términos siguientes \cite{nitsche_ns}:
 
@@ -631,7 +655,7 @@ El método de Nitsche para la condición $u_T = 0$ introduce en el residuo los t
   +\frac{\beta_N \mu}{h} \int_{\Gamma_\mathrm{in}} u_T \cdot v_T \, ds,
 \end{equation}
 
-\noindent donde $v_T = v - (v \cdot \vec{n})\,\vec{n}$ es la componente tangencial de la función de prueba, $h$ es la longitud característica local del elemento, y $\beta_N > 0$ es el parámetro de penalización de Nitsche. El primer término es la consistencia adjunta de la condición, el segundo garantiza la simetría de la formulación, y el tercero es el término de penalización que asegura la coercividad del problema y el cumplimiento de la condición $u_T = 0$. La formulación resultante es consistente (la solución exacta satisface la forma débil), simétrica e incondicionalmente estable para valores suficientemente grandes de $\beta_N$.
+\noindent donde $v_T = v - (v \cdot \vec{n})\,\vec{n}$ es la componente tangencial de la función de prueba, $h$ es la longitud característica de la celda, definida específicamente como el diámetro de la circunferencia circunscrita a cada elemento triangular, y $\beta_N > 0$ es el parámetro de penalización de Nitsche. El primer término es la consistencia adjunta de la condición, el segundo garantiza la simetría de la formulación, y el tercero es el término de penalización que asegura la coercividad del problema y el cumplimiento de la condición $u_T = 0$. La formulación resultante es consistente (la solución exacta satisface la forma débil), simétrica e incondicionalmente estable para valores suficientemente grandes de $\beta_N$.
 
 En el outlet $\Gamma_\mathrm{out}$, la condición de salida se impone de forma débil prescribiendo una presión $p_{\mathrm{out}}^n$ sobre la frontera. Esto se logra de la misma forma que con la presión en la frontera de entrada, añadiendo el término que reemplaza al término de tracción natural del tensor de esfuerzos sobre $\Gamma_\mathrm{out}$:
 \begin{equation}
@@ -672,14 +696,14 @@ Para el escenario acoplado de la estenosis con el árbol microvascular explícit
   R_{\mathrm{out}} = R_{\mathrm{target}} - R_{\mathrm{arbol}}.
 \end{equation}
 
-El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que se conoce el radio de los vasos en cada nivel gracias a la ley de Murray (\cref{eq:ley_murray}). Para este desarrollo se asume el perfil de flujo de Poiseuille para conductos cilíndricos. Bajo estas condiciones, la resistencia hidráulica de un vaso de radio $r$ y longitud $L$ viene dada por:
+El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que se conoce el radio de los vasos en cada nivel gracias a la ley de Murray (\cref{eq:ley_murray}). Para este desarrollo se asume el perfil de flujo de Poiseuille para conductos cilíndricos. Bajo estas condiciones, la resistencia hidráulica de un vaso de radio $r$ y longitud $L$ viene dada por \cite{outflow_resistance}:
 \begin{equation} \label{eq:resistencia_vaso}
   R = \frac{8 \mu L}{\pi r^4}
 \end{equation}
 
-En la generación de la geometría del árbol microvascular, la longitud del vaso en cada nivel mantiene una proporción fija con el radio, de manera que $L = \alpha r$. Al sustituir esta definición, se obtiene que la resistencia particular de un vaso en el primer nivel del árbol (de radio $r_0$) es:
+En la generación de la geometría del árbol microvascular, la longitud del vaso en cada nivel mantiene una proporción fija con el radio, de manera que $L = \lambda r$ (\cref{eq:tree_alpha}). Al sustituir esta definición, se obtiene que la resistencia particular de un vaso en el primer nivel del árbol (de radio $r_0$) es:
 \begin{equation}
-  R_0 = \frac{8 \mu \alpha}{\pi r_0^3}
+  R_0 = \frac{8 \mu \lambda}{\pi r_0^3}
 \end{equation}
 
 Luego, la ley de Murray especifica que para una bifurcación simétrica se cumple que $r_{\mathrm{padre}}^3 = 2 r_{\mathrm{hija}}^3$, por lo que el radio para cualquier rama en un nivel del árbol $j$ es:
@@ -691,7 +715,7 @@ Luego, la ley de Murray especifica que para una bifurcación simétrica se cumpl
 
 Con esto, la resistencia local de un vaso en el nivel $j$ es:
 \begin{equation}
-  R_{\mathrm{vaso}, j} = \frac{8 \mu \alpha}{\pi r_j^3} = \frac{8 \mu \alpha}{\pi \left(r_0 \, 2^{-j/3}\right)^3} = R_0 \, 2^j
+  R_{\mathrm{vaso}, j} = \frac{8 \mu \lambda}{\pi r_j^3} = \frac{8 \mu \lambda}{\pi \left(r_0 \, 2^{-j/3}\right)^3} = R_0 \, 2^j
 \end{equation}
 
 Hay que tener en cuenta que en cada nivel del árbol, existen $2^j$ vasos idénticos dispuestos en paralelo. Por lo tanto, el caudal total del sistema ($Q_{\mathrm{total}}$) se divide equitativamente y cada vaso transporta una fracción del flujo: $Q_j = Q_{\mathrm{total}} / 2^j$.
@@ -713,7 +737,7 @@ Reemplazando la caída de presión \eqref{eq:deltap_nivel} se obtiene:
 
 La resistencia total del árbol se obtiene sumando las resistencias de cada nivel:
 \begin{equation}\label{eq:resistencia_arbol}
-  R_{\mathrm{arbol}} = \sum_{j=0}^{N_{\mathrm{gen}}-1} R_{\mathrm{nivel}, j} = \sum_{j=0}^{N_{\mathrm{gen}}-1} R_0  = N_{\mathrm{gen}} \frac{8 \mu \alpha}{\pi r_0^3}
+  R_{\mathrm{arbol}} = \sum_{j=0}^{N_{\mathrm{gen}}-1} R_{\mathrm{nivel}, j} = \sum_{j=0}^{N_{\mathrm{gen}}-1} R_0  = N_{\mathrm{gen}} \frac{8 \mu \lambda}{\pi r_0^3}
 \end{equation}
 
 
@@ -732,7 +756,7 @@ El sistema ha sido diseñado bajo una arquitectura modular de tres capas que sep
 
 \paragraph{Scenario:} Define la física del problema, incluyendo la geometría del dominio, las propiedades del fluido y las condiciones iniciales y de frontera. Toda nueva configuración física se implementa heredando de esta clase abstracta, lo que garantiza una interfaz consistente y permite extender el sistema a nuevas geometrías únicamente implementando los métodos esenciales.
 
-\paragraph{Solver:} Contiene el esquema numérico para la resolución de las ecuaciones de Navier--Stokes incompresibles. Este componente gestiona la definición de las formas variacionales, la integración temporal y la aplicación de condiciones de contorno. Debido a su diseño modular, distintos esquemas de solución pueden intercambiarse de forma transparente sin alterar la definición del escenario físico.
+\paragraph{Solver:} Contiene el esquema numérico para la resolución de las ecuaciones de Navier--Stokes incompresibles. Este componente gestiona la definición de las formas variacionales, la integración temporal y la aplicación de condiciones de frontera. Debido a su diseño modular, distintos esquemas de solución pueden intercambiarse de forma transparente sin alterar la definición del escenario físico.
 
 \paragraph{Simulation:} Actúa como el orquestador del experimento. Recibe instancias de \textit{Scenario} y \textit{Solver} para gestionar el bucle temporal, la persistencia de resultados y la trazabilidad de parámetros. Al desacoplar la lógica de ejecución de la física y el esquema numérico, permite realizar estudios paramétricos combinando cualquier par de componentes sin necesidad de reescribir código.
 
@@ -759,7 +783,7 @@ Específicamente para el escenario de la enfermedad coronaria, se combinan las g
     \textit{Árbol 2D} & \texttt{n\_gen} & $\mathbb{Z}^{+}$ & Cantidad de niveles de ramificación binaria (\cref{sec:geom_microvascular}). \\
     & \texttt{tree\_gamma} & $\mathbb{R}^{+}$ & Exponente $\gamma$ de la ley de Murray para radios (\cref{eq:ley_murray}). \\
     & \texttt{tree\_angle} [$^\circ$] & $[0, 180]$ & Ángulo de apertura en cada bifurcación. \\
-    & \texttt{tree\_len\_ratio} & $\mathbb{R}^{+}$ & Relación de aspecto $\alpha = L/r$ de los vasos (\cref{eq:tree_alpha}). \\
+    & \texttt{tree\_len\_ratio} & $\mathbb{R}^{+}$ & Relación de aspecto $\lambda = L/r$ de los vasos (\cref{eq:tree_alpha}). \\
     & \texttt{tree\_asym} & $[0, 1]$ & Factor de reparto de flujo entre ramas (0.5 para simetría). \\
     & \texttt{couple\_slope} & $\mathbb{R}^{+}$ & Pendiente de la transición entre la arteria y el árbol. \\ \midrule
     \textit{Solver} & \texttt{T} [s] & $\mathbb{R}^{+}$ & Tiempo físico total de la simulación. \\
@@ -782,7 +806,7 @@ Finalmente, con el objetivo de garantizar la trazabilidad, cada resultado se alm
 
 \subsection{Simulación}
 
-\subsubsection{Parámetros de la simulación}
+\subsubsection{Parámetros de la simulación} \label{sec:param_lad}
 
 La geometría del segmento arterial se parametrizó con base en medidas morfométricas de la arteria descendente anterior izquierda (LAD) obtenidas mediante angiogramas coronarios y angiografía de rayos X. La longitud del segmento se fijó en $L = 138\,\text{mm}$, valor que cae dentro del rango de $72.46$--$144.78\,\text{mm}$ reportado en \cite{lad_length}. El radio de entrada se estableció en $R_{\mathrm{in}} = 1.57\,\text{mm}$, mientras que el radio de salida se fijó en $R_{\mathrm{out}} = 1.20\,\text{mm}$, de acuerdo a los valores reportados en \cite{lad_diameter}.
 
@@ -1023,7 +1047,13 @@ Se evaluó cómo la presencia de la estenosis compromete el suministro de flujo 
 
 % de presion no se incluye analisis cuantitativo porque se corresponde con el modelo de FFR indirectamente, es decir que ya esta incluido
 
-Finalmente, se analizó el esfuerzo cortante medio en la pared (TAWSS) debido a su relevancia en la predicción de la formación de placa. Según \cite{hemo_wss}, valores de TAWSS superiores a $15\,\text{dyn/cm}^2$ se consideran ateroprotectores, mientras que valores inferiores a $4\,\text{dyn/cm}^2$ son pro-aterogénicos. El cálculo se realizó promediando el esfuerzo en el intervalo de tiempo $[0,\,0.5]\,\text{s}$, correspondiente a la fase diastólica; se asume una velocidad inicial nula ya que, durante la sístole, la contracción miocárdica eleva la presión interna, reduciendo el gradiente de presión coronario y el flujo.
+Finalmente, se analizó el esfuerzo cortante medio en la pared (TAWSS) debido a su relevancia en la predicción de la formación de placa. Este índice se calcula promediando la magnitud del vector WSS en el intervalo de tiempo $T$:
+\begin{equation}
+    \label{eq:tawss_definition}
+    \text{TAWSS} = \frac{1}{T} \int_{0}^{T} \|\vec{\tau}_w\| \; dt.
+\end{equation}
+Según \cite{hemo_wss}, valores de TAWSS superiores a $15\,\text{dyn/cm}^2$ se consideran ateroprotectores, mientras que valores inferiores a $4\,\text{dyn/cm}^2$ son pro-aterogénicos. El cálculo se realizó promediando el esfuerzo en el intervalo de tiempo $[0,\,0.5]\,\text{s}$, correspondiente a la fase diastólica; se asume una velocidad inicial nula ya que, durante la sístole, la contracción miocárdica eleva la presión interna, reduciendo el gradiente de presión coronario y el flujo.
+
 
 En la \Cref{tab:tawss_comparativa} se presentan los valores de TAWSS obtenidos en el centro de la estenosis, la zona inmediatamente posterior y el extremo distal de la arteria. Los resultados muestran que las zonas de mayor aceleración en la garganta de la lesión presentan niveles de TAWSS elevados, superando el umbral de protección especialmente en los casos severos. No obstante, en las regiones de recirculación post-estenótica, los niveles de esfuerzo caen drásticamente por debajo del límite aterogénico, evidenciando un alto riesgo de progresión de la enfermedad en dichas áreas.
 
@@ -1068,7 +1098,7 @@ Cualitativamente, el campo de velocidades (\Cref{fig:flujo_arbol}) en el árbol 
   \label{fig:tree_streamlines}
 \end{figure}
 
-Respecto a la distribución del flujo y la simetría, se observa que ésta solo se mantiene en la primera bifurcación. Tras la separación inicial, el fluido sale con más velocidad por la pared interna (la más cercana al centro del árbol) de los vasos del segundo nivel. En consecuencia, al alcanzar la siguiente ramificación, el flujo no encuentra la bifurcación de forma frontal sino con un ligero desplazamiento hacia el centro, provocando que los vasos del tercer nivel no reciban el mismo caudal; los centrales reciben más que los periféricos. En niveles posteriores, siguiendo la misma lógica, el patrón se repetiría aunque con una magnitud decreciente, ya que el incremento de las fuerzas viscosas favorece una mayor disipación radial del flujo.
+Respecto a la distribución del flujo y la simetría, se observa que ésta solo se mantiene en la primera bifurcación. Tras la división inicial, el fluido sale con más velocidad por la pared interna (la más cercana al centro del árbol) de los vasos del segundo nivel. En consecuencia, al alcanzar la siguiente ramificación, el flujo no encuentra la bifurcación de forma frontal sino con un ligero desplazamiento hacia el centro, provocando que los vasos del tercer nivel no reciban el mismo caudal; los centrales reciben más que los periféricos. En niveles posteriores, siguiendo la misma lógica, el patrón se repetiría aunque con una magnitud decreciente, ya que el incremento de las fuerzas viscosas favorece una mayor disipación radial del flujo.
 
 Por otro lado, la distribución de presiones en el árbol microvascular (\Cref{fig:presion_arbol}) muestra un rango de variación muy reducido, con valores que oscilan apenas entre $43.41$ y $43.98\,\mathrm{mmHg}$. En cada bifurcación se observan incrementos localizados de presión en la pared que se enfrenta directamente al flujo del vaso precedente. Sin embargo, la magnitud de las diferencias es tan pequeña que puede ser atribuida a imprecisiones numéricas o a la resolución del método empleado, por lo que no se puede concluir nada al respecto.
 
