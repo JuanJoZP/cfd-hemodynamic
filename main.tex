@@ -599,13 +599,15 @@ Para la coordenada axial $x(t)$, se emplea otra curva de Bézier que permite con
 
 Este esquema paramétrico se aplica de forma simétrica para la mitad distal del vaso ($x \in [x_m, x_m+d]$), completando la geometría de la estenosis.
 
-La discretización espacial se realiza con elementos triangulares. Fue generada con GMSH con el algoritmo MeshAdapt \cite{gmsh} sobre la geometría descrita por las curvas paramétricas definidas anteriormente.
+La discretización espacial se realiza con elementos triangulares generados con GMSH mediante el algoritmo MeshAdapt \cite{gmsh} (Figura~\ref{fig:eac_geometria_arteria}a). Adicionalmente, se desarrolló una variante de mallado estructurado transfinito (Figura~\ref{fig:eac_geometria_arteria}b) que preserva exactamente la simetría radial del dominio, empleada como verificación para evaluar la influencia de la discretización sobre la simetría del flujo.
 \vspace{10pt}
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.8\textwidth]{figures/geometria_arteria.png}
-  \caption{Ejemplo de geometría arterial mallada generada con $\eta=0.6$ y $\alpha = 0.3$.}
+  \includegraphics[width=0.95\textwidth]{figures/geometria_arteria.tiff} \\
+  \vspace{0.3cm}
+  \includegraphics[width=0.95\textwidth]{figures/geometria_arteria_structured.tiff}
+  \caption{Ejemplo de geometría arterial mallada generada con $\eta=0.6$ y $\alpha = 0.3$: (a) malla no estructurada, (b) malla estructurada transfinita.}
   \label{fig:eac_geometria_arteria}
 \end{figure}
 
@@ -981,27 +983,34 @@ Para casos de severidad baja ($\eta = 0.25$), se observa un régimen predominant
   \label{fig:flujo_bajo}
 \end{figure}
 
-Por el contrario, en los escenarios de severidad alta ($\eta = 0.75$), inicialmente el desarrollo del flujo es altamente inestable. Independientemente de la pendiente, durante los primeros instantes de la simulación se observa una perturbación que se propaga axialmente como una onda. Esta estructura presenta un núcleo central de flujo laminar, con unos vórtices que viajan junto a la onda a lo largo de la arteria (\Cref{fig:flujo_alto_transiente}).
+En los escenarios de severidad alta ($\eta = 0.75$), la simulación con malla no estructurada presenta un flujo altamente inestable, se observa una perturbación que se propaga axialmente como una onda, acompañada de unos vórtices que viajan junto a ella a lo largo de la arteria (\Cref{fig:flujo_alto_transiente}). Al alcanzar el estado estacionario, el flujo exhibe una asimetría marcada en la región post-estenótica, con el chorro de fluido adhiriéndose lateralmente a una pared (\Cref{fig:flujo_alto_estacionario}).
 
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_slope_bajo.pdf} \\
   \vspace{0.5cm}
   \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_slope_alto.pdf}
-  \caption{Campos de velocidad en $T=0.07 \, \mathrm{s}$ para severidad alta ($\eta=0.75$): pendiente baja ($\alpha=0.05$, arriba) y pendiente alta ($\alpha=0.3$, abajo).}
+  \caption{Campos de velocidad en $T=0.07 \, \mathrm{s}$ para severidad alta ($\eta=0.75$) con malla no estructurada: pendiente baja ($\alpha=0.05$, arriba) y pendiente alta ($\alpha=0.3$, abajo).}
   \label{fig:flujo_alto_transiente}
 \end{figure}
 
-Una vez alcanzado el estado estacionario en los casos de severidad severa, el flujo exhibe una asimetría marcada en la región post-estenótica. El chorro de fluido, tras ser acelerado por el estrechamiento, tiende a pegarse lateralmente a una de las paredes de la arteria, provocando una zona de recirculación de gran tamaño en la pared opuesta. Posteriormente, la línea de flujo principal cambia de pared, induciendo una segunda zona de recirculación opuesta a la anterior. Finalmente, la energía se disipa y el flujo recupera gradualmente un perfil parabólico completamente laminar hacia el extremo distal de la arteria (\Cref{fig:flujo_alto_estacionario}).
-
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_estado_estacionario2.pdf}
-  \caption{Estado estacionario para severidad alta ($\eta=0.75$). Se observa el efecto de adhesión a las paredes y la formación de zonas de recirculación alternas antes de la recuperación del perfil laminar distal.}
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_estado_estacionario.pdf}
+  \caption{Campo de velocidad en estado estacionario para severidad alta ($\eta=0.75$) con malla no estructurada.}
   \label{fig:flujo_alto_estacionario}
 \end{figure}
 
+Sin embargo, al emplear la malla estructurada que preserva la simetría radial, la perturbación transitoria desaparece y el flujo permanece simétrico durante toda la simulación (\Cref{fig:flujo_alto_comparacion_malla}). Esto indica que la asimetría observada con la malla no estructurada es un artefacto numérico inducido por una discretización que no reproduce la simetría del dominio. Fisicamente la onda no tiene razón de ser, ya que el flujo es simétrico y para el número de Reynolds en este caso ($\Re \approx 204$), se espera que el flujo sea laminar.
 
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/flujo_structured_severity75.tiff}
+  \caption{Campo de velocidad en estado estacionario para severidad alta ($\eta=0.75$) con malla estructurada simétrica.}
+  \label{fig:flujo_alto_comparacion_malla}
+\end{figure}
+
+Para cuantificar el impacto de este artefacto sobre el indicador diagnóstico central del estudio, se compararon los valores de FFR obtenidos con ambas discretizaciones para varios escenarios representativos del rango de parámetros de interés. La diferencia relativa promedio del FFR entre ambos tipos de malla fue de aproximadamente $2\%$, en línea con el criterio de convergencia de malla empleado en este caso, que fue del $3\%$. Es razonable que los indices no sean exactamente iguales, ya que las mallas no solo tienen distinta estructura sino que tienen un número de elementos ligeramente diferente. No obstante, la concordancia del FFR no es inesperada, ya que el canal es lo suficientemente largo ($L=138$ mm) como para que las perturbaciones generadas en la malla no estructurada se disipen antes de alcanzar la salida, de modo que en ambos tipos de malla el perfil de velocidad recupera la forma parabólica y la presión distal resulta ser equivalente.
 
 Respecto al comportamiento de la presión, en la \cref{fig:presion_dist} se presenta el campo de presión para un escenario de severidad baja ($\eta=0.25$) y pendiente baja ($\alpha=0.05$). Se observa un gradiente de presión uniforme desde la entrada hasta la salida del dominio, consistente con el valor de FFR obtenido (donde la pérdida de presión global está determinada por la morfología, como se analiza en la \cref{sec:impacto_morfologia_estenosis}). No obstante, existe una caída de presión localizada en el centro de la estenosis; en este punto, la presión disminuye de forma más pronunciada que el gradiente general para luego recuperarse parcialmente y continuar con la tendencia del gradiente hacia la salida. Este descenso puntual es tanto más abrupto como de mayor magnitud a medida que aumentan la pendiente y la severidad de la lesión, comportamiento que contrasta con el del índice FFR, el cual presenta una relación inversa con el parámetro de pendiente.
 
@@ -1259,6 +1268,8 @@ En primer lugar, la suposición de paredes rígidas en la arteria y el árbol es
 Por otro lado, el tratamiento de la sangre como un fluido Newtoniano subestima la caída de presión total entre un $7.8\%$ y un $12.4\%$ según Dutra et al. \cite{Dutra2021Effect}. Johnston \cite{Johnston2006Modelling} y Wajihah et al. \cite{Wajihah2023Review} reportan que el modelo no-Newtoniano adecuado captura variaciones en el esfuerzo de corte de pared en regiones de bajo flujo y recirculación post-estenótica, donde la viscosidad aumenta de forma no lineal debido a la agregación eritrocitaria.
 
 Por último, la prescripción de condiciones de frontera fijas de resistencia constituye una simplificación que, según Gashi \cite{Gashi2019Impact}, introduce incertidumbre en los cálculos de flujo coronario. Adicionalmente, el modelo no incorpora ni el tono vasomotor dinámico (contracción del miocardio) ni la respuesta a estímulos químicos \cite{Huo2009Effect} que inducen la constricción o dilatación de los vasos. Esta simplificación, sin embargo, no compromete los resultados del presente estudio, dado que el FFR se mide bajo condiciones de hiperemia máxima, donde la regulación vascular está suprimida y la resistencia microvascular se aproxima a un valor estable. De igual manera, si bien un modelo 3D permitiría observar efectos de flujo más complejos \cite{ku_blood_1997}, no está claro si esto cambiaría significativamente los resultados sobre el flujo coronario obtenidos con el presente modelo 2D; explorar estas diferencias en trabajos posteriores sería interesante.
+
+Un hallazgo metodológico relevante fue la sensibilidad del patrón de flujo post-estenótico a la estrategia de mallado. La malla no estructurada que no preserva la simetría radial indujo una asimetría espuria en el chorro post-estenótico que desapareció al emplear una malla estructurada transfinita. Sin embargo, los valores de FFR resultaron robustos frente a la discretización espacial. Esto se debe a que la longitud del canal es suficiente para que el perfil parabólico de velocidad se reestablezca antes de la salida. En consecuencia, las conclusiones sobre la relación entre morfología de la estenosis y FFR no se ven afectadas por este fenómeno.
 
 Más allá de las limitaciones mencionadas, el modelo paramétrico logró predicciones significativas del FFR ($R^2 = 0.85$) con un costo de inferencia mínimo.
 
