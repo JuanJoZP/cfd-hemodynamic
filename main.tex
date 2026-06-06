@@ -135,7 +135,7 @@ La simulación precisa de la hemodinámica coronaria exige una metodología robu
 
 En el contexto coronario, el CFD permite una resolución espacial y temporal de variables hemodinámicas difícil de obtener in vivo. Específicamente, permite cuantificar el impacto funcional de una estenosis y analizar fenómenos locales clave para la aterosclerosis, como las zonas de recirculación y las zonas de bajo esfuerzo de corte de pared (WSS) \cite{malek_hemodynamic_1999}.
 
-El flujo sanguíneo en las arterias coronarias presenta una naturaleza compleja debido a su composición celular. No obstante, en arterias de gran y mediano calibre, la velocidad de corte es lo suficientemente elevada como para que la viscosidad se mantenga prácticamente constante. En este sentido, estudios previos \cite{modelnonnewtonian,johnston_non-newtonian_2004,cho_nonnewtonian_1991} han demostrado que un modelo newtoniano para la sangre constituye una aproximación válida para el cálculo de variables hemodinámicas en estos vasos. Para velocidades medias ($\approx 0,2\,\text{m/s}$), el esfuerzo de corte de pared (WSS) es virtualmente indistinguible entre modelos newtonianos y no-newtonianos \cite{johnston_non-newtonian_2004}.
+El flujo sanguíneo en las arterias coronarias presenta una naturaleza compleja debido a su composición celular. No obstante, en arterias de gran y mediano calibre, la velocidad de corte es lo suficientemente elevada como para que la viscosidad se mantenga prácticamente constante. En este sentido, estudios previos \cite{modelnonnewtonian,johnston_non-newtonian_2004,cho_nonnewtonian_1991} han demostrado que un modelo newtoniano para la sangre constituye una aproximación válida para el cálculo de variables hemodinámicas en estos vasos. Por ejemplo, para velocidades medias como las de la arteria descendente anterior izquierda ($\approx 0,2\,\text{m/s}$) \cite{velocity_lad}, el esfuerzo de corte de pared (WSS) es casi idéntico entre modelos newtonianos y no-newtonianos \cite{johnston_non-newtonian_2004}.
 
 Bajo esta premisa, se adoptan dos supuestos fundamentales para el desarrollo del modelo:
 \begin{itemize}
@@ -528,9 +528,9 @@ Para la comparación de resultados se miden las fuerzas de arrastre y sustentaci
 \noindent donde $\eta$ es el vector normal exterior al círculo (apuntando hacia el fluido). Los coeficientes adimensionales correspondientes se definen como
 \begin{equation}
   \label{eq:dfg1_coeffs}
-  C_D = \frac{2}{\rho, U_{\mathrm{mean}}^2\,L}\,F_D,
+  C_D = \frac{2}{\rho\, U_{\mathrm{mean}}^2\,L}\,F_D,
   \qquad
-  C_L = \frac{2}{\rho, U_{\mathrm{mean}}^2\,L}\,F_L.
+  C_L = \frac{2}{\rho\, U_{\mathrm{mean}}^2\,L}\,F_L.
 \end{equation}
 
 Para el caso $Re=20$, el flujo alcanza un estado estacionario. La simulación transitoria se realiza hasta que se satisfaga el criterio de convergencia relativa definido en la \cref{eq:steady_state_criterion}.
@@ -674,7 +674,7 @@ No obstante, la condición de presión impuesta débilmente en el outlet puede i
 \end{equation*}
 es la parte negativa de la velocidad normal evaluada en el paso anterior, de modo que el término solo penaliza donde el flujo retrocede.
 
-La elección de $p_{\mathrm{out}}^n$ requiere especial atención. La presión en la salida del dominio no es independiente de la geometría simulada, ya que a mayor severidad de la estenosis, mayor es el gradiente de presión a través del vaso, y la presión en el outlet también depende de la resistencia hidráulica en la microvasculatura distal que no se simula explícitamente por completo. En consecuencia, la presión de salida no puede prescribirse directamente a partir de datos conocidos a priori.
+La elección de $p_{\mathrm{out}}^n$ requiere especial atención. La presión en la salida del dominio no es independiente de la geometría simulada, ya que a mayor severidad de la estenosis, mayor es el gradiente de presión a través del vaso, y la presión en el outlet también depende de la resistencia hidráulica en la microvasculatura distal que no se simula explícitamente por completo. En consecuencia, la presión de salida no puede prescribirse directamente a partir de datos conocidos a priori. Tampoco es adecuado imponer una condición de velocidad media en la salida, pues fijaría el caudal que atraviesa la estenosis, cuando este debe ser una consecuencia de la interacción entre la geometría y la resistencia distal; al predeterminar el caudal se condiciona artificialmente la caída de presión y, por tanto, la FFR.
 
 Una elección consistente con la fisiología es suponer una relación lineal entre el flujo volumétrico $Q$ y la presión en el outlet:
 \begin{equation}
@@ -812,7 +812,7 @@ La geometría del segmento arterial se parametrizó con base en medidas morfomé
 
 La presión de entrada se fijó en $p_{\mathrm{in}} = 70\,\mathrm{mmHg}$, valor representativo de la presión diastólica normal \cite{blood_pressure_aha}. Para las propiedades del fluido se adoptaron valores estándar de la sangre: densidad $\rho = 1.060\times10^{-3}\,\mathrm{g/mm^3}$ y viscosidad dinámica $\mu = 3.5\times10^{-3}\,\mathrm{Pa\cdot s}$ \cite{ku_blood_1997}. Para el esquema numérico se seleccionó un paso de tiempo $\Delta t = 10^{-4}\,\mathrm{s}$, un parámetro de penalización de \textit{backflow} $\beta_b = 0.6$ y un parámetro de Nitsche $\beta_N = 100$.
 
-Para el árbol microvascular, se decidió generar $3$ niveles. Esta elección se fundamenta en simulaciones preliminares que mostraron que, a partir de dicho nivel, el número de Reynolds es muy bajo ($Re < 5$), por lo que el flujo entra en un régimen laminar y completamente desarrollado, en consecuencia, la dinámica de flujo en el resto del árbol vascular puede aproximarse adecuadamente de forma analítica \cite{mcdonalds_fisiology, outflow_resistance}.
+Para el árbol microvascular, se decidió generar $3$ niveles. En la arteria y en los primeros niveles del árbol ($j=0,1,2$), el número de Reynolds se mantiene en el orden de $10^1$--$10^2$ (e.g., $Re \approx 204$ en la arteria, $Re \approx 102$ en $j=1$), por lo que los efectos inerciales son importantes y se requiere simulación numérica. En cambio, a partir del tercer nivel, simulaciones preliminares mostraron que el número de Reynolds es bajo ($Re < 5$), los efectos inerciales se vuelven menores y la dinámica converge hacia un flujo de Stokes completamente desarrollado, que puede aproximarse analíticamente \cite{mcdonalds_fisiology, outflow_resistance}.
 
 Por otro lado, el valor de la resistencia de salida $R$ se estimó a partir de mediciones promedio de presión y flujo en pacientes sanos. Según \cite{velocity_lad}, la velocidad de flujo media en la LAD a nivel distal es de $v_{\mathrm{media}} = 280\,\mathrm{mm/s}$. La velocidad media sobre un diámetro transversal de altura $h$ se expresa como:
 \begin{equation*}
@@ -837,7 +837,7 @@ Se realizó un estudio de convergencia de malla con el fin de determinar una res
 
 Se adoptó una estrategia de refinamiento hp, donde se reduce el tamaño de los elementos de la malla, al tiempo que se aumenta el orden de los polinomios de aproximación, hasta lograr convergencia de la solución \cite{ref_hp}. La convergencia se evaluó una vez alcanzado el estado estacionario, mediante el cambio en la norma $L^2$ en el ultimo paso de tiempo, tanto de la velocidad como de la presión entre dos simulaciones consecutivas.  
 
-Se analizó la geometría completa, estenosis y árbol microvascular con tres niveles; se consideraron tres escenarios: obstrucción leve (25\%), moderada (50\%) y severa (75\%). Se inició con polinomios de grado uno y elementos de tamaño $0.3$ mm y se obtuvo convergencia (cambio $< 1\%$) con polinomios de grado dos y elementos de tamaño $0.15$ mm. 
+Se analizó la geometría completa, estenosis y árbol microvascular con tres niveles; se consideraron tres escenarios: obstrucción leve (25\%), moderada (50\%) y severa (75\%). Se inició con polinomios de grado uno y elementos de tamaño $0.3$ mm y con polinomios de grado dos y elementos de tamaño $0.15$ mm se obtuvo convergencia (cambio $< 3\%$) para todas las mallas. 
 
 \subsubsection{Impacto de la forma de la estenosis}
 
@@ -974,9 +974,9 @@ Para casos de severidad baja ($\eta = 0.25$), se observa un régimen predominant
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_bajo_slope_bajo.tiff} \\
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_bajo_slope_bajo.pdf} \\
   \vspace{0.5cm}
-  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_bajo_slope_alto.tiff}
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_bajo_slope_alto.pdf}
   \caption{Campos de velocidad para severidad baja ($\eta=0.25$): pendiente baja ($\alpha=0.05$, arriba) y pendiente alta ($\alpha=0.3$, abajo).}
   \label{fig:flujo_bajo}
 \end{figure}
@@ -985,9 +985,9 @@ Por el contrario, en los escenarios de severidad alta ($\eta = 0.75$), inicialme
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_slope_bajo.tiff} \\
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_slope_bajo.pdf} \\
   \vspace{0.5cm}
-  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_slope_alto.tiff}
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_slope_alto.pdf}
   \caption{Campos de velocidad en $T=0.07 \, \mathrm{s}$ para severidad alta ($\eta=0.75$): pendiente baja ($\alpha=0.05$, arriba) y pendiente alta ($\alpha=0.3$, abajo).}
   \label{fig:flujo_alto_transiente}
 \end{figure}
@@ -996,7 +996,7 @@ Una vez alcanzado el estado estacionario en los casos de severidad severa, el fl
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_estado_estacionario.tiff}
+  \includegraphics[width=0.9\textwidth]{figures/flujo_severity_alto_estado_estacionario2.pdf}
   \caption{Estado estacionario para severidad alta ($\eta=0.75$). Se observa el efecto de adhesión a las paredes y la formación de zonas de recirculación alternas antes de la recuperación del perfil laminar distal.}
   \label{fig:flujo_alto_estacionario}
 \end{figure}
@@ -1007,7 +1007,7 @@ Respecto al comportamiento de la presión, en la \cref{fig:presion_dist} se pres
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.9\textwidth]{figures/presion_dist.tiff}
+  \includegraphics[width=0.9\textwidth]{figures/presion_dist.pdf}
   \caption{Campo de presión para severidad baja ($\eta=0.25$) y pendiente baja ($\alpha=0.05$).}
   \label{fig:presion_dist}
 \end{figure}
@@ -1086,7 +1086,7 @@ Cualitativamente, el campo de velocidades (\Cref{fig:flujo_arbol}) en el árbol 
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.7\textwidth]{figures/flujo_arbol.tiff}
+  \includegraphics[width=0.7\textwidth]{figures/flujo_arbol2.pdf}
   \caption{Campo de velocidad en el árbol microvascular.}
   \label{fig:flujo_arbol}
 \end{figure}
@@ -1100,11 +1100,11 @@ Cualitativamente, el campo de velocidades (\Cref{fig:flujo_arbol}) en el árbol 
 
 Respecto a la distribución del flujo y la simetría, se observa que ésta solo se mantiene en la primera bifurcación. Tras la división inicial, el fluido sale con más velocidad por la pared interna (la más cercana al centro del árbol) de los vasos del segundo nivel. En consecuencia, al alcanzar la siguiente ramificación, el flujo no encuentra la bifurcación de forma frontal sino con un ligero desplazamiento hacia el centro, provocando que los vasos del tercer nivel no reciban el mismo caudal; los centrales reciben más que los periféricos. En niveles posteriores, siguiendo la misma lógica, el patrón se repetiría aunque con una magnitud decreciente, ya que el incremento de las fuerzas viscosas favorece una mayor disipación radial del flujo.
 
-Por otro lado, la distribución de presiones en el árbol microvascular (\Cref{fig:presion_arbol}) muestra un rango de variación muy reducido, con valores que oscilan apenas entre $43.41$ y $43.98\,\mathrm{mmHg}$. En cada bifurcación se observan incrementos localizados de presión en la pared que se enfrenta directamente al flujo del vaso precedente. Sin embargo, la magnitud de las diferencias es tan pequeña que puede ser atribuida a imprecisiones numéricas o a la resolución del método empleado, por lo que no se puede concluir nada al respecto.
+Por otro lado, la distribución de presiones en el árbol microvascular (\Cref{fig:presion_arbol}) muestra un rango de variación reducido, con valores que oscilan apenas entre $43.41$ y $43.98\,\mathrm{mmHg}$. En cada bifurcación se observan incrementos localizados de presión en la pared que se enfrenta directamente al flujo del vaso precedente. A pesar de la pequeña magnitud de las diferencias, se presentaron de forma sistematica en todos los casos evaluados, y en las mallas de menor resolución. Fisicamente este comportamiento es consistente con la conversión de energía cinética en energía de presión en las bifurcaciones. El flujo incide frontalmente sobre la bifurcación, entonces la velocidad disminuye y la presión aumenta, tal como se observa en las \cref{fig:flujo_arbol,fig:presion_arbol}.
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.7\textwidth]{figures/presion_arbol.tiff}
+  \includegraphics[width=0.7\textwidth]{figures/presion_arbol.pdf}
   \caption{Campo de presión en el árbol microvascular.}
   \label{fig:presion_arbol}
 \end{figure}
