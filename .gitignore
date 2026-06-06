@@ -26,3 +26,5 @@ vascusynth.sif
 *.synctex.gz
 *.pdf
 .vscode/
+*.toc
+*.xcf

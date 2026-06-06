@@ -263,10 +263,15 @@ class StenosisPressureStructuredSimulation(Scenario):
         else:
             n_bezier = max(2, int(math.ceil(dist_x / res)))
 
+        len_pre = math.sqrt(cp1_x**2 + (y_top_cp1 - y_top_0)**2)
+        len_post = math.sqrt((L - cp2_x)**2 + (y_top_L - y_top_cp2)**2)
+
         if nx_line is not None:
-            n_line = max(2, int(nx_line))
+            n_line_pre = max(2, int(nx_line))
+            n_line_post = max(2, int(nx_line))
         else:
-            n_line = max(2, n_bezier // 2)
+            n_line_pre = max(2, int(math.ceil(len_pre / res)))
+            n_line_post = max(2, int(math.ceil(len_post / res)))
 
         # --- gmsh geometry ---
         gmsh.initialize()
@@ -361,10 +366,10 @@ class StenosisPressureStructuredSimulation(Scenario):
             gmsh.model.mesh.setTransfiniteCurve(l_inlet, n_inlet + 1)
             gmsh.model.mesh.setTransfiniteCurve(l_outlet, n_outlet + 1)
 
-            gmsh.model.mesh.setTransfiniteCurve(l_top_pre, n_line + 1)
-            gmsh.model.mesh.setTransfiniteCurve(l_top_post, n_line + 1)
-            gmsh.model.mesh.setTransfiniteCurve(l_bot_pre, n_line + 1)
-            gmsh.model.mesh.setTransfiniteCurve(l_bot_post, n_line + 1)
+            gmsh.model.mesh.setTransfiniteCurve(l_top_pre, n_line_pre + 1)
+            gmsh.model.mesh.setTransfiniteCurve(l_top_post, n_line_post + 1)
+            gmsh.model.mesh.setTransfiniteCurve(l_bot_pre, n_line_pre + 1)
+            gmsh.model.mesh.setTransfiniteCurve(l_bot_post, n_line_post + 1)
 
             gmsh.model.mesh.setTransfiniteCurve(bez_top1, n_bezier + 1)
             gmsh.model.mesh.setTransfiniteCurve(bez_top2, n_bezier + 1)
