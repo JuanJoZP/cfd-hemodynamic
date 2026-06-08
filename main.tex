@@ -698,7 +698,7 @@ Para el escenario acoplado de la estenosis con el árbol microvascular explícit
   R_{\mathrm{out}} = R_{\mathrm{target}} - R_{\mathrm{arbol}}.
 \end{equation}
 
-El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que se conoce el radio de los vasos en cada nivel gracias a la ley de Murray (\cref{eq:ley_murray}). Para este desarrollo se asume el perfil de flujo de Poiseuille para conductos cilíndricos. Bajo estas condiciones, la resistencia hidráulica de un vaso de radio $r$ y longitud $L$ viene dada por \cite{outflow_resistance}:
+El valor de $R_{\mathrm{arbol}}$ se puede aproximar de forma analítica aprovechando que se conoce el radio de los vasos en cada nivel gracias a la ley de Murray (\cref{eq:ley_murray}). Para este desarrollo se asume el perfil de flujo de Poiseuille para conductos cilíndricos; no se consideran efectos de tensión superficial, fuerzas de adherencia ni partículas en suspensión. Bajo estas condiciones, la resistencia hidráulica de un vaso de radio $r$ y longitud $L$ viene dada por \cite{outflow_resistance}:
 \begin{equation} \label{eq:resistencia_vaso}
   R = \frac{8 \mu L}{\pi r^4}
 \end{equation}
@@ -1001,7 +1001,7 @@ En los escenarios de severidad alta ($\eta = 0.75$), la simulación con malla no
   \label{fig:flujo_alto_estacionario}
 \end{figure}
 
-Sin embargo, al emplear la malla estructurada que preserva la simetría radial, la perturbación transitoria desaparece y el flujo permanece simétrico durante toda la simulación (\Cref{fig:flujo_alto_comparacion_malla}). Esto indica que la asimetría observada con la malla no estructurada es un artefacto numérico inducido por una discretización que no reproduce la simetría del dominio. Fisicamente la onda no tiene razón de ser, ya que el flujo es simétrico y para el número de Reynolds en este caso ($\Re \approx 204$), se espera que el flujo sea laminar.
+Sin embargo, al emplear la malla estructurada que preserva la simetría radial, la perturbación transitoria desaparece y el flujo permanece simétrico durante toda la simulación (\Cref{fig:flujo_alto_comparacion_malla}). Esto indica que la asimetría observada con la malla no estructurada es un artefacto numérico inducido por una discretización que no reproduce la simetría del dominio. Fisicamente la onda no tiene razón de ser, ya que el flujo es simétrico y para el número de Reynolds en este caso ($\text{Re} \approx 204$), se espera que el flujo sea laminar.
 
 \begin{figure}[htbp]
   \centering
