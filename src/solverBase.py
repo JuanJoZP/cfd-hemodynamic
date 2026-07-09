@@ -110,13 +110,16 @@ class SolverBase(ABC):
     ) -> None:
         """
         Initialize the function space for velocity `self.V`.
-        Initialize the solution function `self.u_sol` in the velocity space, this is used by simulation to save the solution to a file.
+        Initialize the solution function `self.u_sol` in the velocity space,
+        this is used by simulation to save the solution to a file.
         """
         element_v = element(family, cell, deegre, shape=shape)
         self._V = functionspace(self.mesh, element_v)
         self._u_sol = Function(self.V)
         self._u_sol.name = "velocity"
         self._u_prev = Function(self.V)
+        self.u_residual = Function(self.V)
+        self.u_residual.name = "u_residual"
 
     def initPressureSpace(
         self,
@@ -127,13 +130,16 @@ class SolverBase(ABC):
     ) -> None:
         """
         Initialize the function space for pressure `self.Q`.
-        Initialize the solution function `self.p_sol` in the pressure space, this is used by simulation to save the solution to a file.
+        Initialize the solution function `self.p_sol` in the pressure space,
+        this is used by simulation to save the solution to a file.
         """
         element_p = element(family, cell, deegre, shape=shape)
         self._Q = functionspace(self.mesh, element_p)
         self._p_sol = Function(self.Q)
         self._p_sol.name = "pressure"
         self._p_prev = Function(self.Q)
+        self.p_residual = Function(self.Q)
+        self.p_residual.name = "p_residual"
 
     def initStressForm(self):
         scalar = functionspace(

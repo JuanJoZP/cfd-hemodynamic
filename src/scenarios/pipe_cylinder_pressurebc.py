@@ -20,13 +20,34 @@ class PipeCylinderSimulation(Scenario):
     obstacle_marker = 5
 
     def __init__(
-        self, solver_name, dt, T, f: tuple[float, float] = (0, 0), *, rho=1, mu=1e-3
+        self,
+        solver_name,
+        dt,
+        T,
+        f: tuple[float, float] = (0, 0),
+        *,
+        rho=1,
+        mu=1e-3,
+        p_inlet: float,
+        p_outlet: float,
     ):
+        self.p_inlet = float(p_inlet)
+        self.p_outlet = float(p_outlet)
         self._mesh: Mesh = None
         self._ft = None
         self._bcu: list[BoundaryCondition] = None
         self._bcp: list[BoundaryCondition] = None
-        super().__init__(solver_name, "pipe_cylinder", rho, mu, dt, T, f)
+        super().__init__(
+            solver_name,
+            "pipe_cylinder",
+            rho,
+            mu,
+            dt,
+            T,
+            f,
+            p_inlet=self.p_inlet,
+            p_outlet=self.p_outlet,
+        )
 
         self.mesh.topology.create_connectivity(
             self.mesh.topology.dim - 1, self.mesh.topology.dim
@@ -52,11 +73,11 @@ class PipeCylinderSimulation(Scenario):
     def bcu(self):
         if not self._bcu:
             fdim = self.mesh.topology.dim - 1
-            u_inlet = Function(self.solver.V)
-            u_inlet.interpolate(self.inlet_velocity)
-            entities_inflow = self._ft.find(self.inlet_marker)
-            bcu_inflow = BoundaryCondition(u_inlet)
-            bcu_inflow.initTopological(fdim, entities_inflow)
+            # u_inlet = Function(self.solver.V)
+            # u_inlet.interpolate(self.inlet_velocity)
+            # entities_inflow = self._ft.find(self.inlet_marker)
+            # bcu_inflow = BoundaryCondition(u_inlet)
+            # bcu_inflow.initTopological(fdim, entities_inflow)
 
             u_nonslip = Function(self.solver.V)
             u_nonslip.x.array[:] = 0
@@ -68,21 +89,21 @@ class PipeCylinderSimulation(Scenario):
             bcu_obstacle = BoundaryCondition(u_nonslip)
             bcu_obstacle.initTopological(fdim, entities_obstacle)
 
-            self._bcu = [bcu_inflow, bcu_obstacle, bcu_walls]
+            self._bcu = [bcu_obstacle, bcu_walls]
 
         return self._bcu
 
     @property
     def bcp(self):
         if not self._bcp:
-            fdim = self.mesh.topology.dim - 1
-            pr = Function(self.solver.Q)
-            pr.x.array[:] = 0
-            outflow_facets = self._ft.find(self.outlet_marker)
-            bc_outflow = BoundaryCondition(pr)
-            bc_outflow.initTopological(fdim, outflow_facets)
+            # fdim = self.mesh.topology.dim - 1
+            # pr = Function(self.solver.Q)
+            # pr.x.array[:] = 0
+            # outflow_facets = self._ft.find(self.outlet_marker)
+            # bc_outflow = BoundaryCondition(pr)
+            # bc_outflow.initTopological(fdim, outflow_facets)
 
-            self._bcp = [bc_outflow]
+            self._bcp = []
 
         return self._bcp
 

@@ -7,6 +7,8 @@
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:30:00
 #SBATCH --array=0-5
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=juanjo.zuluaga@urosario.edu.co
 
 export PYTHONPATH=$(pwd):$PYTHONPATH
 

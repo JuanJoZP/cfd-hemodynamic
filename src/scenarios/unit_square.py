@@ -1,6 +1,12 @@
 import numpy as np
 from dolfinx.fem import Function
-from dolfinx.mesh import CellType, Mesh, create_unit_square, locate_entities_boundary
+from dolfinx.mesh import (
+    CellType,
+    Mesh,
+    create_unit_square,
+    locate_entities_boundary,
+    meshtags,
+)
 from mpi4py import MPI
 from petsc4py import PETSc
 
@@ -9,12 +15,17 @@ from src.scenario import Scenario
 
 
 class UnitSquareSimulation(Scenario):
+    inlet_marker = 1
+    outlet_marker = 2
+    wall_marker = 3
+
     def __init__(
         self, solver_name, dt, T, f: tuple[float, float] = (0, 0), *, rho=1, mu=1
     ):
         self._mesh: Mesh = None
         self._bcu: list[BoundaryCondition] = None
         self._bcp: list[BoundaryCondition] = None
+        self._ft = None
         super().__init__(solver_name, "unit_square", rho, mu, dt, T, f)
 
         self.setup()
@@ -24,6 +35,25 @@ class UnitSquareSimulation(Scenario):
         if not self._mesh:
             self._mesh = create_unit_square(
                 MPI.COMM_WORLD, 32, 32, cell_type=CellType.quadrilateral
+            )
+
+            # Create facet tags
+            fdim = self._mesh.topology.dim - 1
+            inflow_facets = locate_entities_boundary(self._mesh, fdim, self.inflow)
+            outflow_facets = locate_entities_boundary(self._mesh, fdim, self.outflow)
+            wall_facets = locate_entities_boundary(self._mesh, fdim, self.walls)
+
+            indices = np.concatenate([inflow_facets, outflow_facets, wall_facets])
+            values = np.concatenate(
+                [
+                    np.full(len(inflow_facets), self.inlet_marker, dtype=np.int32),
+                    np.full(len(outflow_facets), self.outlet_marker, dtype=np.int32),
+                    np.full(len(wall_facets), self.wall_marker, dtype=np.int32),
+                ]
+            )
+            sorted_indices = np.argsort(indices)
+            self._ft = meshtags(
+                self._mesh, fdim, indices[sorted_indices], values[sorted_indices]
             )
 
         return self._mesh

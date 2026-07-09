@@ -1,5 +1,3 @@
-# SUPG, PSPG, and LSIC stabilization, newton linealization, full schur preconditioning
-
 from typing import Callable
 
 import numpy as np
@@ -13,7 +11,6 @@ from dolfinx.fem.petsc import (
 from dolfinx.mesh import Mesh
 from petsc4py import PETSc
 from ufl import (
-    CellDiameter,
     FacetNormal,
     MixedFunctionSpace,
     TestFunctions,
@@ -48,7 +45,6 @@ class Solver(SolverBase):
         mu: float,
         f: list,
         initial_velocity: Callable[[np.ndarray], np.ndarray] = None,
-        **kwargs,
     ):
         super().__init__(mesh, dt, rho, mu, f)
 
@@ -64,20 +60,33 @@ class Solver(SolverBase):
         if initial_velocity:
             self.u_prev.interpolate(initial_velocity)
 
-        # weak form
+        # BDF2 state: u at time n-1
+        self.u_prev2 = Function(self.V)
+
+        # BDF coefficients as updateable Constants (start with BDF1)
+        self.bdf_a0 = Constant(mesh, PETSc.ScalarType(1.0))
+        self.bdf_a1 = Constant(mesh, PETSc.ScalarType(-1.0))
+        self.bdf_a2 = Constant(mesh, PETSc.ScalarType(0.0))
+
+        self.step_count = 0
+
+        # weak form — spatial terms at u_sol (fully implicit, consistent with BDF2)
         u_sol = self.u_sol
         p_sol = self.p_sol
         u_prev = self.u_prev
-        u_mid = 0.5 * (u_sol + u_prev)
+        u_prev2 = self.u_prev2
         n = FacetNormal(self.mesh)
 
-        F = self.rho * inner(v, (u_sol - u_prev) / self.dt) * dx
-        F += self.rho * dot(v, dot(u_mid, nabla_grad(u_mid))) * dx
+        F = self.rho * inner(
+            v,
+            (self.bdf_a0 * u_sol + self.bdf_a1 * u_prev + self.bdf_a2 * u_prev2)
+            / self.dt,
+        ) * dx
+        F += self.rho * dot(v, dot(u_sol, nabla_grad(u_sol))) * dx
         F -= inner(v, self.rho * self.f) * dx
-        F += inner(self.epsilon(v), self.sigma(u_mid, p_sol, self.mu)) * dx
-        # probar p_prev en vez de p_sol
-        F += dot(p_sol * n, v) * ds - dot(mu * nabla_grad(u_mid) * n, v) * ds
-        F += inner(q, div(u_mid)) * dx
+        F += inner(self.epsilon(v), self.sigma(u_sol, p_sol, self.mu)) * dx
+        F += dot(p_sol * n, v) * ds - dot(self.mu * nabla_grad(u_sol) * n, v) * ds
+        F += inner(q, div(u_sol)) * dx
 
         # stabilization terms
         V_dg0 = functionspace(mesh, ("DG", 0))
@@ -86,14 +95,17 @@ class Solver(SolverBase):
             mesh.topology.dim,
             np.arange(h.x.index_map.size_local + h.x.index_map.num_ghosts),
         )
-        # h = CellDiameter(self.mesh)
 
         vnorm = sqrt(
             inner(u_prev, u_prev)
         )  # u_prev instead of u_sol to avoid nonlinearity after derivation
 
-        R = self.rho * ((u_sol - u_prev) / self.dt + dot(u_mid, nabla_grad(u_mid)))
-        R -= div(self.sigma(u_mid, p_sol, self.mu))
+        R = self.rho * (
+            (self.bdf_a0 * u_sol + self.bdf_a1 * u_prev + self.bdf_a2 * u_prev2)
+            / self.dt
+            + dot(u_sol, nabla_grad(u_sol))
+        )
+        R -= div(self.sigma(u_sol, p_sol, self.mu))
         R -= self.rho * self.f
 
         # SUPG
@@ -106,7 +118,7 @@ class Solver(SolverBase):
         tau_supg = (
             1 / (tau_supg1**2) + 1 / (tau_supg2**2) + 1 / (tau_supg3**2)
         ) ** (-1 / 2)
-        F_supg = inner(tau_supg * R, dot(u_mid, nabla_grad(v))) * dx
+        F_supg = inner(tau_supg * R, dot(u_sol, nabla_grad(v))) * dx
 
         # PSPG
         tau_pspg = tau_supg
@@ -116,7 +128,7 @@ class Solver(SolverBase):
         Re = (vnorm * h) / (2.0 * (self.mu / self.rho))
         z = conditional(le(Re, 3), Re / 3, 1.0)
         tau_lsic = (vnorm * h * z) / 2.0
-        F_lsic = tau_lsic * inner(div(u_mid), self.rho * div(v)) * dx
+        F_lsic = tau_lsic * inner(div(u_sol), self.rho * div(v)) * dx
 
         F += F_supg + F_lsic
         F += F_pspg
@@ -231,8 +243,9 @@ class Solver(SolverBase):
         pc = ksp.getPC()
         pc.setType("fieldsplit")
         pc.setFieldSplitType(PETSc.PC.CompositeType.SCHUR)
-        pc.setFieldSplitSchurFactType(PETSc.PC.SchurFactType.FULL)
-        pc.setFieldSplitSchurPreType(PETSc.PC.SchurPreType.SELFP)
+        pc.setFieldSplitSchurFactType(PETSc.PC.SchurFactType.LOWER)
+
+        pc.setFieldSplitSchurPreType(PETSc.PC.SchurPreType.SELF)
 
         V_map = self.V.dofmap.index_map
         Q_map = self.Q.dofmap.index_map
@@ -252,25 +265,23 @@ class Solver(SolverBase):
         pc.setFieldSplitIS(("u", is_u), ("p", is_p))
         pc.setUp()
 
-        # set solvers for schur and pressure blocks
-        ksp_u, ksp_p = pc.getFieldSplitSchurGetSubKSP()
-        # ksp_u.setType("preonly")
-        # ksp_u.getPC().setType("lu")
-        # ksp_p.setType("preonly")
-        # ksp_p.getPC().setType("lu")
-        ksp_u.setType("gmres")
-        ksp_u.getPC().setType("asm")
-        ksp_p.setType("preonly")
-        ksp_p.getPC().setType("asm")
-
-        ksp_u.getPC().setUp()
-        ksp_p.getPC().setUp()
-
         opts = PETSc.Options()
-        opts["nonlinear_snes_max_it"] = 100
-        opts["nonlinear_snes_monitor"] = ""
-        opts["nonlinear_ksp_max_it"] = 1000
-        opts["nonlinear_ksp_gmres_restart"] = 200
+        prefix = "nonlinear_"
+        opts[f"{prefix}snes_rtol"] = 1.0e-04
+        opts[f"{prefix}snes_max_it"] = 50
+        opts[f"{prefix}snes_ksp_ew"] = True
+
+        opts[f"{prefix}ksp_converged_reason"] = ""
+        opts[f"{prefix}ksp_max_it"] = 10000
+
+        opts[f"{prefix}fieldsplit_p_pc_type"] = "lsc"
+        opts[f"{prefix}fieldsplit_p_ksp_type"] = "preonly"
+        opts[f"{prefix}fieldsplit_u_ksp_type"] = "preonly"
+        opts[f"{prefix}fieldsplit_u_pc_type"] = "lu"
+        opts[f"{prefix}fieldsplit_u_pc_factor_mat_solver_type"] = "mumps"
+        opts[f"{prefix}fieldsplit_p_lsc_ksp_type"] = "preonly"
+        opts[f"{prefix}fieldsplit_p_lsc_pc_type"] = "lu"
+
         snes.setFromOptions()
         snes.setUp()
 
@@ -292,25 +303,17 @@ class Solver(SolverBase):
 
         self.nullsp = PETSc.NullSpace().create(vectors=[vec_const], comm=self.mesh.comm)
 
-    def _updateResidual(self) -> None:
-        u_size_local = self.u_residual.x.petsc_vec.getLocalSize()
-        start_u, end_u = self.u_residual.x.petsc_vec.getOwnershipRange()
-        start_p, end_p = self.p_residual.x.petsc_vec.getOwnershipRange()
-
-        self.u_residual.x.petsc_vec.setValues(
-            range(start_u, end_u), self.b.array_r[:u_size_local]
-        )
-        self.p_residual.x.petsc_vec.setValues(
-            range(start_p, end_p), self.b.array_r[u_size_local:]
-        )
-        self.u_residual.x.petsc_vec.ghostUpdate(
-            addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
-        )
-        self.p_residual.x.petsc_vec.ghostUpdate(
-            addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
-        )
-
     def solveStep(self):
+        # Set BDF coefficients: BDF1 for first step, BDF2 thereafter
+        if self.step_count == 0:
+            self.bdf_a0.value = 1.0
+            self.bdf_a1.value = -1.0
+            self.bdf_a2.value = 0.0
+        else:
+            self.bdf_a0.value = 1.5
+            self.bdf_a1.value = -2.0
+            self.bdf_a2.value = 0.5
+
         if self.nullsp.test(self.A):
             self.A.setNullSpace(
                 self.nullsp
@@ -319,16 +322,20 @@ class Solver(SolverBase):
         self.nullsp.remove(self.x_n)  # creo que se puede quitar?
 
         self.solver.solve(None, self.x_n)
-        self.updateSolution(self.x_n)
-        self._updateResidual()
-
         its_snes = self.solver.getIterationNumber()
         its_ksp = self.solver.getLinearSolveIterations()
         PETSc.Sys.Print(
             f"Solver converged in {its_snes} nonlinear iterations"
             f" (with total number of {its_ksp} linear iterations)"
         )
+        self.updateSolution(self.x_n)
 
         reason = self.solver.getConvergedReason()
         if reason < 0:
             raise RuntimeError(f"Did not converge, reason: {reason}.")
+
+        # Save current u_prev (= u^n) into u_prev2 for the next step (= u^(n-1) there)
+        self.u_prev2.x.array[:] = self.u_prev.x.array[:]
+        self.u_prev2.x.scatter_forward()
+
+        self.step_count += 1

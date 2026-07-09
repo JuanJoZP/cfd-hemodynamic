@@ -16,9 +16,11 @@ if str(root_path) not in sys.path:
     sys.path.append(str(root_path))
 
 
+from src.utils.hpc import load_config
+
+
 def run_solving(config_path, output_base, job_idx=None, early_stop_override=None):
-    with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+    config = load_config(config_path)
 
     try:
         from mpi4py import MPI
@@ -76,27 +78,29 @@ def run_solving(config_path, output_base, job_idx=None, early_stop_override=None
         exp_dir.mkdir(parents=True, exist_ok=True)
 
         # Mesh location logic
-        mesh_path = (
-            exp_dir / "mesh.msh"
-        )  # Default: Look in the experiment folder itself
+        # 1. First try the experiment directory itself (current output_base)
+        # 2. Then try the 'meshes' sibling directory if output_base is in 'results'
+        mesh_path = None
 
-        if not mesh_path.exists():
-            # Fallback logic for legacy structures (results vs meshes)
-            if "results" in str(output_base):
-                alt_base = Path(str(output_base).replace("results", "meshes"))
-                alt_mesh_path = alt_base / exp_name / "mesh.msh"
-                if alt_mesh_path.exists():
-                    mesh_path = alt_mesh_path
+        search_dirs = [exp_dir]
+        if "results" in str(output_base):
+            alt_base = Path(str(output_base).replace("results", "meshes", 1))
+            search_dirs.append(alt_base / exp_name)
 
-        if not mesh_path.exists():
+        for s_dir in search_dirs:
+            candidate = s_dir / "mesh.msh"
+            if candidate.exists():
+                mesh_path = candidate
+                break
+
+        if not mesh_path:
             if rank == 0:
-                print(
-                    f"[WARN] No se encontró malla para {exp_name} en {mesh_path} (ni alternativos). Saltando..."
-                )
+                print(f"[WARN] No se encontró malla para {exp_name}.")
+                print(f"       Buscado en: {[str(d) for d in search_dirs]}")
             continue
 
         if rank == 0:
-            print(f"[SOLVE] {exp_name}", flush=True)
+            print(f"[SOLVE] {exp_name} (Mesh: {mesh_path})", flush=True)
 
         try:
             # 1. Obtener la CLASE del escenario con params de experimento 'congelados'
@@ -123,6 +127,11 @@ def run_solving(config_path, output_base, job_idx=None, early_stop_override=None
                     f"  [DEBUG] Creating Simulation object (solver={solver_name})...",
                     flush=True,
                 )
+            solver_passthrough = {
+                k: run_params[k]
+                for k in ("p_inlet", "p_outlet", "p_terminal", "beta_nitsche")
+                if k in run_params
+            }
             sim = Simulation(
                 name=exp_name,
                 simulation=ScenarioClass,
@@ -132,7 +141,8 @@ def run_solving(config_path, output_base, job_idx=None, early_stop_override=None
                 output_dir=output_base,
                 mu=run_params["mu"],
                 rho=run_params["rho"],
-                early_stop_tolerance=run_params["early_stop_tolerance"],
+                **({"early_stop_tolerance": run_params["early_stop_tolerance"]} if "early_stop_tolerance" in run_params else {}),
+                **solver_passthrough,
                 **{k: v for k, v in experiment.items() if k != "solver"},
             )
             if rank == 0:

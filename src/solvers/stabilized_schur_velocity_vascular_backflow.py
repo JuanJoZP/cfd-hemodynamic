@@ -1,9 +1,23 @@
-# SUPG, PSPG, and LSIC stabilization, newton linealization, full schur preconditioning
+# SUPG/PSPG/LSIC stabilization, Newton linearization, Schur fieldsplit preconditioner.
+# Inlet: strong Dirichlet parabolic velocity (from scenario).
+# Outlet: resistance BC p = R*Q + backflow stabilization (Moghadam et al. 2011, Eq. 10).
+#
+# Outlet traction: sigma·n = -p_c·n - rho*theta*(u·n)_- * u
+#   where p_c = R_resistance * Q (Q computed from u_prev), theta = beta_backflow,
+#   (u·n)_- = (u·n - |u·n|) / 2  (active only when flow reverses at the outlet).
+#   p_c is updated via fixed-point iteration between timesteps.
 
 from typing import Callable
 
 import numpy as np
-from dolfinx.fem import Constant, DirichletBC, Function, form, functionspace
+from dolfinx.fem import (
+    Constant,
+    DirichletBC,
+    Function,
+    assemble_scalar,
+    form,
+    functionspace,
+)
 from dolfinx.fem.petsc import (
     assemble_matrix_block,
     assemble_vector_block,
@@ -11,10 +25,11 @@ from dolfinx.fem.petsc import (
     create_vector_block,
 )
 from dolfinx.mesh import Mesh
+from mpi4py import MPI
 from petsc4py import PETSc
 from ufl import (
-    CellDiameter,
     FacetNormal,
+    Measure,
     MixedFunctionSpace,
     TestFunctions,
     TrialFunctions,
@@ -22,7 +37,6 @@ from ufl import (
     derivative,
     div,
     dot,
-    ds,
     dx,
     extract_blocks,
     ge,
@@ -48,17 +62,46 @@ class Solver(SolverBase):
         mu: float,
         f: list,
         initial_velocity: Callable[[np.ndarray], np.ndarray] = None,
-        **kwargs,
+        v_max: float = None,
+        p_grade: int = 1,
+        beta_backflow: float = 0.2,
+        R_resistance: float = None,
+        alpha_damping: float = 0.75,
     ):
+        if v_max is None:
+            raise ValueError(
+                "v_max is required for stabilized_schur_velocity_vascular_backflow. "
+                "Pass it via CLI: --v_max <value>"
+            )
+
+        if R_resistance is None:
+            raise ValueError(
+                "R_resistance is required for stabilized_schur_velocity_vascular_backflow. "
+                "Pass it via CLI: --R_resistance <value>"
+            )
+
+        self.v_max = float(v_max)
+        self.beta_backflow = float(beta_backflow)
+        self.R_resistance = float(R_resistance)
+        self.alpha_damping = float(alpha_damping)
+
+        if mesh.comm.rank == 0:
+            print(
+                f"[Solver] p_grade={p_grade}, v_max={self.v_max:.4f}, "
+                f"beta_backflow={self.beta_backflow:.2f}, "
+                f"R_resistance={self.R_resistance:.4e}, "
+                f"alpha_damping={self.alpha_damping:.2f}",
+                flush=True,
+            )
+
         super().__init__(mesh, dt, rho, mu, f)
 
         super().initVelocitySpace(
-            "Lagrange", mesh.topology.cell_name(), 1, shape=(mesh.geometry.dim,)
+            "Lagrange", mesh.topology.cell_name(), p_grade, shape=(mesh.geometry.dim,)
         )
-        super().initPressureSpace("Lagrange", mesh.topology.cell_name(), 1)
+        super().initPressureSpace("Lagrange", mesh.topology.cell_name(), p_grade)
 
         self.VQ = MixedFunctionSpace(self.V, self.Q)
-
         v, q = TestFunctions(self.VQ)
 
         if initial_velocity:
@@ -69,14 +112,13 @@ class Solver(SolverBase):
         p_sol = self.p_sol
         u_prev = self.u_prev
         u_mid = 0.5 * (u_sol + u_prev)
+        self.u_mid = u_mid
         n = FacetNormal(self.mesh)
 
         F = self.rho * inner(v, (u_sol - u_prev) / self.dt) * dx
         F += self.rho * dot(v, dot(u_mid, nabla_grad(u_mid))) * dx
         F -= inner(v, self.rho * self.f) * dx
         F += inner(self.epsilon(v), self.sigma(u_mid, p_sol, self.mu)) * dx
-        # probar p_prev en vez de p_sol
-        F += dot(p_sol * n, v) * ds - dot(mu * nabla_grad(u_mid) * n, v) * ds
         F += inner(q, div(u_mid)) * dx
 
         # stabilization terms
@@ -86,11 +128,8 @@ class Solver(SolverBase):
             mesh.topology.dim,
             np.arange(h.x.index_map.size_local + h.x.index_map.num_ghosts),
         )
-        # h = CellDiameter(self.mesh)
 
-        vnorm = sqrt(
-            inner(u_prev, u_prev)
-        )  # u_prev instead of u_sol to avoid nonlinearity after derivation
+        vnorm = sqrt(inner(u_prev, u_prev))
 
         R = self.rho * ((u_sol - u_prev) / self.dt + dot(u_mid, nabla_grad(u_mid)))
         R -= div(self.sigma(u_mid, p_sol, self.mu))
@@ -98,9 +137,7 @@ class Solver(SolverBase):
 
         # SUPG
         eps = Constant(self.mesh, np.finfo(PETSc.ScalarType()).resolution)
-        tau_supg1 = h / conditional(
-            ge((2.0 * vnorm), eps), (2.0 * vnorm), eps
-        )  # avoid division by zero
+        tau_supg1 = h / conditional(ge((2.0 * vnorm), eps), (2.0 * vnorm), eps)
         tau_supg2 = self.dt / 2.0
         tau_supg3 = (h * h) / (4.0 * (self.mu / self.rho))
         tau_supg = (
@@ -121,58 +158,7 @@ class Solver(SolverBase):
         F += F_supg + F_lsic
         F += F_pspg
         self.F = F
-
-    def updateSolution(self, x: PETSc.Vec) -> None:
-        "Updates the solution functions u_sol and p_sol with the values in x."
-        start_u, end_u = self.u_prev.x.petsc_vec.getOwnershipRange()
-        start_p, end_p = self.p_prev.x.petsc_vec.getOwnershipRange()
-        u_size_local = self.u_prev.x.petsc_vec.getLocalSize()
-
-        self.u_sol.x.petsc_vec.setValues(
-            range(start_u, end_u), x.array_r[:u_size_local]
-        )
-        self.p_sol.x.petsc_vec.setValues(
-            range(start_p, end_p), x.array_r[u_size_local:]
-        )
-        self.u_sol.x.petsc_vec.ghostUpdate(
-            addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
-        )
-        self.p_sol.x.petsc_vec.ghostUpdate(
-            addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
-        )
-
-    def assembleJacobian(
-        self,
-        snes: PETSc.SNES,
-        x: PETSc.Vec,
-        J_mat: PETSc.Mat,
-        P_mat: PETSc.Mat,
-        bcs: list[DirichletBC] = [],
-    ) -> None:
-        "Assembles the Jacobian matrix evaluated at u_sol and p_sol."
-        J_mat.zeroEntries()
-        assemble_matrix_block(J_mat, self.J_form, bcs)
-        J_mat.assemble()
-
-    def assembleResidual(
-        self,
-        snes: PETSc.SNES,
-        x: PETSc.Vec,
-        F_vec: PETSc.Vec,
-        bcs: list[DirichletBC] = [],
-    ) -> None:
-        "Assembles the residual vector evaluated at u_sol and p_sol, applies lifting and set_bcs so that the constrained dofs are = x_n - g."
-        with F_vec.localForm() as F_local:
-            F_local.set(0.0)
-
-        x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
-        self.updateSolution(x)
-        [bc.update() for bc in bcs]
-
-        assemble_vector_block(
-            F_vec, self.F_form, self.J_form, bcs=bcs, x0=x, alpha=-1.0
-        )
-        F_vec.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+        self._v_test = v
 
     def setup(
         self,
@@ -181,24 +167,60 @@ class Solver(SolverBase):
         facet_tags=None,
         tags=None,
     ) -> None:
-        # create linealizated problem
-        du, dp = TrialFunctions(self.VQ)
+        # 1. Outlet subdomain measure
+        ds_out = Measure(
+            "ds",
+            domain=self.mesh,
+            subdomain_data=facet_tags,
+            subdomain_id=tags["outlet"],
+        )
 
+        n = FacetNormal(self.mesh)
+        self._n = n
+        self._ds_out = ds_out
+        v = self._v_test
+        u = self.u_mid
+
+        # 2. Resistance outlet pressure p_c = R * Q  (Q from u_prev, updated after each step)
+        #    From IBP: −∫(σ·n)·v dΓ = −∫(2με(u)·n)·v dΓ + ∫p(v·n) dΓ
+        #    Replace p → p_c in the pressure boundary integral,
+        #    keep viscous boundary integral as natural (involves unknown u):
+        Q_init = assemble_scalar(form(dot(self.u_prev, n) * ds_out))
+        Q_init = self.mesh.comm.allreduce(Q_init, op=MPI.SUM)
+        p_c_val = self.R_resistance * abs(Q_init)
+        self._p_c = Constant(self.mesh, PETSc.ScalarType(p_c_val))
+        self.F += 0.5 * self._p_c * dot(v, n) * ds_out
+        self.F -= dot(dot(2 * self.mu * self.epsilon(u), n), v) * ds_out
+
+        # Flux form for resistance BC: Q = ∫_outlet u_prev·n dΓ
+        self._Q_form = form(dot(self.u_prev, n) * ds_out)
+
+        # 3. Backflow stabilization (Moghadam et al. 2011, Eq. 10):
+        #    -beta * <w, rho * (u·n)_- * u>_{Gamma_out}
+        #    (u·n)_- = (u·n - |u·n|) / 2   (negative when backflow)
+        #    Semi-implicit: use u_prev for (u·n)_- coefficient, u_mid for velocity.
+        u_prev = self.u_prev
+        un_prev = dot(u_prev, n)
+        un_minus = 0.5 * (un_prev - abs(un_prev))  # <= 0 when backflow, 0 otherwise
+        self.F -= self.beta_backflow * self.rho * un_minus * dot(u, v) * ds_out
+
+        # 4. Linearize and compile
+        du, dp = TrialFunctions(self.VQ)
         J = derivative(self.F, (self.u_sol, self.p_sol), (du, dp))
         self.F_form = form(extract_blocks(self.F))
         self.J_form = form(extract_blocks(J))
-
         self.A = create_matrix_block(self.J_form)
         self.b = create_vector_block(self.F_form)
-        self.x_n = self.b.duplicate()  # solution to the nth newton iteration
+        self.x_n = self.b.duplicate()
         self.offset = (
             self.V.dofmap.index_map.size_local + self.V.dofmap.index_map.num_ghosts
-        ) * self.V.dofmap.index_map_bs  # after this index values of x correspond to pressure, before to velocity
+        ) * self.V.dofmap.index_map_bs
 
+        # 5. Dirichlet BCs (wall no-slip + inlet parabolic from scenario)
         self.bcu_d = [bc.getBC(self.V) for bc in bcu]
-        self.bcp_d = [bc.getBC(self.Q) for bc in bcp]
+        self.bcp_d = []
 
-        # newton solver
+        # 6. SNES + Schur fieldsplit
         snes = PETSc.SNES().create(self.mesh.comm)
         snes.setOptionsPrefix("nonlinear_")
         snes.setType("newtonls")
@@ -212,20 +234,15 @@ class Solver(SolverBase):
             kargs={"bcs": [*self.bcu_d, *self.bcp_d]},
         )
 
-        # x is the initial guess for the newton iteration = solution at previous time step
         start, end = self.x_n.getOwnershipRange()
         u_size_local = self.u_prev.x.petsc_vec.getLocalSize()
         self.x_n.setValues(range(start, start + u_size_local), self.u_prev.x.petsc_vec)
-        self.x_n.setValues(
-            range(start + u_size_local, end),
-            self.p_prev.x.petsc_vec,
-        )
+        self.x_n.setValues(range(start + u_size_local, end), self.p_prev.x.petsc_vec)
         self.x_n.assemble()
 
-        # fgmres global solver with field split (schur) preconditioner
         ksp = snes.getKSP()
         ksp.setType("fgmres")
-        snes.computeJacobian(self.x_n, self.A)  # asemble A in order to set up PC
+        snes.computeJacobian(self.x_n, self.A)
         ksp.setOperators(self.A)
 
         pc = ksp.getPC()
@@ -252,16 +269,11 @@ class Solver(SolverBase):
         pc.setFieldSplitIS(("u", is_u), ("p", is_p))
         pc.setUp()
 
-        # set solvers for schur and pressure blocks
         ksp_u, ksp_p = pc.getFieldSplitSchurGetSubKSP()
-        # ksp_u.setType("preonly")
-        # ksp_u.getPC().setType("lu")
-        # ksp_p.setType("preonly")
-        # ksp_p.getPC().setType("lu")
         ksp_u.setType("gmres")
-        ksp_u.getPC().setType("asm")
+        ksp_u.getPC().setType("lu")
         ksp_p.setType("preonly")
-        ksp_p.getPC().setType("asm")
+        ksp_p.getPC().setType("lu")
 
         ksp_u.getPC().setUp()
         ksp_p.getPC().setUp()
@@ -279,18 +291,65 @@ class Solver(SolverBase):
 
         self.solver = snes
 
-        # constant pressure null space
+        # Constant pressure null space
         vec_const = self.A.createVecs()[0]
         vec_const.set(0.0)
         indices_p = is_p.getIndices()
         for i in indices_p:
             vec_const.setValue(i, 1.0)
         vec_const.assemble()
-
         norm = vec_const.norm(PETSc.NormType.NORM_2)
-        vec_const.scale(1.0 / norm)  # normalize
-
+        vec_const.scale(1.0 / norm)
         self.nullsp = PETSc.NullSpace().create(vectors=[vec_const], comm=self.mesh.comm)
+
+    def updateSolution(self, x: PETSc.Vec) -> None:
+        start_u, end_u = self.u_prev.x.petsc_vec.getOwnershipRange()
+        start_p, end_p = self.p_prev.x.petsc_vec.getOwnershipRange()
+        u_size_local = self.u_prev.x.petsc_vec.getLocalSize()
+
+        self.u_sol.x.petsc_vec.setValues(
+            range(start_u, end_u), x.array_r[:u_size_local]
+        )
+        self.p_sol.x.petsc_vec.setValues(
+            range(start_p, end_p), x.array_r[u_size_local:]
+        )
+        self.u_sol.x.petsc_vec.ghostUpdate(
+            addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
+        )
+        self.p_sol.x.petsc_vec.ghostUpdate(
+            addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
+        )
+
+    def assembleJacobian(
+        self,
+        snes: PETSc.SNES,
+        x: PETSc.Vec,
+        J_mat: PETSc.Mat,
+        P_mat: PETSc.Mat,
+        bcs: list[DirichletBC] = [],
+    ) -> None:
+        J_mat.zeroEntries()
+        assemble_matrix_block(J_mat, self.J_form, bcs)
+        J_mat.assemble()
+
+    def assembleResidual(
+        self,
+        snes: PETSc.SNES,
+        x: PETSc.Vec,
+        F_vec: PETSc.Vec,
+        bcs: list[DirichletBC] = [],
+    ) -> None:
+        with F_vec.localForm() as F_local:
+            F_local.set(0.0)
+
+        x.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+        self.updateSolution(x)
+        [bc.update() for bc in bcs]
+
+        assemble_vector_block(
+            F_vec, self.F_form, self.J_form, bcs=bcs, x0=x, alpha=-1.0
+        )
+        F_vec.ghostUpdate(addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
 
     def _updateResidual(self) -> None:
         u_size_local = self.u_residual.x.petsc_vec.getLocalSize()
@@ -310,13 +369,30 @@ class Solver(SolverBase):
             addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD
         )
 
+    def _compute_outlet_flux(self) -> float:
+        """Compute Q = ∫_outlet u_prev·n dΓ (scalar, positive = outflow)."""
+        Q_local = assemble_scalar(self._Q_form)
+        return self.mesh.comm.allreduce(Q_local, op=MPI.SUM)
+
+    def _update_outlet_pressure(self) -> None:
+        """Update outlet pressure from resistance model with damping:
+        p_c^{n+1} = alpha * R * Q + (1 - alpha) * p_c^{n}
+        """
+        Q = self._compute_outlet_flux()
+        p_new = self.R_resistance * abs(Q)
+        p_old = float(self._p_c.value)
+        p_c_val = self.alpha_damping * p_new + (1 - self.alpha_damping) * p_old
+        self._p_c.value = p_c_val
+        PETSc.Sys.Print(
+            f"  Resistance BC: Q={Q:.6e}, p_new={p_new:.4f}, "
+            f"p_damped={p_c_val:.4f} (alpha={self.alpha_damping:.2f})"
+        )
+
     def solveStep(self):
         if self.nullsp.test(self.A):
-            self.A.setNullSpace(
-                self.nullsp
-            )  # esto deberia moverse a setup pero da error
+            self.A.setNullSpace(self.nullsp)
 
-        self.nullsp.remove(self.x_n)  # creo que se puede quitar?
+        self.nullsp.remove(self.x_n)
 
         self.solver.solve(None, self.x_n)
         self.updateSolution(self.x_n)
@@ -332,3 +408,6 @@ class Solver(SolverBase):
         reason = self.solver.getConvergedReason()
         if reason < 0:
             raise RuntimeError(f"Did not converge, reason: {reason}.")
+
+        # Fixed-point update: compute outlet flux → update outlet pressure for next step
+        self._update_outlet_pressure()

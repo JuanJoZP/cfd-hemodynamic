@@ -82,12 +82,16 @@ def generate_vascusynth_tree(params, tmp_dir="src/geom/tree/tmp", bind=False):
     if bind:
         cmd.extend(["--bind", "."])
 
+    gxl_path = os.path.join(tmp_dir, "output", "tree_structure.xml")
+
+    if os.path.exists(gxl_path):
+        print(f"[INFO] Reusing cached VascuSynth GXL: {gxl_path}")
+        return gxl_path
+
     print(f"[INFO] Running VascuSynth wrapper: {' '.join(cmd)}")
     result = subprocess.run(cmd)
     if result.returncode != 0:
         print(f"[ERROR] VascuSynth failed with code {result.returncode}")
         raise RuntimeError("VascuSynth execution failed")
 
-    # El GXL de salida estará en tmp/output/output.gxl
-    gxl_path = os.path.join(tmp_dir, "output", "tree_structure.xml")
     return gxl_path

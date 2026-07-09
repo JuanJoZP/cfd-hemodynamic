@@ -25,5 +25,6 @@ disable = [
     "too-few-public-methods",
     "broad-exception-caught",
     "unspecified-encoding",
+    "invalid-name",
     "C0415",
 ]

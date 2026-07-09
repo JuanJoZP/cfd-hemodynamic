@@ -24,5 +24,10 @@ vascusynth.sif
 *.fdb_latexmk
 *.fls
 *.synctex.gz
+*.nav
+*.snm
 *.pdf
 .vscode/
+*.toc
+*.xcf
+figures/

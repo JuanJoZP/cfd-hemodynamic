@@ -1,0 +1,24 @@
+base_params:
+  p_inlet: 1000.0
+  p_terminal: 0.0
+
+artery_params:
+  radius_in: 1.5
+  radius_out: 0.65
+  length: 80
+  stenosis_slope: 0.2
+
+simulation_params:
+  rho: 1.06e-3
+  mu: 3.5e-3
+  dt: 0.01
+  T: inf
+  bc_type:
+    inlet: "pressure"
+    outlet: "pressure"
+
+matrix:
+  stenosis_severity: [0, 0.4]
+  artery_mesh_size_from_curvature: [20, 22, 24, 26]
+  solver: ["stabilized_pcd", "stabilized_lsc"]
+  geometry_type: ["stenosis"]

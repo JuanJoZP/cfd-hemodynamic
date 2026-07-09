@@ -44,14 +44,14 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
             self.base_params = base_params
 
             # Cargar malla de GMSH
-            self._mesh, self.mt, self.ft = gmshio.read_from_msh(
+            self._mesh, self.mt, self._ft = gmshio.read_from_msh(
                 str(self._mesh_path), MPI.COMM_WORLD, 0, gdim=3
             )
 
             # Tags definidos en stenosis.py
-            self.INLET_TAG = INLET_TAG
-            self.OUTLET_TAG = OUTLET_TAG
-            self.WALL_TAG = WALL_TAG
+            self.inlet_marker = INLET_TAG
+            self.outlet_marker = OUTLET_TAG
+            self.wall_marker = WALL_TAG
 
             super().__init__(
                 solver_name=solver_name,
@@ -61,6 +61,7 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
                 dt=dt,
                 T=T,
                 f=f,
+                **kwargs,
             )
 
         @property
@@ -71,9 +72,6 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
         def bcu(self):
             is_hyper = self.experiment_params.get(
                 "hyperemia", self.base_params.get("hyperemia", False)
-            )
-            q_val = (
-                self.base_params["q_in_hyper"] if is_hyper else self.base_params["q_in"]
             )
 
             bc_type_raw = self.experiment_params.get(
@@ -86,16 +84,21 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
             # Common: Wall No-Slip
             u_nonslip = Function(self.solver.V)
             u_nonslip.x.array[:] = 0.0
-            entities_walls = self.ft.find(self.WALL_TAG)
+            entities_walls = self._ft.find(self.wall_marker)
             bcu_walls = BoundaryCondition(u_nonslip)
             bcu_walls.initTopological(fdim, entities_walls)
 
             bcs = [bcu_walls]
 
             # Inlet Configs
-            entities_inflow = self.ft.find(self.INLET_TAG)
+            entities_inflow = self._ft.find(self.inlet_marker)
 
             if bc_inlet in ("velocity_parabolic", "default"):
+                q_val = (
+                    self.base_params["q_in_hyper"]
+                    if is_hyper
+                    else self.base_params["q_in"]
+                )
                 # Parabolic velocity profile
                 r_in = self.base_params["radius_in"]
                 area = np.pi * r_in**2
@@ -117,6 +120,11 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
             elif bc_inlet == "velocity_constant":
                 # Constant (plug) velocity profile
                 r_in = self.base_params["radius_in"]
+                q_val = (
+                    self.base_params["q_in_hyper"]
+                    if is_hyper
+                    else self.base_params["q_in"]
+                )
                 area = np.pi * r_in**2
                 v_avg = q_val / area
 
@@ -147,7 +155,7 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
                 # Zero velocity at outlet (wall-like blockage)
                 u_outlet = Function(self.solver.V)
                 u_outlet.x.array[:] = 0.0
-                entities_outlet = self.ft.find(self.OUTLET_TAG)
+                entities_outlet = self._ft.find(self.outlet_marker)
                 bcu_outlet = BoundaryCondition(u_outlet)
                 bcu_outlet.initTopological(fdim, entities_outlet)
 
@@ -169,7 +177,7 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
                 p_val = self.base_params.get("p_terminal", 0.0)
                 p_out = Function(self.solver.Q)
                 p_out.x.array[:] = float(p_val)
-                outflow_entities = self.ft.find(self.OUTLET_TAG)
+                outflow_entities = self._ft.find(self.outlet_marker)
                 bc_outflow = BoundaryCondition(p_out)
                 bc_outflow.initTopological(fdim, outflow_entities)
                 bcs.append(bc_outflow)
@@ -181,7 +189,7 @@ def create_experiment_scenario_class(mesh_path, experiment_params, base_params):
                 )
                 p_in = Function(self.solver.Q)
                 p_in.x.array[:] = float(p_in_val)
-                inflow_entities = self.ft.find(self.INLET_TAG)
+                inflow_entities = self._ft.find(self.inlet_marker)
                 bc_inflow = BoundaryCondition(p_in)
                 bc_inflow.initTopological(fdim, inflow_entities)
                 bcs.append(bc_inflow)

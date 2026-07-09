@@ -32,6 +32,7 @@ tar -czvf "$OUTPUT_FILE" \
     --exclude='results' \
     --exclude='*.sif' \
     src/ \
+    scripts/ \
     *.py \
 
 echo ""
