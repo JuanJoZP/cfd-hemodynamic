@@ -12,6 +12,7 @@ Simulaciones de dinámica de fluidos computacional (CFD) para aplicaciones hemod
 - [Ejecución en HPC con SLURM](#ejecución-en-hpc-con-slurm)
 - [Escenarios](#escenarios-srcscenarios)
 - [Solvers](#solvers-srcsolvers)
+- [Contribuciones](#contribuciones)
 - [Uso del CLI](#uso-del-cli)
 
 ## Descripción
